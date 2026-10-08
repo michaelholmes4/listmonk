@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldUser,
   Upload,
+  Workflow,
   Users,
   Wrench,
 } from '@lucide/vue'
@@ -123,6 +124,19 @@ export const navigation: NavGroup[] = [
         to: { name: 'campaign-analytics' },
       },
     ],
+  },
+  {
+    key: 'automations',
+    label: 'web.automations.title',
+    icon: Workflow,
+    perms: ['automations:get'],
+    leaf: {
+      key: 'automations',
+      label: 'web.automations.title',
+      icon: Workflow,
+      perms: ['automations:get'],
+      to: { name: 'automations' },
+    },
   },
   {
     key: 'users',

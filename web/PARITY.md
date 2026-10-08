@@ -44,3 +44,12 @@ Routes derive from `frontend/src/router/index.js`.
 
 `pnpm spec:coverage` lists routes missing from `docs/swagger/collections.yaml` (a few misc: settings by key,
 exports, subscriber PATCH). Document each when its screen is ported.
+
+## librelist-only screens (no classic equivalent)
+
+| Route | Screen | Notes |
+|---|---|---|
+| `/automations` | Automations | Search, status filter, sort, paging, create, pause/resume/archive/delete (confirmed) |
+| `/automations/:id` | Builder | Flow tab (triggers, vertical steps, condition branches side by side, per-step settings sheet, draft/publish bar, unsaved-changes guard, Ctrl+S), Activity (enrollments, per-person step log), Settings (re-entry, send window, timezone, goal), Versions. An email step is written with the campaign editor inside the step. Tested end to end (`e2e/automations.spec.ts`, `e2e/automations-api.spec.ts`) |
+| `/subscribers/:id` → Automations tab | Subscriber automations | The automations a subscriber is or was in, and their tracked events |
+| `/settings/maintenance` → Tracked events | Event cleanup | Deletes events older than a date |

@@ -1,9 +1,10 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
+import { expect, test, type APIResponse } from '@playwright/test'
 
 // The automation API and /api/track, driven end to end against the real backend. No screen yet
 // (that is the builder's job); this pins the contract the builder will use.
 
-async function data<T = any>(res: Awaited<ReturnType<APIRequestContext['get']>>): Promise<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test helper over untyped JSON
+async function data<T = any>(res: APIResponse): Promise<T> {
   expect(res.ok(), await res.text()).toBeTruthy()
   return (await res.json()).data as T
 }

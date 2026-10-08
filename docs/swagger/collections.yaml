@@ -5534,10 +5534,13 @@ components:
     AutomationRule:
       type: object
       description: >-
-        A condition. A group has `all` or `any` (lists of rules); a leaf has a `field` (a subscriber field, `attribs.x`,
-        `list:<id>`, `event:<name>`, `opened:<campaign id>`, `clicked:<campaign id>`) with an `op` and a `value`. Raw SQL
-        (`sql`) needs the `subscribers:sql_query` permission. Opened and clicked rules only work when
-        `privacy.individual_tracking` is on.
+        A condition. A group has `op` (`and` or `or`) and `rules`. A leaf has a `type`: `attribute` (`path` such as
+        `plan` or `address.city`, an `operator` of eq, neq, contains, gt, gte, lt, lte, exists, not_exists, and a
+        `value`), `subscriber` (`path` email, name or status), `list` (`list_id` and an `operator` of is_member,
+        is_not_member, confirmed, unsubscribed), `step` (`node_id` of an earlier email step and an `operator` of opened,
+        not_opened, clicked, not_clicked), `event` (`name`, an `operator` of occurred or not_occurred, and an optional
+        `within` such as `7d`) or `sql` (`query`). Raw SQL needs the `subscribers:sql_query` permission. Opened and
+        clicked rules only work when `privacy.individual_tracking` is on.
       additionalProperties: true
     AutomationRequest:
       type: object

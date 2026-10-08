@@ -6,7 +6,8 @@ import { needsRestart, waitForReload, type SaveOutcome } from '@/features/settin
 import { i18n } from '@/i18n'
 import { keys } from './keys'
 
-export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: api.getSettings, staleTime: 0, gcTime: 0 })
+export const useSettings = (o: { enabled?: boolean } = {}) =>
+  useQuery({ queryKey: keys.settings, queryFn: api.getSettings, staleTime: 0, gcTime: 0, enabled: o.enabled ?? true })
 
 /**
  * Saving settings reloads the server. Unless campaigns are running (then the app only flags that a

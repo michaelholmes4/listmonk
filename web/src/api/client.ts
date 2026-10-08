@@ -3,11 +3,14 @@ import axios, { type AxiosRequestConfig } from 'axios'
 /** Error thrown by every API call. `message` is safe to show to the user. */
 export class ApiError extends Error {
   readonly status: number
+  /** The response's `data`, when an error carries structured detail (e.g. publish problems). */
+  readonly data?: unknown
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.data = data
   }
 
   /**
@@ -48,9 +51,9 @@ http.interceptors.response.use(
     if (!axios.isAxiosError(err)) throw err
 
     const status = err.response?.status ?? 0
-    const body = err.response?.data as { message?: string } | undefined
+    const body = err.response?.data as { message?: string; data?: unknown } | undefined
 
-    const apiErr = new ApiError(body?.message || err.message, status)
+    const apiErr = new ApiError(body?.message || err.message, status, body?.data)
     // No session or session expired: go through the server-rendered login, which returns here.
     if (apiErr.unauthenticated) window.location.assign(loginURL())
     throw apiErr

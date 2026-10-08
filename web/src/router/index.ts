@@ -53,6 +53,22 @@ export const router = createRouter({
       meta: { title: 'globals.terms.list', parents: [{ title: 'globals.terms.lists', to: { name: 'lists' } }] },
     },
     {
+      path: '/automations',
+      name: 'automations',
+      component: () => import('@/views/automations/AutomationList.vue'),
+      meta: { title: 'web.automations.title', perms: ['automations:get'] },
+    },
+    {
+      path: '/automations/:id(\\d+)',
+      name: 'automation',
+      component: () => import('@/views/automations/AutomationEdit.vue'),
+      meta: {
+        title: 'web.automations.automation',
+        parents: [{ title: 'web.automations.title', to: { name: 'automations' } }],
+        perms: ['automations:get'],
+      },
+    },
+    {
       path: '/campaigns',
       name: 'campaigns',
       component: () => import('@/views/campaigns/CampaignList.vue'),

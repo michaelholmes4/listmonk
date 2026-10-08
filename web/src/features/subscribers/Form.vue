@@ -29,6 +29,7 @@ import { useGoBack } from '@/composables/useGoBack'
 import { usePermission } from '@/composables/usePermission'
 import ListPicker from '@/features/lists/ListPicker.vue'
 import SubscriberActivity from './SubscriberActivity.vue'
+import SubscriberAutomations from './SubscriberAutomations.vue'
 import { emptySubscriber, parseAttribs, subscriberSchema, toForm } from './schema'
 import type { Subscriber } from '@/api/types'
 
@@ -146,6 +147,7 @@ const statusVariant = (s?: string) => (s === 'blocklisted' ? 'destructive' : s =
               {{ t('globals.terms.bounces') }} ({{ bounces?.length ?? 0 }})
             </TabsTrigger>
             <TabsTrigger value="activity" :disabled="!isEditing">{{ t('subscribers.activity') }}</TabsTrigger>
+            <TabsTrigger v-if="can('automations:get')" value="automations" :disabled="!isEditing">{{ t('web.automations.title') }}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="lists" class="space-y-3 pt-3">
@@ -255,6 +257,10 @@ const statusVariant = (s?: string) => (s === 'blocklisted' ? 'destructive' : s =
 
           <TabsContent value="activity" class="pt-3">
             <SubscriberActivity v-if="subscriberId !== undefined && tab === 'activity'" :subscriber-id="subscriberId" />
+          </TabsContent>
+
+          <TabsContent v-if="can('automations:get')" value="automations" class="pt-3">
+            <SubscriberAutomations v-if="subscriberId !== undefined && tab === 'automations'" :subscriber-id="subscriberId" />
           </TabsContent>
         </Tabs>
 
