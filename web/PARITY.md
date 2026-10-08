@@ -7,8 +7,8 @@ Routes derive from `frontend/src/router/index.js`.
 | Done | Route | Classic view | Notes |
 |:---:|---|---|---|
 | ◐ | `/` dashboard | Dashboard | Counts, breakdowns and both charts done. Left: "slow queries cached" note (needs `app.cache_slow_queries` from `/api/settings`) and the global refresh action |
-| ☐ | `/lists` | Lists | |
-| ☐ | `/lists/:id` | List form | |
+| ◐ | `/lists` | Lists | Search, archived view, sort, paging, create/edit/delete, bulk delete ("select all N" resolves IDs first; the backend's delete-by-query ignores the status filter), opt-in campaign shortcut. Left: "slow queries cached" note (needs `app.cache_slow_queries`). Opt-in campaign, send-campaign and import links still hand off to the classic UI until those screens are ported |
+| ☑ | `/lists/:id` | List form | Sheet: name, type, opt-in, tags, description, archive; read-only without `list:manage` |
 | ☐ | `/lists/forms` | Forms generator | |
 | ◐ | `/subscribers` | Subscribers | Search, advanced SQL query (gated by `subscribers:sql_query`), list/status filter, sort, paging, export, bulk blocklist/delete/manage lists, row actions. e2e covers by-ID bulk; the "select all N" by-query path is not covered yet |
 | ☑ | `/subscribers/:id` | Subscriber form | Sheet over the table: lists, preconfirm, send opt-in, subscriptions, bounces, activity, attributes |

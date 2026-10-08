@@ -3,7 +3,12 @@ export const keys = {
   config: ['config'] as const,
   profile: ['profile'] as const,
   about: ['about'] as const,
-  lists: { all: ['lists'] as const, minimal: ['lists', 'minimal'] as const },
+  lists: {
+    all: ['lists'] as const,
+    minimal: ['lists', 'minimal'] as const,
+    page: (q: unknown) => ['lists', 'page', q] as const,
+    detail: (id: number) => ['lists', 'detail', id] as const,
+  },
   subscribers: {
     all: ['subscribers'] as const,
     page: (q: unknown) => ['subscribers', 'page', q] as const,

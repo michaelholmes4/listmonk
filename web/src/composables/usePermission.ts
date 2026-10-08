@@ -16,7 +16,8 @@ export function usePermission() {
 
   /** Per-list permission from the user's list role. Global list permissions cover every list. */
   function canList(listId: number, perm: 'list:get' | 'list:manage'): boolean {
-    if (can('lists:get_all', 'lists:manage_all')) return true
+    // Mirrors auth.User.GetPermittedLists: each global permission covers only its own type.
+    if (can(perm === 'list:get' ? 'lists:get_all' : 'lists:manage_all')) return true
     const lists = profile.value?.list_role?.lists ?? []
     return lists.some((l) => l.id === listId && l.permissions?.includes(perm))
   }

@@ -484,7 +484,8 @@ export interface paths {
         put?: never;
         /** @description handles list creation */
         post: operations["createList"];
-        delete?: never;
+        /** @description deletes lists by ids, or every list matching `query` (or all of them with `all`) */
+        delete: operations["deleteLists"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1925,6 +1926,12 @@ export interface components {
             optin?: string;
             tags?: string[];
             subscriber_count?: number;
+            /** @description Subscription counts by status (unconfirmed, confirmed, unsubscribed). */
+            subscriber_statuses?: {
+                [key: string]: number;
+            };
+            /** @enum {string} */
+            status?: "active" | "archived";
             description?: string;
         };
         NewList: {
@@ -1933,6 +1940,8 @@ export interface components {
             type?: "public" | "private";
             /** @enum {string} */
             optin?: "single" | "double";
+            /** @enum {string} */
+            status?: "active" | "archived";
             tags?: string[];
             description?: string;
         };
@@ -3081,10 +3090,16 @@ export interface operations {
                 per_page?: number | "all";
                 /** @description Optional string to search a list by name. */
                 query?: string;
-                /** @description Field to sort results by. name|status|created_at|updated_at */
-                order_by?: "name" | "status" | "created_at" | "updated_at";
+                /** @description Field to sort results by. */
+                order_by?: "name" | "status" | "created_at" | "updated_at" | "subscriber_count";
                 /** @description ASC|DESC Sort by ascending or descending order. */
                 order?: "ASC" | "DESC";
+                /** @description Filter by list type. */
+                type?: "public" | "private";
+                /** @description Filter by opt-in type. */
+                optin?: "single" | "double";
+                /** @description Filter by status. Archived lists are hidden unless asked for. */
+                status?: "active" | "archived";
                 /** @description When set to true, returns response without body content */
                 minimal?: boolean;
                 /** @description Tags to filter lists. Repeat in the query for multiple values. */
@@ -3136,6 +3151,35 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["List"];
+                    };
+                };
+            };
+        };
+    };
+    deleteLists: {
+        parameters: {
+            query?: {
+                /** @description List ids to delete. Repeat in the query for multiple values. */
+                id?: number[];
+                /** @description Delete every list whose name matches. */
+                query?: string;
+                /** @description Delete every list the user may manage (with or without a query). */
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
                     };
                 };
             };

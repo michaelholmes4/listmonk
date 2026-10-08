@@ -34,5 +34,6 @@
   "web.common.view": "View",
   "web.common.all": "All",
   "web.common.refreshing": "Refreshing…",
-  "web.subscribers.campaignDeleted": "Campaign deleted"
+  "web.subscribers.campaignDeleted": "Campaign deleted",
+  "web.common.selectAll": "Select all"
 }

@@ -57,7 +57,7 @@ export const navigation: NavGroup[] = [
     label: 'globals.terms.lists',
     icon: List,
     children: [
-      { key: 'lists', label: 'menu.allLists', icon: List, legacy: '/admin/lists' },
+      { key: 'lists', label: 'menu.allLists', icon: List, to: { name: 'lists' } },
       { key: 'forms', label: 'menu.forms', icon: Newspaper, legacy: '/admin/lists/forms' },
     ],
   },

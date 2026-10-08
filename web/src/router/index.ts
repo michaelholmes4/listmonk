@@ -28,6 +28,16 @@ export const router = createRouter({
       meta: { title: 'menu.dashboard' },
     },
     ...[
+      { path: '/lists', name: 'lists' },
+      { path: '/lists/new', name: 'list-new' },
+      { path: '/lists/:id(\\d+)', name: 'list' },
+    ].map((r) => ({
+      ...r,
+      // Same pattern as subscribers: the sheet is the list view with the sheet open.
+      component: () => import('@/views/lists/ListsView.vue'),
+      meta: { title: 'globals.terms.lists' },
+    })),
+    ...[
       { path: '/subscribers', name: 'subscribers' },
       { path: '/subscribers/new', name: 'subscribers-new' },
       { path: '/subscribers/:id(\\d+)', name: 'subscriber' },

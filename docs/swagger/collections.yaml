@@ -1026,11 +1026,11 @@ paths:
             type: string
         - in: query
           name: order_by
-          description: Field to sort results by. name|status|created_at|updated_at
+          description: Field to sort results by.
           required: false
           schema:
             type: string
-            enum: ["name", "status", "created_at", "updated_at"]
+            enum: ["name", "status", "created_at", "updated_at", "subscriber_count"]
         - in: query
           name: order
           description: ASC|DESC Sort by ascending or descending order.
@@ -1038,6 +1038,27 @@ paths:
           schema:
             type: string
             enum: ["ASC", "DESC"]
+        - in: query
+          name: type
+          description: Filter by list type.
+          required: false
+          schema:
+            type: string
+            enum: [public, private]
+        - in: query
+          name: optin
+          description: Filter by opt-in type.
+          required: false
+          schema:
+            type: string
+            enum: [single, double]
+        - in: query
+          name: status
+          description: Filter by status. Archived lists are hidden unless asked for.
+          required: false
+          schema:
+            type: string
+            enum: [active, archived]
         - in: query
           name: minimal
           description: When set to true, returns response without body content
@@ -1073,6 +1094,43 @@ paths:
                         type: integer
                       page:
                         type: integer
+
+    delete:
+      description: deletes lists by ids, or every list matching `query` (or all of them with `all`)
+      operationId: deleteLists
+      tags:
+        - Lists
+      parameters:
+        - in: query
+          name: id
+          description: List ids to delete. Repeat in the query for multiple values.
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+        - in: query
+          name: query
+          description: Delete every list whose name matches.
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: all
+          description: Delete every list the user may manage (with or without a query).
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
 
     post:
       description: handles list creation
@@ -4219,6 +4277,14 @@ components:
             type: string
         subscriber_count:
           type: integer
+        subscriber_statuses:
+          type: object
+          description: Subscription counts by status (unconfirmed, confirmed, unsubscribed).
+          additionalProperties:
+            type: integer
+        status:
+          type: string
+          enum: [active, archived]
         description:
           type: string
 
@@ -4233,6 +4299,9 @@ components:
         optin:
           type: string
           enum: [single, double]
+        status:
+          type: string
+          enum: [active, archived]
         tags:
           type: array
           items:
