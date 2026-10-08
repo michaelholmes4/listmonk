@@ -114,6 +114,9 @@ type Manager struct {
 type CampaignMessage struct {
 	Campaign   *models.Campaign
 	Subscriber models.Subscriber
+	// librelist fork: set for automation email steps (see fork.go).
+	Event      map[string]any
+	Automation map[string]any
 
 	from     string
 	to       string

@@ -86,3 +86,23 @@ func TestSchemaIsUsable(t *testing.T) {
 		}
 	}
 }
+
+func TestDashboardCountsIgnoreAutomationCampaigns(t *testing.T) {
+	db := testdb.New(t)
+	ctx := context.Background()
+	if err := Run(ctx, db, quiet); err != nil {
+		t.Fatal(err)
+	}
+	for _, typ := range []string{"regular", "regular", "automation", "automation", "automation"} {
+		if _, err := db.Exec(`INSERT INTO campaigns (uuid, name, subject, from_email, body, messenger, type) VALUES (gen_random_uuid(), 'c', 's', 'a@b.c', 'b', 'email', $1::campaign_type)`, typ); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`REFRESH MATERIALIZED VIEW mat_dashboard_counts`); err != nil {
+		t.Fatal(err)
+	}
+	var total int
+	if err := db.Get(&total, `SELECT (data->'campaigns'->>'total')::INT FROM mat_dashboard_counts`); err != nil || total != 2 {
+		t.Fatalf("campaign total = %d (%v), want 2", total, err)
+	}
+}

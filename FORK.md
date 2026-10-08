@@ -9,8 +9,11 @@ git merge upstream/master        # or a release tag
 ```
 Known conflict hotspots (the only upstream files we edit):
 - `cmd/handlers.go` (routes), `cmd/init.go` (wiring), `cmd/upgrade.go` (fork-migration call)
-- `queries/campaigns.sql` (exclude `automation` campaigns from the manager and default list)
-- `internal/core/subscribers.go` (automation trigger hooks)
+- `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list and the dashboard counts)
+- `internal/core/core.go`, `subscribers.go`, `subscriptions.go` (automation trigger hooks: `Hooks.OnSubscriptionsConfirmed`
+  / `OnAttribsChanged`, and one `forkBegin`/`forkEnd` pair around each mutation; the logic is in `fork_hooks.go`)
+- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`)
+- `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `eng.Stop` in the shutdown closure)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
 - `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`)
@@ -29,8 +32,31 @@ themes them via `static/public/static/librelist-auth.css`, scoped to `section.lo
 subscriber pages are untouched. Post-login `next` still defaults to `/admin` until Phase 7.
 
 Everything else we add lives in new files: `web/`, `internal/automation/`,
-`internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/track.go`,
-`cmd/web.go`, `static/public/static/librelist-auth.css`.
+`internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/automation_sender.go`,
+`cmd/track.go`, `cmd/web.go`, `static/public/static/librelist-auth.css`.
+
+## Automation: things to know
+- **Engine.** River (poll-only, one job kind) drives `internal/automation`; one DB transaction per node. Email steps are
+  at-most-once per attempt (guard + `sending` row, send, finish); a failed send is retried, and the last failed
+  attempt marks the enrollment `failed`.
+- **Email content** is a hidden campaign (`campaigns.type = 'automation'`) per step, linked to the step's topic list so the
+  unsubscribe link records an opt-out. Automation campaigns are filtered out of every upstream campaign query and of the
+  manager's scan (`queries/campaigns.sql`); if a merge adds a new campaign query, check it excludes them.
+  A step's campaign is shared by all versions of the automation: editing it changes what in-flight enrollments send.
+- **Consent** (`internal/automation/consent.go`): blocklisted gets nothing; transactional is otherwise sent; marketing needs
+  an enabled subscriber who has not unsubscribed from the topic (and has confirmed, on a double opt-in list). `POST /api/tx`
+  keeps its upstream behaviour and does *not* check the blocklist: the two differ on purpose.
+- **Triggers** fire from core hooks after the mutation commits, in the background. "Joined a list" means a *live*
+  subscription: confirmed, or unconfirmed on a single opt-in list. The by-query bulk subscription endpoints
+  (`/api/subscribers/query/lists`) do not fire triggers. An automation that adds people to lists can start another
+  (chains are possible; the re-entry rule is what stops loops).
+- **Opened / clicked conditions** only work when `privacy.individual_tracking` is on (otherwise views and clicks carry no
+  subscriber). The builder should say so.
+- **Raw SQL conditions** need `subscribers:sql_query` to create or edit, run in a read-only transaction with a 5 s timeout.
+- **`POST /api/track`** merges `upsert_attribs` (top-level keys) into the subscriber *before* recording the event;
+  retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
+- **Retention.** `DELETE /api/maintenance/events?before_date=` prunes events. Deleting a subscriber cascades to their events
+  and enrollments.
 
 ## Migrations
 Fork migrations are a separate sequence in `internal/migrations/fork/`, tracked under the

@@ -52,6 +52,13 @@ type Constants struct {
 // Hooks contains external function hooks that are required by the core package.
 type Hooks struct {
 	SendOptinConfirmation func(models.Subscriber, []int) (int, error)
+
+	// librelist fork: automation triggers (see fork_hooks.go). Both are optional.
+	// OnSubscriptionsConfirmed is called with the lists a subscriber has just joined (a live subscription:
+	// confirmed, or unconfirmed on a single opt-in list).
+	OnSubscriptionsConfirmed func(subscriberID int, listIDs []int)
+	// OnAttribsChanged is called after a subscriber's attributes were saved.
+	OnAttribsChanged func(subscriberID int, before, after map[string]any)
 }
 
 // Opt contains the controllers required to start the core.

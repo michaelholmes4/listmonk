@@ -200,6 +200,9 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		g.POST("/api/tx", pm(a.SendTxMessage, "tx:send"))
 
+		// librelist: automations and event tracking.
+		initAutomationRoutes(g, a)
+
 		g.GET("/api/profile", a.GetUserProfile)
 		g.PUT("/api/profile", a.UpdateUserProfile)
 		g.GET("/api/users", pm(a.GetUsers, "users:get"))

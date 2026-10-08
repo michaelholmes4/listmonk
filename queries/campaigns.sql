@@ -71,6 +71,8 @@ SELECT  c.*,
     ) AS lists
 FROM campaigns c
 WHERE ($1 = 0 OR id = $1)
+    -- librelist: the hidden campaigns behind automation email steps are not listed.
+    AND ($1 > 0 OR c.type <> 'automation')
     AND (CARDINALITY($2::campaign_status[]) = 0 OR status = ANY($2))
     AND (CARDINALITY($3::VARCHAR(100)[]) = 0 OR $3 <@ tags)
     AND ($4 = '' OR TO_TSVECTOR(CONCAT(name, ' ', subject)) @@ TO_TSQUERY($4) OR CONCAT(c.name, ' ', c.subject) ILIKE $4)
@@ -184,6 +186,8 @@ WITH camps AS (
     FROM campaigns
     LEFT JOIN templates ON (templates.id = campaigns.template_id)
     WHERE (status='running' OR (status='scheduled' AND NOW() >= campaigns.send_at))
+    -- librelist: automation steps are sent by the automation engine, never by the campaign manager.
+    AND campaigns.type <> 'automation'
     AND NOT(campaigns.id = ANY($1::INT[]))
 ),
 campLists AS (

@@ -57,6 +57,15 @@
         ]
     },
     {
+        "group": "automations",
+        "permissions":
+        [
+            "automations:get",
+            "automations:manage",
+            "track:send"
+        ]
+    },
+    {
         "group": "users",
         "permissions":
         [

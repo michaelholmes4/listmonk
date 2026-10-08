@@ -342,6 +342,9 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 		return models.Subscriber{}, false, err
 	}
 
+	// librelist fork: a new subscriber starts from nothing, so whatever is confirmed now is new.
+	c.forkEnd(&forkSnap{subIDs: []int{out.ID}, subs: map[[2]int]bool{}, attribs: map[int]map[string]any{}})
+
 	hasOptin := false
 	if !preconfirm && c.consts.SendOptinConfirmation {
 		// Send a confirmation e-mail (if there are any double opt-in lists).
@@ -370,6 +373,7 @@ func (c *Core) UpdateSubscriber(id int, sub models.Subscriber) (models.Subscribe
 		}
 	}
 
+	snap := c.forkBegin([]int{id}, nil) // librelist fork
 	_, err := c.q.UpdateSubscriber.Exec(id,
 		sub.Email,
 		strings.TrimSpace(sub.Name),
@@ -381,6 +385,7 @@ func (c *Core) UpdateSubscriber(id int, sub models.Subscriber) (models.Subscribe
 		return models.Subscriber{}, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
 	}
+	c.forkEnd(snap)
 
 	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
 	if err != nil {
@@ -411,6 +416,7 @@ func (c *Core) UpdateSubscriberWithLists(id int, sub models.Subscriber, listIDs 
 		}
 	}
 
+	snap := c.forkBegin([]int{id}, nil) // librelist fork
 	_, err := c.q.UpdateSubscriberWithLists.Exec(id,
 		sub.Email,
 		strings.TrimSpace(sub.Name),
@@ -427,6 +433,7 @@ func (c *Core) UpdateSubscriberWithLists(id int, sub models.Subscriber, listIDs 
 		return models.Subscriber{}, false, echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
 	}
+	c.forkEnd(snap)
 
 	out, err := c.GetSubscriber(sub.ID, "", sub.Email)
 	if err != nil {
@@ -515,11 +522,16 @@ func (c *Core) ConfirmOptionSubscription(subUUID string, listUUIDs []string, met
 		meta = models.JSON{}
 	}
 
+	var snap *forkSnap // librelist fork
+	if c.forkOn() {
+		snap = c.forkBegin([]int{c.forkSubscriberID(subUUID)}, nil)
+	}
 	if _, err := c.q.ConfirmSubscriptionOptin.Exec(subUUID, pq.Array(listUUIDs), meta); err != nil {
 		c.log.Printf("error confirming subscription: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscribers}", "error", pqErrMsg(err)))
 	}
+	c.forkEnd(snap)
 
 	return nil
 }

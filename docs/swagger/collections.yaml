@@ -55,6 +55,8 @@ tags:
     description: Users API
   - name: Roles
     description: Roles API
+  - name: Automations
+    description: Marketing automation and event tracking (librelist)
   - name: Maintenance
     description: Maintenance API
   - name: Public
@@ -2755,6 +2757,398 @@ paths:
                   data:
                     type: boolean
 
+  /track:
+    post:
+      tags: [Automations]
+      description: >-
+        Records an event about a subscriber and starts the automations that listen for it. The subscriber is found by
+        `id` or `email`; an unknown email creates the subscriber (with no list subscriptions). `upsert_attribs` is
+        merged into the attributes (top-level keys) before the event is recorded. Send an `Idempotency-Key` header to
+        make a retried request record, and trigger, only once.
+      operationId: trackEvent
+      parameters:
+        - { in: header, name: Idempotency-Key, required: false, schema: { type: string, maxLength: 255 } }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrackRequest" }
+      responses:
+        "200":
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      subscriber_id: { type: integer }
+                      event_id: { type: integer, description: Absent when `duplicate` is true. }
+                      duplicate: { type: boolean }
+
+  /automations:
+    get:
+      tags: [Automations]
+      description: lists automations with their enrollment counts
+      operationId: getAutomations
+      parameters:
+        - { in: query, name: query, schema: { type: string } }
+        - { in: query, name: status, schema: { type: array, items: { $ref: "#/components/schemas/AutomationStatus" } }, style: form, explode: true }
+        - { in: query, name: order_by, schema: { type: string, enum: [name, status, created_at, updated_at] } }
+        - { in: query, name: order, schema: { type: string, enum: [asc, desc] } }
+        - { in: query, name: page, schema: { type: integer } }
+        - { in: query, name: per_page, schema: { type: string, description: A number or `all`. } }
+      responses:
+        "200":
+          description: A page of automations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results: { type: array, items: { $ref: "#/components/schemas/AutomationRow" } }
+                      total: { type: integer }
+                      per_page: { type: integer }
+                      page: { type: integer }
+    post:
+      tags: [Automations]
+      description: creates an empty draft automation
+      operationId: createAutomation
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationRequest" }
+      responses:
+        "200":
+          description: The new automation
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/Automation" } } }
+
+  /automations/emails:
+    post:
+      tags: [Automations]
+      description: >-
+        creates the hidden campaign that holds the content of an email step. Edit it with the campaign endpoints, and
+        put the returned ID in the step's `campaign_id`. It never appears in the campaign list.
+      operationId: createAutomationEmail
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                subject: { type: string, description: Defaults to the name. }
+                from_email: { type: string, description: Defaults to the server's. }
+                list_id: { type: integer, description: The topic list; the unsubscribe link records an opt-out on it. }
+                content_type: { type: string, enum: [richtext, html, markdown, plain, visual] }
+                body: { type: string }
+                template_id: { type: integer, description: Defaults to the default campaign template. }
+      responses:
+        "200":
+          description: The campaign
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: object, properties: { campaign_id: { type: integer } } } } }
+
+  "/automations/{id}":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      operationId: getAutomation
+      responses:
+        "200":
+          description: The automation
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/Automation" } } }
+    put:
+      tags: [Automations]
+      description: changes the name and the automation-wide settings
+      operationId: updateAutomation
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationRequest" }
+      responses:
+        "200":
+          description: The automation
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/Automation" } } }
+    delete:
+      tags: [Automations]
+      description: deletes a draft or archived automation (a live one must be archived first)
+      operationId: deleteAutomation
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: boolean } } }
+
+  "/automations/{id}/draft":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      operationId: getAutomationDraft
+      responses:
+        "200":
+          description: The draft version
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/AutomationVersion" } } }
+    put:
+      tags: [Automations]
+      description: >-
+        saves the draft. An incomplete draft is accepted; the problems found so far come back with it. Raw SQL
+        conditions need the `subscribers:sql_query` permission.
+      operationId: saveAutomationDraft
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationGraph" }
+      responses:
+        "200":
+          description: The saved draft and any problems
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      version: { $ref: "#/components/schemas/AutomationVersion" }
+                      problems: { type: array, items: { $ref: "#/components/schemas/AutomationProblem" } }
+
+  "/automations/{id}/publish":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    post:
+      tags: [Automations]
+      description: >-
+        freezes the draft and makes it the version new enrollments use. Fails with 400 and `data.problems` if the draft is
+        incomplete. People already inside keep running the version they entered.
+      operationId: publishAutomation
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enroll_existing: { type: boolean, description: Also enroll the current members of the lists that trigger it (in the background). }
+      responses:
+        "200":
+          description: The automation and the published version
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      automation: { $ref: "#/components/schemas/Automation" }
+                      version: { $ref: "#/components/schemas/AutomationVersion" }
+        "400":
+          description: The draft has problems
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AutomationInvalid" }
+
+  "/automations/{id}/pause":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    post:
+      tags: [Automations]
+      description: stops advancing enrollments; they keep their place
+      operationId: pauseAutomation
+      responses:
+        "200":
+          description: The automation
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/Automation" } } }
+
+  "/automations/{id}/resume":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    post:
+      tags: [Automations]
+      operationId: resumeAutomation
+      responses:
+        "200":
+          description: The automation
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/Automation" } } }
+
+  "/automations/{id}/archive":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    post:
+      tags: [Automations]
+      description: ends all enrollments and retires the automation
+      operationId: archiveAutomation
+      responses:
+        "200":
+          description: The automation
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/Automation" } } }
+
+  "/automations/{id}/enroll":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    post:
+      tags: [Automations]
+      description: enrolls subscribers into an active automation (those inside already, or barred by the re-entry rule, are skipped)
+      operationId: enrollInAutomation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subscriber_ids]
+              properties:
+                subscriber_ids: { type: array, maxItems: 1000, items: { type: integer } }
+      responses:
+        "200":
+          description: How many were enrolled
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: object, properties: { enrolled: { type: integer } } } } }
+
+  "/automations/{id}/versions":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      operationId: getAutomationVersions
+      responses:
+        "200":
+          description: Every version, newest first
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/AutomationVersion" } } } }
+
+  "/automations/{id}/enrollments":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      operationId: getAutomationEnrollments
+      parameters:
+        - { in: query, name: status, schema: { type: array, items: { $ref: "#/components/schemas/EnrollmentStatus" } }, style: form, explode: true }
+        - { in: query, name: query, description: Matches the subscriber's email or name., schema: { type: string } }
+        - { in: query, name: page, schema: { type: integer } }
+        - { in: query, name: per_page, schema: { type: string } }
+      responses:
+        "200":
+          description: A page of enrollments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results: { type: array, items: { $ref: "#/components/schemas/AutomationEnrollment" } }
+                      total: { type: integer }
+                      per_page: { type: integer }
+                      page: { type: integer }
+
+  "/automations/{id}/enrollments/{eid}/steps":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+      - { in: path, name: eid, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      operationId: getAutomationEnrollmentSteps
+      responses:
+        "200":
+          description: What happened at each step
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/AutomationStep" } } } }
+
+  "/automations/{id}/stats":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      description: how many enrollments reached, passed, skipped and failed each step
+      operationId: getAutomationStats
+      responses:
+        "200":
+          description: One row per step that has been reached
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/AutomationNodeStat" } } } }
+
+  "/subscribers/{id}/automations":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      operationId: getSubscriberAutomations
+      responses:
+        "200":
+          description: The automations the subscriber is, or was, in
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: array, items: { $ref: "#/components/schemas/SubscriberAutomation" } } } }
+
+  "/subscribers/{id}/events":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Automations]
+      operationId: getSubscriberEvents
+      parameters:
+        - { in: query, name: page, schema: { type: integer } }
+        - { in: query, name: per_page, schema: { type: string } }
+      responses:
+        "200":
+          description: A page of events, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results: { type: array, items: { $ref: "#/components/schemas/AutomationEvent" } }
+                      total: { type: integer }
+                      per_page: { type: integer }
+                      page: { type: integer }
+
+  /maintenance/events:
+    delete:
+      tags: [Maintenance]
+      description: deletes tracked events older than `before_date`
+      operationId: deleteOldEvents
+      parameters:
+        - { in: query, name: before_date, required: true, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: How many were deleted
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: object, properties: { deleted: { type: integer } } } } }
+
   "/public/lists":
     get:
       description: returns the list of public lists with minimal fields
@@ -5100,6 +5494,180 @@ components:
               total:
                 type: integer
 
+    AutomationStatus:
+      type: string
+      enum: [draft, active, paused, archived]
+    EnrollmentStatus:
+      type: string
+      enum: [active, waiting, completed, exited, failed]
+    TrackRequest:
+      type: object
+      required: [subscriber, name]
+      properties:
+        subscriber:
+          type: object
+          description: Send either `id` or `email`.
+          properties:
+            id: { type: integer }
+            email: { type: string }
+            name: { type: string, description: Used only when the subscriber is created. }
+        name: { type: string, maxLength: 200, example: signed_up }
+        properties: { type: object, additionalProperties: true, description: Exposed to templates as `.Event.Properties`. }
+        occurred_at: { type: string, format: date-time, description: Defaults to now; may not be in the future. }
+        upsert_attribs: { type: object, additionalProperties: true }
+    AutomationSettings:
+      type: object
+      properties:
+        reentry:
+          type: object
+          properties:
+            mode: { type: string, enum: [once, always, interval] }
+            interval: { type: string, example: 30d }
+        send_window:
+          type: object
+          properties:
+            days: { type: array, items: { type: integer, minimum: 0, maximum: 6 } }
+            start: { type: string, example: "09:00" }
+            end: { type: string, example: "17:00" }
+        timezone: { type: string, example: Europe/Berlin }
+        goal: { $ref: "#/components/schemas/AutomationRule" }
+    AutomationRule:
+      type: object
+      description: >-
+        A condition. A group has `all` or `any` (lists of rules); a leaf has a `field` (a subscriber field, `attribs.x`,
+        `list:<id>`, `event:<name>`, `opened:<campaign id>`, `clicked:<campaign id>`) with an `op` and a `value`. Raw SQL
+        (`sql`) needs the `subscribers:sql_query` permission. Opened and clicked rules only work when
+        `privacy.individual_tracking` is on.
+      additionalProperties: true
+    AutomationRequest:
+      type: object
+      properties:
+        name: { type: string, maxLength: 200 }
+        settings: { $ref: "#/components/schemas/AutomationSettings" }
+    Automation:
+      type: object
+      properties:
+        id: { type: integer }
+        uuid: { type: string }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/AutomationStatus" }
+        current_version_id: { type: integer, nullable: true }
+        settings: { $ref: "#/components/schemas/AutomationSettings" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AutomationRow:
+      allOf:
+        - $ref: "#/components/schemas/Automation"
+        - type: object
+          properties:
+            active: { type: integer }
+            waiting: { type: integer }
+            completed: { type: integer }
+            exited: { type: integer }
+            failed: { type: integer }
+    AutomationTrigger:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [list_joined, attribute_changed, event, manual] }
+        config:
+          type: object
+          properties:
+            list_id: { type: integer }
+            attribute: { type: string }
+            equals: {}
+            event: { type: string }
+    AutomationNode:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [send_email, delay, wait_until, condition, update_attribute, add_to_list, remove_from_list, exit] }
+        config: { type: object, additionalProperties: true }
+    AutomationEdge:
+      type: object
+      properties:
+        from: { type: string }
+        to: { type: string }
+        handle: { type: string, enum: [yes, no], description: Only on a condition's outgoing edges. }
+    AutomationGraph:
+      type: object
+      properties:
+        triggers: { type: array, items: { $ref: "#/components/schemas/AutomationTrigger" } }
+        nodes: { type: array, items: { $ref: "#/components/schemas/AutomationNode" } }
+        edges: { type: array, items: { $ref: "#/components/schemas/AutomationEdge" } }
+        root: { type: string, description: The first node after the trigger. }
+    AutomationVersion:
+      type: object
+      properties:
+        id: { type: integer }
+        automation_id: { type: integer }
+        version: { type: integer }
+        graph: { $ref: "#/components/schemas/AutomationGraph" }
+        published_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+    AutomationProblem:
+      type: object
+      properties:
+        node_id: { type: string }
+        message: { type: string }
+    AutomationInvalid:
+      type: object
+      properties:
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            problems: { type: array, items: { $ref: "#/components/schemas/AutomationProblem" } }
+    AutomationEnrollment:
+      type: object
+      properties:
+        id: { type: integer }
+        automation_id: { type: integer }
+        version_id: { type: integer }
+        subscriber_id: { type: integer }
+        email: { type: string }
+        subscriber_name: { type: string }
+        status: { $ref: "#/components/schemas/EnrollmentStatus" }
+        current_node_id: { type: string, nullable: true }
+        next_run_at: { type: string, format: date-time, nullable: true }
+        entered_at: { type: string, format: date-time }
+        exited_at: { type: string, format: date-time, nullable: true }
+        exit_reason: { type: string, nullable: true }
+    SubscriberAutomation:
+      allOf:
+        - $ref: "#/components/schemas/AutomationEnrollment"
+        - type: object
+          properties:
+            automation_name: { type: string }
+    AutomationStep:
+      type: object
+      properties:
+        id: { type: integer }
+        enrollment_id: { type: integer }
+        node_id: { type: string }
+        status: { type: string, enum: [waiting, sending, done, skipped, failed] }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        result: { type: object, additionalProperties: true }
+        error: { type: string, nullable: true }
+    AutomationNodeStat:
+      type: object
+      properties:
+        node_id: { type: string }
+        entered: { type: integer }
+        done: { type: integer }
+        skipped: { type: integer }
+        failed: { type: integer }
+        waiting: { type: integer }
+    AutomationEvent:
+      type: object
+      properties:
+        id: { type: integer }
+        subscriber_id: { type: integer }
+        name: { type: string }
+        properties: { type: object, additionalProperties: true }
+        occurred_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
     List:
       type: object
       properties:

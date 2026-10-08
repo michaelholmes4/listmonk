@@ -24,11 +24,13 @@ func (c *Core) GetSubscriptions(subID int, subUUID string, allLists bool) ([]mod
 
 // AddSubscriptions adds list subscriptions to subscribers.
 func (c *Core) AddSubscriptions(subIDs, listIDs []int, status string) error {
+	snap := c.forkBegin(subIDs, listIDs) // librelist fork
 	if _, err := c.q.AddSubscribersToLists.Exec(pq.Array(subIDs), pq.Array(listIDs), status); err != nil {
 		c.log.Printf("error adding subscriptions: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
 			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscribers}", "error", err.Error()))
 	}
+	c.forkEnd(snap)
 
 	return nil
 }

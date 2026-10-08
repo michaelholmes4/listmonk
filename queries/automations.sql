@@ -146,7 +146,7 @@ WHERE e.automation_id = $1 GROUP BY st.node_id;
 -- No row back means this idempotency key was seen before.
 INSERT INTO subscriber_events (subscriber_id, name, properties, idempotency_key, occurred_at)
 VALUES ($1, $2, $3, $4, $5)
-ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+ON CONFLICT (subscriber_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING *;
 
 -- name: automation-list-events
@@ -201,3 +201,23 @@ SELECT optin::TEXT FROM lists WHERE id = $1;
 INSERT INTO campaigns (uuid, name, subject, from_email, body, content_type, messenger, template_id, type, headers, status)
 VALUES ($1, $2, $3, $4, $5, $6::content_type, $7, $8, 'automation', '[]', 'draft')
 RETURNING id;
+
+-- name: automation-step-campaigns
+-- Which of these IDs are hidden automation campaigns (an email step may only point at one).
+SELECT id FROM campaigns WHERE id = ANY($1::INT[]) AND type = 'automation';
+
+-- name: automation-clear-campaign-lists
+DELETE FROM campaign_lists WHERE campaign_id = $1;
+
+-- name: automation-set-campaign-list
+-- Links a step campaign to its topic list, so the unsubscribe link records the opt-out there.
+INSERT INTO campaign_lists (campaign_id, list_id, list_name) SELECT $1, id, name FROM lists WHERE id = $2;
+
+-- name: automation-default-template
+SELECT id FROM templates WHERE is_default = true AND type = 'campaign' LIMIT 1;
+
+-- name: automation-subscriber-ids-by-list
+-- Confirmed members of a list who can be enrolled (for "also enroll current matches").
+SELECT s.id FROM subscribers s
+JOIN subscriber_lists sl ON sl.subscriber_id = s.id AND sl.list_id = $1 AND sl.status = 'confirmed'
+WHERE s.status = 'enabled' AND s.id > $2 ORDER BY s.id LIMIT $3;

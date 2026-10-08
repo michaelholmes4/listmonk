@@ -15,7 +15,7 @@ func TestRealWorkerRunsTheJobs(t *testing.T) {
 	h := newHarness(t)
 	// Real time, since River schedules by the database clock.
 	h.clock.t = time.Now()
-	eng, err := New(Config{DB: h.db, Queries: h.eng.q, Sender: h.sender, Clock: h.clock, Log: h.eng.log})
+	eng, err := New(Config{DB: h.db, Queries: h.eng.q, Sender: h.sender, Log: h.eng.log}) // real clock, as in production
 	if err != nil {
 		t.Fatal(err)
 	}

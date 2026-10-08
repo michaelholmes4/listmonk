@@ -84,7 +84,7 @@ func newHarness(t *testing.T) *harness {
 		clock:  &fakeClock{t: time.Now().UTC().Truncate(time.Second)},
 		sender: &fakeSender{},
 	}
-	h.eng, err = New(Config{DB: db, Queries: q, Sender: h.sender, Clock: h.clock, Log: log.New(io.Discard, "", 0)})
+	h.eng, err = New(Config{DB: db, Queries: q, Sender: h.sender, Clock: h.clock, FixedSchedule: true, Log: log.New(io.Discard, "", 0)})
 	if err != nil {
 		t.Fatal(err)
 	}

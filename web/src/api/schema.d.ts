@@ -1124,6 +1124,318 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/track": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Records an event about a subscriber and starts the automations that listen for it. The subscriber is found by `id` or `email`; an unknown email creates the subscriber (with no list subscriptions). `upsert_attribs` is merged into the attributes (top-level keys) before the event is recorded. Send an `Idempotency-Key` header to make a retried request record, and trigger, only once. */
+        post: operations["trackEvent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description lists automations with their enrollment counts */
+        get: operations["getAutomations"];
+        put?: never;
+        /** @description creates an empty draft automation */
+        post: operations["createAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/emails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description creates the hidden campaign that holds the content of an email step. Edit it with the campaign endpoints, and put the returned ID in the step's `campaign_id`. It never appears in the campaign list. */
+        post: operations["createAutomationEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getAutomation"];
+        /** @description changes the name and the automation-wide settings */
+        put: operations["updateAutomation"];
+        post?: never;
+        /** @description deletes a draft or archived automation (a live one must be archived first) */
+        delete: operations["deleteAutomation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getAutomationDraft"];
+        /** @description saves the draft. An incomplete draft is accepted; the problems found so far come back with it. Raw SQL conditions need the `subscribers:sql_query` permission. */
+        put: operations["saveAutomationDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description freezes the draft and makes it the version new enrollments use. Fails with 400 and `data.problems` if the draft is incomplete. People already inside keep running the version they entered. */
+        post: operations["publishAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description stops advancing enrollments; they keep their place */
+        post: operations["pauseAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["resumeAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description ends all enrollments and retires the automation */
+        post: operations["archiveAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description enrolls subscribers into an active automation (those inside already, or barred by the re-entry rule, are skipped) */
+        post: operations["enrollInAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getAutomationVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/enrollments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getAutomationEnrollments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/enrollments/{eid}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                eid: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getAutomationEnrollmentSteps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/automations/{id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        /** @description how many enrollments reached, passed, skipped and failed each step */
+        get: operations["getAutomationStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subscribers/{id}/automations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getSubscriberAutomations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/subscribers/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["getSubscriberEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/maintenance/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description deletes tracked events older than `before_date` */
+        delete: operations["deleteOldEvents"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/lists": {
         parameters: {
             query?: never;
@@ -2287,6 +2599,188 @@ export interface components {
                 campaign_uuid?: string;
                 total?: number;
             }[];
+        };
+        /** @enum {string} */
+        AutomationStatus: "draft" | "active" | "paused" | "archived";
+        /** @enum {string} */
+        EnrollmentStatus: "active" | "waiting" | "completed" | "exited" | "failed";
+        TrackRequest: {
+            /** @description Send either `id` or `email`. */
+            subscriber: {
+                id?: number;
+                email?: string;
+                /** @description Used only when the subscriber is created. */
+                name?: string;
+            };
+            /** @example signed_up */
+            name: string;
+            /** @description Exposed to templates as `.Event.Properties`. */
+            properties?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Format: date-time
+             * @description Defaults to now; may not be in the future.
+             */
+            occurred_at?: string;
+            upsert_attribs?: {
+                [key: string]: unknown;
+            };
+        };
+        AutomationSettings: {
+            reentry?: {
+                /** @enum {string} */
+                mode?: "once" | "always" | "interval";
+                /** @example 30d */
+                interval?: string;
+            };
+            send_window?: {
+                days?: number[];
+                /** @example 09:00 */
+                start?: string;
+                /** @example 17:00 */
+                end?: string;
+            };
+            /** @example Europe/Berlin */
+            timezone?: string;
+            goal?: components["schemas"]["AutomationRule"];
+        };
+        /** @description A condition. A group has `all` or `any` (lists of rules); a leaf has a `field` (a subscriber field, `attribs.x`, `list:<id>`, `event:<name>`, `opened:<campaign id>`, `clicked:<campaign id>`) with an `op` and a `value`. Raw SQL (`sql`) needs the `subscribers:sql_query` permission. Opened and clicked rules only work when `privacy.individual_tracking` is on. */
+        AutomationRule: {
+            [key: string]: unknown;
+        };
+        AutomationRequest: {
+            name?: string;
+            settings?: components["schemas"]["AutomationSettings"];
+        };
+        Automation: {
+            id?: number;
+            uuid?: string;
+            name?: string;
+            status?: components["schemas"]["AutomationStatus"];
+            current_version_id?: number | null;
+            settings?: components["schemas"]["AutomationSettings"];
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        AutomationRow: components["schemas"]["Automation"] & {
+            active?: number;
+            waiting?: number;
+            completed?: number;
+            exited?: number;
+            failed?: number;
+        };
+        AutomationTrigger: {
+            id?: string;
+            /** @enum {string} */
+            type?: "list_joined" | "attribute_changed" | "event" | "manual";
+            config?: {
+                list_id?: number;
+                attribute?: string;
+                equals?: unknown;
+                event?: string;
+            };
+        };
+        AutomationNode: {
+            id?: string;
+            /** @enum {string} */
+            type?: "send_email" | "delay" | "wait_until" | "condition" | "update_attribute" | "add_to_list" | "remove_from_list" | "exit";
+            config?: {
+                [key: string]: unknown;
+            };
+        };
+        AutomationEdge: {
+            from?: string;
+            to?: string;
+            /**
+             * @description Only on a condition's outgoing edges.
+             * @enum {string}
+             */
+            handle?: "yes" | "no";
+        };
+        AutomationGraph: {
+            triggers?: components["schemas"]["AutomationTrigger"][];
+            nodes?: components["schemas"]["AutomationNode"][];
+            edges?: components["schemas"]["AutomationEdge"][];
+            /** @description The first node after the trigger. */
+            root?: string;
+        };
+        AutomationVersion: {
+            id?: number;
+            automation_id?: number;
+            version?: number;
+            graph?: components["schemas"]["AutomationGraph"];
+            /** Format: date-time */
+            published_at?: string | null;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        AutomationProblem: {
+            node_id?: string;
+            message?: string;
+        };
+        AutomationInvalid: {
+            message?: string;
+            data?: {
+                problems?: components["schemas"]["AutomationProblem"][];
+            };
+        };
+        AutomationEnrollment: {
+            id?: number;
+            automation_id?: number;
+            version_id?: number;
+            subscriber_id?: number;
+            email?: string;
+            subscriber_name?: string;
+            status?: components["schemas"]["EnrollmentStatus"];
+            current_node_id?: string | null;
+            /** Format: date-time */
+            next_run_at?: string | null;
+            /** Format: date-time */
+            entered_at?: string;
+            /** Format: date-time */
+            exited_at?: string | null;
+            exit_reason?: string | null;
+        };
+        SubscriberAutomation: components["schemas"]["AutomationEnrollment"] & {
+            automation_name?: string;
+        };
+        AutomationStep: {
+            id?: number;
+            enrollment_id?: number;
+            node_id?: string;
+            /** @enum {string} */
+            status?: "waiting" | "sending" | "done" | "skipped" | "failed";
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            result?: {
+                [key: string]: unknown;
+            };
+            error?: string | null;
+        };
+        AutomationNodeStat: {
+            node_id?: string;
+            entered?: number;
+            done?: number;
+            skipped?: number;
+            failed?: number;
+            waiting?: number;
+        };
+        AutomationEvent: {
+            id?: number;
+            subscriber_id?: number;
+            name?: string;
+            properties?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            occurred_at?: string;
+            /** Format: date-time */
+            created_at?: string;
         };
         List: {
             id?: number;
@@ -5122,6 +5616,608 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    trackEvent: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TrackRequest"];
+            };
+        };
+        responses: {
+            /** @description Recorded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            subscriber_id?: number;
+                            /** @description Absent when `duplicate` is true. */
+                            event_id?: number;
+                            duplicate?: boolean;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getAutomations: {
+        parameters: {
+            query?: {
+                query?: string;
+                status?: components["schemas"]["AutomationStatus"][];
+                order_by?: "name" | "status" | "created_at" | "updated_at";
+                order?: "asc" | "desc";
+                page?: number;
+                per_page?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of automations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            results?: components["schemas"]["AutomationRow"][];
+                            total?: number;
+                            per_page?: number;
+                            page?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    createAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AutomationRequest"];
+            };
+        };
+        responses: {
+            /** @description The new automation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Automation"];
+                    };
+                };
+            };
+        };
+    };
+    createAutomationEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    /** @description Defaults to the name. */
+                    subject?: string;
+                    /** @description Defaults to the server's. */
+                    from_email?: string;
+                    /** @description The topic list; the unsubscribe link records an opt-out on it. */
+                    list_id?: number;
+                    /** @enum {string} */
+                    content_type?: "richtext" | "html" | "markdown" | "plain" | "visual";
+                    body?: string;
+                    /** @description Defaults to the default campaign template. */
+                    template_id?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The campaign */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            campaign_id?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The automation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Automation"];
+                    };
+                };
+            };
+        };
+    };
+    updateAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AutomationRequest"];
+            };
+        };
+        responses: {
+            /** @description The automation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Automation"];
+                    };
+                };
+            };
+        };
+    };
+    deleteAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    getAutomationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["AutomationVersion"];
+                    };
+                };
+            };
+        };
+    };
+    saveAutomationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["AutomationGraph"];
+            };
+        };
+        responses: {
+            /** @description The saved draft and any problems */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            version?: components["schemas"]["AutomationVersion"];
+                            problems?: components["schemas"]["AutomationProblem"][];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    publishAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Also enroll the current members of the lists that trigger it (in the background). */
+                    enroll_existing?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The automation and the published version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            automation?: components["schemas"]["Automation"];
+                            version?: components["schemas"]["AutomationVersion"];
+                        };
+                    };
+                };
+            };
+            /** @description The draft has problems */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutomationInvalid"];
+                };
+            };
+        };
+    };
+    pauseAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The automation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Automation"];
+                    };
+                };
+            };
+        };
+    };
+    resumeAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The automation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Automation"];
+                    };
+                };
+            };
+        };
+    };
+    archiveAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The automation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Automation"];
+                    };
+                };
+            };
+        };
+    };
+    enrollInAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    subscriber_ids: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description How many were enrolled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            enrolled?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getAutomationVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every version, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["AutomationVersion"][];
+                    };
+                };
+            };
+        };
+    };
+    getAutomationEnrollments: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["EnrollmentStatus"][];
+                /** @description Matches the subscriber's email or name. */
+                query?: string;
+                page?: number;
+                per_page?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of enrollments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            results?: components["schemas"]["AutomationEnrollment"][];
+                            total?: number;
+                            per_page?: number;
+                            page?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getAutomationEnrollmentSteps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                eid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What happened at each step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["AutomationStep"][];
+                    };
+                };
+            };
+        };
+    };
+    getAutomationStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One row per step that has been reached */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["AutomationNodeStat"][];
+                    };
+                };
+            };
+        };
+    };
+    getSubscriberAutomations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The automations the subscriber is, or was, in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SubscriberAutomation"][];
+                    };
+                };
+            };
+        };
+    };
+    getSubscriberEvents: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of events, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            results?: components["schemas"]["AutomationEvent"][];
+                            total?: number;
+                            per_page?: number;
+                            page?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteOldEvents: {
+        parameters: {
+            query: {
+                before_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            deleted?: number;
+                        };
                     };
                 };
             };

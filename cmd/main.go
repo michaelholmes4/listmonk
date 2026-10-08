@@ -16,6 +16,7 @@ import (
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/v2"
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/automation"
 	"github.com/knadh/listmonk/internal/bounce"
 	"github.com/knadh/listmonk/internal/buflog"
 	"github.com/knadh/listmonk/internal/captcha"
@@ -46,6 +47,7 @@ type App struct {
 	auth       *auth.Auth
 	media      media.Store
 	bounce     *bounce.Manager
+	automation *automation.Engine // librelist fork
 	captcha    *captcha.Captcha
 	i18n       *i18n.I18n
 	pg         *paginator.Paginator
@@ -261,6 +263,9 @@ func main() {
 	// messages) get processed at the specified interval.
 	go mgr.Run()
 
+	// librelist: start the automation engine (needs the manager to send).
+	eng := initAutomation(fs, db, core, mgr, lo, ko)
+
 	// =========================================================================
 	// Initialize the App{} with all the global shared components, controllers and fields.
 	app := &App{
@@ -277,6 +282,7 @@ func main() {
 		auth:       auth,
 		media:      media,
 		bounce:     bounce,
+		automation: eng,
 		captcha:    initCaptcha(),
 		i18n:       i18n,
 		log:        lo,
@@ -320,6 +326,11 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		srv.Shutdown(ctx)
+
+		// librelist: let in-flight automation jobs finish before the DB goes away.
+		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		eng.Stop(stopCtx)
+		stopCancel()
 
 		// Close the campaign manager.
 		mgr.Close()

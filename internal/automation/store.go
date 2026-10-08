@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // Errors callers map to HTTP statuses.
@@ -234,6 +236,9 @@ func (s *Store) SaveDraft(ctx context.Context, automationID int, graph *Graph, a
 		graph.Edges = []Edge{}
 	}
 	problems := graph.Validate(ValidateOpts{AllowSQL: allowSQL})
+	if err := s.syncStepCampaigns(ctx, graph); err != nil {
+		return nil, nil, err
+	}
 
 	draft, err := s.Draft(ctx, automationID)
 	if err != nil {
@@ -326,3 +331,251 @@ func (s *Store) SetStatus(ctx context.Context, id int, status Status) (*Automati
 	}
 	return &a, nil
 }
+
+// StepCampaign describes the hidden campaign that holds an email step's content.
+type StepCampaign struct {
+	Name        string
+	Subject     string
+	FromEmail   string
+	Messenger   string
+	ContentType string
+	Body        string
+	TemplateID  int // 0: the default campaign template
+	ListID      int // the topic, linked so unsubscribing records an opt-out
+}
+
+// CreateStepCampaign makes the hidden campaign behind a new email step and returns its ID. It is
+// edited afterwards with the ordinary campaign editor.
+func (s *Store) CreateStepCampaign(ctx context.Context, p StepCampaign) (int, error) {
+	if p.ContentType == "" {
+		p.ContentType = "richtext"
+	}
+	if p.Messenger == "" {
+		p.Messenger = "email"
+	}
+	if p.Subject == "" {
+		p.Subject = p.Name
+	}
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	var tpl any
+	if p.TemplateID > 0 {
+		tpl = p.TemplateID
+	} else {
+		var id int
+		if err := tx.GetContext(ctx, &id, s.q.get("default-template")); err == nil {
+			tpl = id
+		}
+	}
+	var id int
+	if err := tx.GetContext(ctx, &id, s.q.get("insert-step-campaign"), uuid.NewString(), p.Name, p.Subject, p.FromEmail, p.Body, p.ContentType, p.Messenger, tpl); err != nil {
+		return 0, err
+	}
+	if p.ListID > 0 {
+		if _, err := tx.ExecContext(ctx, s.q.get("set-campaign-list"), id, p.ListID); err != nil {
+			return 0, err
+		}
+	}
+	return id, tx.Commit()
+}
+
+// syncStepCampaigns checks that every email step points at a hidden automation campaign (never an
+// ordinary campaign, which it could otherwise hijack) and links each to its topic list.
+func (s *Store) syncStepCampaigns(ctx context.Context, g *Graph) error {
+	var ids []int
+	topic := map[int]int{}
+	for _, n := range g.Nodes {
+		if n.Type != NodeSendEmail {
+			continue
+		}
+		var c SendEmailConfig
+		if json.Unmarshal(n.Config, &c) != nil || c.CampaignID == 0 {
+			continue
+		}
+		ids = append(ids, c.CampaignID)
+		topic[c.CampaignID] = c.ListID
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	var ok []int
+	if err := s.db.SelectContext(ctx, &ok, s.q.get("step-campaigns"), pqIntArray(ids)); err != nil {
+		return err
+	}
+	good := map[int]bool{}
+	for _, id := range ok {
+		good[id] = true
+	}
+	var problems []Problem
+	for _, n := range g.Nodes {
+		var c SendEmailConfig
+		if n.Type == NodeSendEmail && json.Unmarshal(n.Config, &c) == nil && c.CampaignID > 0 && !good[c.CampaignID] {
+			problems = append(problems, Problem{NodeID: n.ID, Message: "its content does not exist (or is not an automation email)"})
+		}
+	}
+	if len(problems) > 0 {
+		return &InvalidError{problems}
+	}
+
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for camp, list := range topic {
+		if _, err := tx.ExecContext(ctx, s.q.get("clear-campaign-lists"), camp); err != nil {
+			return err
+		}
+		if list > 0 {
+			if _, err := tx.ExecContext(ctx, s.q.get("set-campaign-list"), camp, list); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}
+
+// EnrollmentRow is an enrollment as listed, with who it is.
+type EnrollmentRow struct {
+	Enrollment
+	Email          string `db:"email" json:"email"`
+	SubscriberName string `db:"subscriber_name" json:"subscriber_name"`
+	Total          int    `db:"total" json:"-"`
+}
+
+// Enrollments lists an automation's enrollments, newest first.
+func (s *Store) Enrollments(ctx context.Context, automationID int, statuses []EnrollmentStatus, search string, page, perPage int) ([]EnrollmentRow, int, error) {
+	var st any
+	if len(statuses) > 0 {
+		ss := make([]string, len(statuses))
+		for i, x := range statuses {
+			ss[i] = string(x)
+		}
+		st = "{" + strings.Join(ss, ",") + "}"
+	}
+	offset := 0
+	if perPage > 0 && page > 1 {
+		offset = (page - 1) * perPage
+	}
+	var rows []EnrollmentRow
+	if err := s.db.SelectContext(ctx, &rows, s.q.get("list-enrollments"), automationID, st, search, offset, perPage); err != nil {
+		return nil, 0, err
+	}
+	total := 0
+	if len(rows) > 0 {
+		total = rows[0].Total
+	}
+	return rows, total, nil
+}
+
+// Steps returns what an enrollment has run, in order.
+func (s *Store) Steps(ctx context.Context, enrollmentID int64) ([]Step, error) {
+	var out []Step
+	if err := s.db.SelectContext(ctx, &out, s.q.get("list-steps"), enrollmentID); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// NodeStat counts how an automation's enrollments have fared at one step.
+type NodeStat struct {
+	NodeID  string `db:"node_id" json:"node_id"`
+	Entered int    `db:"entered" json:"entered"`
+	Done    int    `db:"done" json:"done"`
+	Skipped int    `db:"skipped" json:"skipped"`
+	Failed  int    `db:"failed" json:"failed"`
+	Waiting int    `db:"waiting" json:"waiting"`
+}
+
+// NodeStats returns per-step counts.
+func (s *Store) NodeStats(ctx context.Context, automationID int) ([]NodeStat, error) {
+	var out []NodeStat
+	if err := s.db.SelectContext(ctx, &out, s.q.get("node-stats"), automationID); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SubscriberEnrollment is one automation a subscriber has been in.
+type SubscriberEnrollment struct {
+	Enrollment
+	AutomationName string `db:"automation_name" json:"automation_name"`
+}
+
+// SubscriberEnrollments lists every automation a subscriber has entered.
+func (s *Store) SubscriberEnrollments(ctx context.Context, subscriberID int) ([]SubscriberEnrollment, error) {
+	var out []SubscriberEnrollment
+	if err := s.db.SelectContext(ctx, &out, s.q.get("list-subscriber-enrollments"), subscriberID); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RecordEvent stores an event. It reports false (and no event) when the idempotency key was used
+// before, which is how a retried request is told apart from a new one.
+func (s *Store) RecordEvent(ctx context.Context, subscriberID int, name string, properties json.RawMessage, key string, at time.Time) (*Event, bool, error) {
+	if len(properties) == 0 {
+		properties = json.RawMessage(`{}`)
+	}
+	var k any
+	if key != "" {
+		k = key
+	}
+	var ev Event
+	if err := s.db.GetContext(ctx, &ev, s.q.get("insert-event"), subscriberID, name, []byte(properties), k, at); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return &ev, true, nil
+}
+
+// EventRow is an event with the total, for paging.
+type EventRow struct {
+	Event
+	Total int `db:"total" json:"-"`
+}
+
+// Events lists a subscriber's events, newest first.
+func (s *Store) Events(ctx context.Context, subscriberID, page, perPage int) ([]Event, int, error) {
+	offset := 0
+	if perPage > 0 && page > 1 {
+		offset = (page - 1) * perPage
+	}
+	var rows []EventRow
+	if err := s.db.SelectContext(ctx, &rows, s.q.get("list-events"), subscriberID, offset, perPage); err != nil {
+		return nil, 0, err
+	}
+	out := make([]Event, len(rows))
+	total := 0
+	for i, r := range rows {
+		out[i], total = r.Event, r.Total
+	}
+	return out, total, nil
+}
+
+// DeleteEventsBefore removes old events (the maintenance cleanup).
+func (s *Store) DeleteEventsBefore(ctx context.Context, before time.Time) (int64, error) {
+	res, err := s.db.ExecContext(ctx, s.q.get("delete-old-events"), before)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// SubscriberIDsOnList pages through the confirmed, enabled members of a list.
+func (s *Store) SubscriberIDsOnList(ctx context.Context, listID, afterID, limit int) ([]int, error) {
+	var ids []int
+	if err := s.db.SelectContext(ctx, &ids, s.q.get("subscriber-ids-by-list"), listID, afterID, limit); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+func pqIntArray(ids []int) any { return pq.Array(ids) }

@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS subscriber_events (
     occurred_at     TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sub_events_idem ON subscriber_events (idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sub_events_idem ON subscriber_events (subscriber_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sub_events_sub ON subscriber_events (subscriber_id, name, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sub_events_name ON subscriber_events (name, occurred_at DESC);
 

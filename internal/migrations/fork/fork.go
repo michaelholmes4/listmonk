@@ -33,12 +33,20 @@ var sqlAutomations string
 //go:embed 002_automation_campaign_type.sql
 var sqlCampaignType string
 
+//go:embed 005_event_idempotency_scope.sql
+var sqlEventIdem string
+
+//go:embed 004_dashboard_counts.sql
+var sqlDashboardCounts string
+
 // All is every migration in order. Add new ones at the end with the next number.
 var All = []Migration{
 	{1, "automation tables", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlAutomations) }},
 	// ALTER TYPE ... ADD VALUE can't be used in the transaction that adds it, so it's its own step.
 	{2, "automation campaign type", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlCampaignType) }},
 	{3, "job queue tables", upRiver},
+	{4, "dashboard counts skip automation campaigns", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlDashboardCounts) }},
+	{5, "event idempotency keys are per subscriber", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlEventIdem) }},
 }
 
 func execTx(ctx context.Context, db *sqlx.DB, query string) error {

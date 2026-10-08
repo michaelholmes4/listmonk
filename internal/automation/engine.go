@@ -62,6 +62,10 @@ type Config struct {
 	Log     *log.Logger
 	// Workers is how many jobs run at once.
 	Workers int
+	// FixedSchedule always gives a job its scheduled time, even when it is due now. Tests with a fake
+	// clock need that (they pick jobs by it); in production an explicit time makes River park the job
+	// as "scheduled" until its maintenance leader promotes it, seconds later.
+	FixedSchedule bool
 	// PollInterval is how often the queue looks for due jobs.
 	PollInterval time.Duration
 }
@@ -177,8 +181,12 @@ func (e *Engine) Stop(ctx context.Context) error {
 // enqueue schedules a wake-up inside the caller's transaction, so the state change and the job
 // either both happen or neither does.
 func (e *Engine) enqueue(ctx context.Context, tx *sqlx.Tx, enrollmentID int64, at time.Time) error {
-	// Always set explicitly, from the engine's clock (the real one outside tests).
-	_, err := e.river.InsertTx(ctx, tx.Tx, AdvanceArgs{EnrollmentID: enrollmentID}, &river.InsertOpts{ScheduledAt: at})
+	// The time comes from the engine's clock (the real one outside tests). See Config.FixedSchedule.
+	opts := &river.InsertOpts{ScheduledAt: at}
+	if !e.cfg.FixedSchedule && !at.After(e.clock.Now()) {
+		opts.ScheduledAt = time.Time{} // due now: available at once
+	}
+	_, err := e.river.InsertTx(ctx, tx.Tx, AdvanceArgs{EnrollmentID: enrollmentID}, opts)
 	return err
 }
 
