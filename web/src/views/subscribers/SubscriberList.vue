@@ -100,7 +100,7 @@ const query = computed<SubscriberQuery>(() => ({
   page: pagination.value.pageIndex + 1,
   perPage: pagination.value.pageSize,
   orderBy: sorting.value[0]?.id as SubscriberQuery['orderBy'],
-  order: sorting.value[0] ? (sorting.value[0].desc ? 'DESC' : 'ASC') : undefined,
+  order: sorting.value[0] ? (sorting.value[0].desc ? 'desc' : 'asc') : undefined,
 }))
 
 const { data, isPending, isFetching } = useSubscribers(query)

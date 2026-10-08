@@ -16,5 +16,7 @@ export const keys = {
     activity: (id: number) => ['subscribers', 'activity', id] as const,
     bounces: (id: number) => ['subscribers', 'bounces', id] as const,
   },
+  import: { status: ['import', 'status'] as const, logs: ['import', 'logs'] as const },
+  bounces: { all: ['bounces'] as const, page: (q: unknown) => ['bounces', 'page', q] as const },
   dashboard: { counts: ['dashboard', 'counts'] as const, charts: ['dashboard', 'charts'] as const },
 }

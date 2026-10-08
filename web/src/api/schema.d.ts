@@ -447,8 +447,25 @@ export interface paths {
         get: operations["getBounces"];
         put?: never;
         post?: never;
-        /** @description handles deletion of bounce records. */
+        /** @description handles deletion of bounce records. `all` deletes every bounce, ignoring any filter. */
         delete: operations["deleteBounces"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bounces/blocklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description blocklists every subscriber that has a bounce record (not filterable; to blocklist some, use /subscribers/blocklist with subscriber ids). */
+        put: operations["blocklistBouncedSubscribers"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1949,7 +1966,8 @@ export interface components {
             name?: string;
             total?: number;
             imported?: number;
-            status?: string;
+            /** @enum {string} */
+            status?: "none" | "importing" | "stopping" | "finished" | "failed";
         };
         Campaign: {
             id?: number;
@@ -2476,8 +2494,8 @@ export interface operations {
                 query?: string;
                 /** @description Result sorting field. Options are name, status, created_at, updated_at */
                 order_by?: "name" | "status" | "created_at" | "updated_at";
-                /** @description ASC|DESC Sort by ascending or descending order. */
-                order?: "ASC" | "DESC";
+                /** @description asc|desc Sort by ascending or descending order. */
+                order?: "asc" | "desc";
                 /** @description Subscription status to filter by if there are one or more list_ids. */
                 subscription_status?: string;
                 /** @description ID of lists to filter by. Repeat in the query for multiple values. */
@@ -2974,8 +2992,8 @@ export interface operations {
                 per_page?: number | "all";
                 /** @description Filter bounce records by their source of origin */
                 source?: string;
-                /** @description Specifies the field by which to sort the bounce records. Available options are 'email', 'campaign_name', 'source', and 'created_at' */
-                order_by?: "email" | "campaign_name" | "source" | "created_at";
+                /** @description Specifies the field by which to sort the bounce records. */
+                order_by?: "email" | "campaign_name" | "source" | "type" | "created_at";
                 /** @description Determines the sort order of results. Use 'asc' for ascending or 'desc' for descending order */
                 order?: "asc" | "desc";
             };
@@ -2993,7 +3011,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: {
-                            results?: components["schemas"]["Bounce"][];
+                            results?: components["schemas"]["BounceRecord"][];
                             query?: string;
                             total?: number;
                             per_page?: number;
@@ -3009,9 +3027,31 @@ export interface operations {
             query?: {
                 /** @description flag for multiple bounce record deletion */
                 all?: boolean;
-                /** @description list of bounce ids to delete */
-                id?: string;
+                /** @description Bounce ids to delete. Repeat in the query for multiple values. */
+                id?: number[];
             };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    blocklistBouncedSubscribers: {
+        parameters: {
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -3092,8 +3132,8 @@ export interface operations {
                 query?: string;
                 /** @description Field to sort results by. */
                 order_by?: "name" | "status" | "created_at" | "updated_at" | "subscriber_count";
-                /** @description ASC|DESC Sort by ascending or descending order. */
-                order?: "ASC" | "DESC";
+                /** @description asc|desc Sort by ascending or descending order. */
+                order?: "asc" | "desc";
                 /** @description Filter by list type. */
                 type?: "public" | "private";
                 /** @description Filter by opt-in type. */
@@ -3300,7 +3340,7 @@ export interface operations {
                 "multipart/form-data": {
                     /**
                      * @description JSON string containing import parameters for more detail https://listmonk.app/docs/apis/import/#params-json-string
-                     * @example {"mode":"subscribe", "subscription_status":"confirmed", "delim":",", "lists":[1, 2], "overwrite": true}
+                     * @example {"mode":"subscribe", "subscription_status":"confirmed", "delim":",", "lists":[1, 2], "overwrite_userinfo": true, "overwrite_subscription_status": false}
                      */
                     params?: string;
                     /**
@@ -3383,7 +3423,7 @@ export interface operations {
                 /** @description Filter campaigns by tags. Multiple tags can be specified by repeating the parameter */
                 tags?: string[];
                 /** @description Determines the sort order of results. ASC for ascending, DESC for descending order */
-                order?: "ASC" | "DESC";
+                order?: "asc" | "desc";
                 /** @description Specifies the field by which to sort the campaigns. Available options are 'name', 'status', 'created_at', and 'updated_at' */
                 order_by?: "name" | "status" | "created_at" | "updated_at";
                 /** @description SQL query expression to filter campaigns by custom criteria */

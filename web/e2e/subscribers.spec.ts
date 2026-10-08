@@ -97,3 +97,31 @@ test('subscribers: bulk blocklist then delete the selection', async ({ page }) =
   await expect(page.getByRole('row')).toHaveCount(2) // header + empty-state row
   await expect(page.getByText('Nothing to show.')).toBeVisible()
 })
+
+test('subscribers: sort order really flips (server accepts lowercase asc/desc only)', async ({ page }) => {
+  const tag = `sort${Date.now()}`
+  for (const p of ['aaa', 'zzz']) {
+    const res = await page.request.post('/api/subscribers', {
+      data: { email: `${p}-${tag}@example.com`, name: tag, status: 'enabled', lists: [] },
+    })
+    expect(res.ok()).toBeTruthy()
+  }
+
+  try {
+    await page.goto(`/app/subscribers?q=${tag}`)
+    const emails = page.getByRole('row').getByRole('button', { name: /@example\.com$/ })
+    await expect(emails).toHaveCount(2)
+
+    await page.getByRole('button', { name: 'E-mail' }).click() // first click: ascending
+    await expect(page).toHaveURL(/sort=email:asc/)
+    await expect(emails.first()).toContainText('aaa-')
+
+    await page.getByRole('button', { name: 'E-mail' }).click() // second click: descending
+    await expect(page).toHaveURL(/sort=email:desc/)
+    await expect(emails.first()).toContainText('zzz-')
+  } finally {
+    const res = await page.request.get(`/api/subscribers?search=${tag}&per_page=all`)
+    const ids: number[] = (await res.json()).data.results.map((s: { id: number }) => s.id)
+    if (ids.length) await page.request.delete(`/api/subscribers?${ids.map((i) => `id=${i}`).join('&')}`)
+  }
+})

@@ -3,8 +3,8 @@ import { format } from 'date-fns'
 import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { List } from '@/api/types'
+import { selectColumn } from '@/components/datatable/selectColumn'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import RowActions from './RowActions.vue'
 
 type T = (key: string, ...args: unknown[]) => string
@@ -35,22 +35,7 @@ export function visibleStatuses(l: List): [string, number][] {
 export function createColumns(c: Handlers): ColumnDef<any, List>[] {
   const { t, n } = c
   return [
-    {
-      id: 'select',
-      enableSorting: false,
-      header: ({ table }) =>
-        h(Checkbox, {
-          'modelValue': table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false,
-          'onUpdate:modelValue': (v: boolean | 'indeterminate') => table.toggleAllPageRowsSelected(v === true),
-          'aria-label': t('web.common.selectAll'),
-        }),
-      cell: ({ row }) =>
-        h(Checkbox, {
-          'modelValue': row.getIsSelected(),
-          'onUpdate:modelValue': (v: boolean | 'indeterminate') => row.toggleSelected(v === true),
-          'aria-label': row.original.name,
-        }),
-    },
+    selectColumn<List>(t('web.common.selectAll'), (l) => l.name ?? ''),
     {
       id: 'name',
       accessorKey: 'name',

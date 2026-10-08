@@ -18,7 +18,7 @@ export interface ListQuery {
   perPage: number | 'all'
   /** Unset = oldest first (the server's default, by id). */
   orderBy?: 'name' | 'status' | 'created_at' | 'updated_at' | 'subscriber_count'
-  order?: 'ASC' | 'DESC'
+  order?: 'asc' | 'desc'
 }
 
 // The server matches names with a tsquery-ish LIKE; punctuation only produces errors.

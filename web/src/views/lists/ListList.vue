@@ -51,7 +51,7 @@ const query = computed<ListQuery>(() => ({
   page: pagination.value.pageIndex + 1,
   perPage: pagination.value.pageSize,
   orderBy: sorting.value[0]?.id as ListQuery['orderBy'],
-  order: sorting.value[0] ? (sorting.value[0].desc ? 'DESC' : 'ASC') : undefined,
+  order: sorting.value[0] ? (sorting.value[0].desc ? 'desc' : 'asc') : undefined,
 }))
 
 const { data, isPending } = useLists(query)

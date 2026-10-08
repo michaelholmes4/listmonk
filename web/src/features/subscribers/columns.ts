@@ -4,8 +4,8 @@ import { h } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { Subscriber } from '@/api/types'
 import CopyText from '@/components/CopyText.vue'
+import { selectColumn } from '@/components/datatable/selectColumn'
 import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
 import RowActions from './RowActions.vue'
 
 type T = (key: string, ...args: unknown[]) => string
@@ -25,22 +25,7 @@ export const activeListCount = (s: Subscriber) =>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches DataTable's `columns` prop
 export function createColumns({ t, onEdit, onDelete }: Handlers): ColumnDef<any, Subscriber>[] {
   return [
-    {
-      id: 'select',
-      enableSorting: false,
-      header: ({ table }) =>
-        h(Checkbox, {
-          'modelValue': table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false,
-          'onUpdate:modelValue': (v: boolean | 'indeterminate') => table.toggleAllPageRowsSelected(v === true),
-          'aria-label': t('subscribers.selectAll', { num: '' }),
-        }),
-      cell: ({ row }) =>
-        h(Checkbox, {
-          'modelValue': row.getIsSelected(),
-          'onUpdate:modelValue': (v: boolean | 'indeterminate') => row.toggleSelected(v === true),
-          'aria-label': row.original.email,
-        }),
-    },
+    selectColumn<Subscriber>(t('web.common.selectAll'), (s) => s.email ?? ''),
     {
       id: 'email',
       accessorKey: 'email',

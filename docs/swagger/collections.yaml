@@ -367,11 +367,11 @@ paths:
             enum: ["name", "status", "created_at", "updated_at"]
         - in: query
           name: order
-          description: ASC|DESC Sort by ascending or descending order.
+          description: asc|desc Sort by ascending or descending order.
           required: false
           schema:
             type: string
-            enum: ["ASC", "DESC"]
+            enum: ["asc", "desc"]
         - in: query
           name: subscription_status
           description: Subscription status to filter by if there are one or more list_ids.
@@ -887,10 +887,10 @@ paths:
             type: string
         - in: query
           name: order_by
-          description: Specifies the field by which to sort the bounce records. Available options are 'email', 'campaign_name', 'source', and 'created_at'
+          description: Specifies the field by which to sort the bounce records.
           schema:
             type: string
-            enum: ["email", "campaign_name", "source", "created_at"]
+            enum: ["email", "campaign_name", "source", "type", "created_at"]
         - in: query
           name: order
           description: Determines the sort order of results. Use 'asc' for ascending or 'desc' for descending order
@@ -911,7 +911,7 @@ paths:
                       results:
                         type: array
                         items:
-                          $ref: "#/components/schemas/Bounce"
+                          $ref: "#/components/schemas/BounceRecord"
                       query:
                         type: string
                       total:
@@ -921,7 +921,7 @@ paths:
                       page:
                         type: integer
     delete:
-      description: handles deletion of bounce records.
+      description: handles deletion of bounce records. `all` deletes every bounce, ignoring any filter.
       operationId: deleteBounces
       tags:
         - Bounces
@@ -933,9 +933,28 @@ paths:
             type: boolean
         - in: query
           name: id
-          description: list of bounce ids to delete
+          description: Bounce ids to delete. Repeat in the query for multiple values.
           schema:
-            type: string
+            type: array
+            items:
+              type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+
+  /bounces/blocklist:
+    put:
+      description: blocklists every subscriber that has a bounce record (not filterable; to blocklist some, use /subscribers/blocklist with subscriber ids).
+      operationId: blocklistBouncedSubscribers
+      tags:
+        - Bounces
       responses:
         "200":
           description: OK
@@ -1033,11 +1052,11 @@ paths:
             enum: ["name", "status", "created_at", "updated_at", "subscriber_count"]
         - in: query
           name: order
-          description: ASC|DESC Sort by ascending or descending order.
+          description: asc|desc Sort by ascending or descending order.
           required: false
           schema:
             type: string
-            enum: ["ASC", "DESC"]
+            enum: ["asc", "desc"]
         - in: query
           name: type
           description: Filter by list type.
@@ -1262,7 +1281,7 @@ paths:
                 params:
                   type: string
                   description: JSON string containing import parameters for more detail https://listmonk.app/docs/apis/import/#params-json-string
-                  example: '{"mode":"subscribe", "subscription_status":"confirmed", "delim":",", "lists":[1, 2], "overwrite": true}'
+                  example: '{"mode":"subscribe", "subscription_status":"confirmed", "delim":",", "lists":[1, 2], "overwrite_userinfo": true, "overwrite_subscription_status": false}'
                 file:
                   type: string
                   format: binary
@@ -1362,7 +1381,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: ["ASC", "DESC"]
+            enum: ["asc", "desc"]
         - in: query
           name: order_by
           description: Specifies the field by which to sort the campaigns. Available options are 'name', 'status', 'created_at', and 'updated_at'
@@ -4320,6 +4339,7 @@ components:
           type: integer
         status:
           type: string
+          enum: [none, importing, stopping, finished, failed]
 
     Campaign:
       type: object

@@ -23,7 +23,7 @@ export interface SubscriberQuery extends SubscriberFilter {
   perPage: number
   /** Unset = newest first (the server's default, by id). */
   orderBy?: 'email' | 'name' | 'status' | 'created_at' | 'updated_at'
-  order?: 'ASC' | 'DESC'
+  order?: 'asc' | 'desc'
 }
 
 /** Body fields for the by-query bulk endpoints. */

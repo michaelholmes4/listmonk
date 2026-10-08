@@ -13,8 +13,8 @@ Routes derive from `frontend/src/router/index.js`.
 | ◐ | `/subscribers` | Subscribers | Search, advanced SQL query (gated by `subscribers:sql_query`), list/status filter, sort, paging, export, bulk blocklist/delete/manage lists, row actions. e2e covers by-ID bulk; the "select all N" by-query path is not covered yet |
 | ☑ | `/subscribers/:id` | Subscriber form | Page (+ `/subscribers/new`): lists, preconfirm, send opt-in, subscriptions, bounces, activity, attributes |
 | ☑ | `/subscribers/lists/:listID` | Subscribers of a list | Same view; `?subscription_status=` honoured |
-| ☐ | `/subscribers/import` | Import | CSV + progress |
-| ☐ | `/subscribers/bounces` | Bounces | |
+| ☑ | `/subscribers/import` | Import | CSV/ZIP upload, subscribe/blocklist modes, overwrite options (with confirm), live progress and log, stop/done. `?list_id=` preselects lists |
+| ☑ | `/subscribers/bounces` | Bounces | Filters (campaign, source), sort, paging, details, delete and blocklist by ID. "Select all N" resolves the filtered IDs: the server's delete-all and blocklist-all ignore filters. The classic UI's "type" filter never worked (the API has none) and is omitted. Tested against a mocked API |
 | ☐ | `/campaigns` | Campaigns | |
 | ☐ | `/campaigns/:id` | Campaign editor | richtext (TinyMCE 7), HTML, markdown, visual |
 | ☐ | `/campaigns/media` | Media | |

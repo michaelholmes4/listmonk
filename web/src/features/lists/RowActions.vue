@@ -28,12 +28,12 @@ const manage = () => canList(props.id, 'list:manage')
       <DropdownMenuItem @select="emit('edit')">
         <Pencil />{{ manage() ? t('globals.buttons.edit') : t('web.common.view') }}
       </DropdownMenuItem>
-      <!-- Campaign editor and import aren't ported yet; these go to the classic screens. -->
+      <!-- The campaign editor isn't ported yet; this goes to the classic screen. -->
       <DropdownMenuItem v-if="can('campaigns:manage')" as-child>
         <a :href="`/admin/campaigns/new?list_id=${id}`"><Rocket />{{ t('lists.sendCampaign') }}</a>
       </DropdownMenuItem>
       <DropdownMenuItem v-if="can('subscribers:import')" as-child>
-        <a :href="`/admin/subscribers/import?list_id=${id}`"><FileUp />{{ t('import.title') }}</a>
+        <RouterLink :to="{ name: 'import', query: { list_id: id } }"><FileUp />{{ t('import.title') }}</RouterLink>
       </DropdownMenuItem>
       <template v-if="manage()">
         <DropdownMenuSeparator />

@@ -42,5 +42,7 @@
   "web.subscribers.help.what": "A subscriber is one e-mail address. Their subscriptions to lists carry the opt-in status.",
   "web.subscribers.help.blocklist": "Blocklisting stops all e-mail to this address, whatever lists they are on.",
   "web.subscribers.help.attribs": "Attributes are free-form JSON you can use in templates and in queries, for example city or plan.",
-  "web.common.learnMore": "Learn more"
+  "web.common.learnMore": "Learn more",
+  "web.bounces.details": "Details",
+  "web.bounces.confirmCount": "{num} selected"
 }

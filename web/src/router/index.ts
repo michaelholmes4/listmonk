@@ -52,6 +52,26 @@ export const router = createRouter({
       component: () => import('@/views/lists/ListEdit.vue'),
       meta: { title: 'globals.terms.list', parents: [{ title: 'globals.terms.lists', to: { name: 'lists' } }] },
     },
+    {
+      path: '/subscribers/bounces',
+      name: 'bounces',
+      component: () => import('@/views/bounces/BounceList.vue'),
+      meta: {
+        title: 'globals.terms.bounces',
+        parents: [{ title: 'globals.terms.subscribers', to: { name: 'subscribers' } }],
+        perms: ['bounces:get'],
+      },
+    },
+    {
+      path: '/subscribers/import',
+      name: 'import',
+      component: () => import('@/views/import/ImportView.vue'),
+      meta: {
+        title: 'import.title',
+        parents: [{ title: 'globals.terms.subscribers', to: { name: 'subscribers' } }],
+        perms: ['subscribers:import'],
+      },
+    },
     ...[
       { path: '/subscribers', name: 'subscribers' },
       { path: '/subscribers/lists/:listID(\\d+)', name: 'subscribers-list' },
