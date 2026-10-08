@@ -21,6 +21,9 @@ if [ -f web/package.json ]; then
   (cd web && pnpm exec playwright install --with-deps chromium)
 fi
 
+# Media uploads go to ./uploads (the dev server runs from the repo root); it must exist.
+mkdir -p uploads
+
 # Build everything once so the binary has the embedded assets, then install the schema.
 make dist
 ./listmonk --install --idempotent --yes --config .devcontainer/config.toml

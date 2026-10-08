@@ -24,3 +24,6 @@ web/node_modules
 web/dist
 !.devcontainer/config.toml
 .pnpm-store
+
+# librelist: local uploads from the dev server
+uploads/

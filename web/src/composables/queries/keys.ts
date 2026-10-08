@@ -18,5 +18,7 @@ export const keys = {
   },
   import: { status: ['import', 'status'] as const, logs: ['import', 'logs'] as const },
   bounces: { all: ['bounces'] as const, page: (q: unknown) => ['bounces', 'page', q] as const },
+  templates: { all: ['templates'] as const, detail: (id: number) => ['templates', 'detail', id] as const },
+  media: { all: ['media'] as const, page: (q: unknown) => ['media', 'page', q] as const },
   dashboard: { counts: ['dashboard', 'counts'] as const, charts: ['dashboard', 'charts'] as const },
 }

@@ -83,4 +83,12 @@ export const api = {
   async raw<T>(url: string, params?: Params, cfg?: Config): Promise<T> {
     return (await http.get<T>(url, { params, ...cfg })).data
   },
+  /** GET an endpoint that answers with an HTML document (template and campaign previews). */
+  async html(url: string, params?: Params, cfg?: Config): Promise<string> {
+    return (await http.get<string>(url, { params, responseType: 'text', ...cfg })).data
+  },
+  /** POST url-encoded form fields to an endpoint that answers with an HTML document. */
+  async postFormForHTML(url: string, fields: Record<string, string>, cfg?: Config): Promise<string> {
+    return (await http.post<string>(url, new URLSearchParams(fields), { responseType: 'text', ...cfg })).data
+  },
 }

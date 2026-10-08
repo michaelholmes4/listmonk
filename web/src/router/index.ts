@@ -53,6 +53,38 @@ export const router = createRouter({
       meta: { title: 'globals.terms.list', parents: [{ title: 'globals.terms.lists', to: { name: 'lists' } }] },
     },
     {
+      path: '/campaigns/media',
+      name: 'media',
+      component: () => import('@/views/media/MediaList.vue'),
+      meta: { title: 'media.title', perms: ['media:get'] },
+    },
+    {
+      path: '/campaigns/templates',
+      name: 'templates',
+      component: () => import('@/views/templates/TemplateList.vue'),
+      meta: { title: 'globals.terms.templates', perms: ['templates:get'] },
+    },
+    {
+      path: '/campaigns/templates/new',
+      name: 'template-new',
+      component: () => import('@/views/templates/TemplateCreate.vue'),
+      meta: {
+        title: 'templates.newTemplate',
+        parents: [{ title: 'globals.terms.templates', to: { name: 'templates' } }],
+        perms: ['templates:manage'],
+      },
+    },
+    {
+      path: '/campaigns/templates/:id(\\d+)',
+      name: 'template',
+      component: () => import('@/views/templates/TemplateEdit.vue'),
+      meta: {
+        title: 'globals.terms.template',
+        parents: [{ title: 'globals.terms.templates', to: { name: 'templates' } }],
+        perms: ['templates:get'],
+      },
+    },
+    {
       path: '/subscribers/bounces',
       name: 'bounces',
       component: () => import('@/views/bounces/BounceList.vue'),

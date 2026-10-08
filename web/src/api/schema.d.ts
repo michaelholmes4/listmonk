@@ -2087,12 +2087,10 @@ export interface components {
             filename?: string;
             content_type?: string;
             created_at?: string;
-            thumb_url?: string;
-            thumb_uri?: string;
+            thumb_url?: string | null;
             provider?: string;
             meta?: Record<string, never>;
             url?: string;
-            uri?: string;
         };
         Template: {
             id?: number;
@@ -2102,7 +2100,8 @@ export interface components {
             body?: string;
             body_source?: string;
             subject?: string;
-            type?: string;
+            /** @enum {string} */
+            type?: "campaign" | "campaign_visual" | "tx";
             is_default?: boolean;
         };
         NewTemplate: {
@@ -3847,7 +3846,12 @@ export interface operations {
     };
     getMedia: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Search by filename. */
+                query?: string;
+                page?: number;
+                per_page?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3861,7 +3865,12 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data?: components["schemas"]["MediaFileObject"][];
+                        data?: {
+                            results?: components["schemas"]["MediaFileObject"][];
+                            total?: number;
+                            per_page?: number;
+                            page?: number;
+                        };
                     };
                 };
             };
@@ -3946,9 +3955,9 @@ export interface operations {
     };
     getTemplates: {
         parameters: {
-            query: {
-                /** @description boolean flag for response with/without body */
-                no_body: boolean;
+            query?: {
+                /** @description when true, the (large) template bodies are left out */
+                no_body?: boolean;
             };
             header?: never;
             path?: never;
@@ -4119,17 +4128,7 @@ export interface operations {
             };
             cookie?: never;
         };
-        /** @description template parameters */
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": {
-                    /** @description type of template */
-                    template_type?: string;
-                    /** @description template body */
-                    body?: string;
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description response */
             200: {
@@ -4160,7 +4159,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Template"];
+                    "application/json": {
+                        data?: components["schemas"]["Template"];
+                    };
                 };
             };
         };

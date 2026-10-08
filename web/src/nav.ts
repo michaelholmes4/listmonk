@@ -110,13 +110,13 @@ export const navigation: NavGroup[] = [
         perms: ['campaigns:manage'],
         legacy: '/admin/campaigns/new',
       },
-      { key: 'media', label: 'menu.media', icon: Image, perms: ['media:*'], legacy: '/admin/campaigns/media' },
+      { key: 'media', label: 'menu.media', icon: Image, perms: ['media:*'], to: { name: 'media' } },
       {
         key: 'templates',
         label: 'globals.terms.templates',
         icon: FileText,
         perms: ['templates:get'],
-        legacy: '/admin/campaigns/templates',
+        to: { name: 'templates' },
       },
       {
         key: 'analytics',

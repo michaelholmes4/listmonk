@@ -1843,6 +1843,23 @@ paths:
       operationId: getMedia
       tags:
         - Media
+      parameters:
+        - in: query
+          name: query
+          description: Search by filename.
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+        - in: query
+          name: per_page
+          required: false
+          schema:
+            type: integer
       responses:
         "200":
           description: response
@@ -1852,9 +1869,18 @@ paths:
                 type: object
                 properties:
                   data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/MediaFileObject"
+                    type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/MediaFileObject"
+                      total:
+                        type: integer
+                      per_page:
+                        type: integer
+                      page:
+                        type: integer
     post:
       description: handles media file uploads.
       operationId: uploadMedia
@@ -1934,8 +1960,8 @@ paths:
       parameters:
         - in: query
           name: no_body
-          description: boolean flag for response with/without body
-          required: true
+          description: when true, the (large) template bodies are left out
+          required: false
           schema:
             type: boolean
       responses:
@@ -2090,20 +2116,6 @@ paths:
       operationId: previewTemplateById
       tags:
         - Templates
-      requestBody:
-        description: template parameters
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                template_type:
-                  description: type of template
-                  type: string
-                body:
-                  description: template body
-                  type: string
       parameters:
         - in: path
           name: id
@@ -2139,7 +2151,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Template"
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Template"
 
   /tx:
     post:
@@ -4590,15 +4605,12 @@ components:
           type: string
         thumb_url:
           type: string
-        thumb_uri:
-          type: string
+          nullable: true
         provider:
           type: string
         meta:
           type: object
         url:
-          type: string
-        uri:
           type: string
 
     Template:
@@ -4620,6 +4632,7 @@ components:
           type: string
         type:
           type: string
+          enum: [campaign, campaign_visual, tx]
         is_default:
           type: boolean
 

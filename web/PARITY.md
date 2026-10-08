@@ -17,8 +17,8 @@ Routes derive from `frontend/src/router/index.js`.
 | ☑ | `/subscribers/bounces` | Bounces | Filters (campaign, source), sort, paging, details, delete and blocklist by ID. "Select all N" resolves the filtered IDs: the server's delete-all and blocklist-all ignore filters. The classic UI's "type" filter never worked (the API has none) and is omitted. Tested against a mocked API |
 | ☐ | `/campaigns` | Campaigns | |
 | ☐ | `/campaigns/:id` | Campaign editor | richtext (TinyMCE 7), HTML, markdown, visual |
-| ☐ | `/campaigns/media` | Media | |
-| ☐ | `/campaigns/templates` | Templates | |
+| ☑ | `/campaigns/media` | Media | Search, multi-file upload, delete, paging (page and search in the URL). `MediaGallery` has a `selectable` mode for the campaign editor's picker |
+| ◐ | `/campaigns/templates` | Templates | List (client-side sort), create/edit pages, preview (also of unsaved edits, F9), clone, set default, delete. **Left: the visual (drag-and-drop) template type is still edited in the classic admin** until the email-builder is mounted here, together with the campaign editor |
 | ☐ | `/campaigns/analytics` | Analytics | |
 | ☐ | `/users` | Users | |
 | ☐ | `/users/roles/users` | User roles | |

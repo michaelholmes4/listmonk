@@ -46,8 +46,17 @@ const props = withDefaults(
     emptyText?: string
     /** Stable row key; needed so a selection survives page changes. */
     rowId?: (row: TData) => string
+    /** Set false for small lists that are loaded whole: hides the pager and shows every row. */
+    paginated?: boolean
   }>(),
-  { rowCount: undefined, loading: false, pageSizes: () => [20, 50, 100], emptyText: undefined, rowId: undefined },
+  {
+    rowCount: undefined,
+    loading: false,
+    pageSizes: () => [20, 50, 100],
+    emptyText: undefined,
+    rowId: undefined,
+    paginated: true,
+  },
 )
 
 const pagination = defineModel<PaginationState>('pagination', { default: () => ({ pageIndex: 0, pageSize: 20 }) })
@@ -127,6 +136,6 @@ const colCount = computed(() => props.columns.length)
         </TableBody>
       </Table>
     </div>
-    <DataTablePagination v-model="pagination" :total="rowCount ?? data.length" :page-sizes="pageSizes" />
+    <DataTablePagination v-if="paginated" v-model="pagination" :total="rowCount ?? data.length" :page-sizes="pageSizes" />
   </div>
 </template>

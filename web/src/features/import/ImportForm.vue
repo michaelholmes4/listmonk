@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { ImportParams } from '@/api/import'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import FileChips from '@/components/FileChips.vue'
 import FileDropzone from '@/components/FileDropzone.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -137,7 +138,8 @@ function run() {
 
     <div class="space-y-2">
       <Label>{{ t('import.csvFile') }}</Label>
-      <FileDropzone v-model="file" accept=".csv,.zip" :label="t('import.csvFileHelp')" />
+      <FileDropzone accept=".csv,.zip" :label="t('import.csvFileHelp')" @select="file = $event[0]" />
+      <FileChips :files="file ? [file] : []" @remove="file = null" />
     </div>
 
     <Button type="submit" :disabled="!canSubmit || start.isPending.value">
