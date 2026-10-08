@@ -47,7 +47,6 @@
   "web.bounces.confirmCount": "{num} selected",
   "web.templates.bodyRequired": "The template body is required.",
   "web.templates.subjectRequired": "A transactional template needs a subject.",
-  "web.templates.visualInClassic": "Visual templates are edited in the classic admin for now. Everything else about them (preview, clone, default, delete) works here.",
   "web.templates.help.what": "Campaign templates wrap the body of every campaign you send: header, footer, branding. The placeholder marks where the campaign content goes.",
   "web.templates.help.tx": "Transactional templates are complete messages with their own subject, sent through the API (and from automations).",
   "web.campaigns.invalidHeaders": "Headers must be a JSON array of objects, one header per object.",

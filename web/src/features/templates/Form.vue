@@ -12,10 +12,12 @@ import PreviewDialog from '@/components/PreviewDialog.vue'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCreateTemplate, usePreviewTemplate, useUpdateTemplate } from '@/composables/queries/useTemplates'
 import { useGoBack } from '@/composables/useGoBack'
 import { usePermission } from '@/composables/usePermission'
+import VisualEditor from '@/features/campaigns/visual/VisualEditor.vue'
 import { typeLabelKey } from './columns'
 import { emptyTemplate, hasContentPlaceholder, templateSchema, toForm } from './schema'
 
@@ -45,6 +47,11 @@ const placeholder = '{{ template "content" . }}'
 const isVisual = computed(() => values.type === 'campaign_visual')
 // Campaign templates are useless without the placeholder; say so before the server does.
 const missingPlaceholder = computed(() => values.type === 'campaign' && !!values.body && !hasContentPlaceholder(values.body))
+
+function onVisualChange(v: { source: string; body: string }) {
+  setFieldValue('body', v.body)
+  setFieldValue('bodySource', v.source)
+}
 
 const onSubmit = handleSubmit((v) => {
   const body = { name: v.name, type: v.type, subject: v.type === 'tx' ? v.subject : '', body: v.body, body_source: v.bodySource ?? undefined }
@@ -105,14 +112,19 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
       </FormItem>
     </FormField>
 
-    <!-- The visual (drag-and-drop) editor is the classic UI's React email-builder; until it's wired
-         in here, those templates are edited in the classic admin. -->
-    <div v-if="isVisual" class="rounded-lg border p-4 text-sm">
-      <p class="font-medium">{{ t('templates.typeCampaignVisual') }}</p>
-      <p class="mt-1 text-muted-foreground">{{ t('web.templates.visualInClassic') }}</p>
-      <Button as-child variant="outline" size="sm" class="mt-3">
-        <a href="/admin/campaigns/templates">{{ t('web.nav.legacyHint') }}</a>
-      </Button>
+    <div v-if="isVisual" class="space-y-2">
+      <div class="flex items-center justify-between">
+        <Label>{{ t('templates.typeCampaignVisual') }}</Label>
+        <Button type="button" variant="outline" size="sm" @click="showPreview">
+          <Eye />{{ t('templates.preview') }} (F9)
+        </Button>
+      </div>
+      <VisualEditor
+        :source="values.bodySource ?? null"
+        :body="values.body ?? ''"
+        :disabled="!canManage"
+        @change="onVisualChange"
+      />
     </div>
 
     <FormField v-else name="body">

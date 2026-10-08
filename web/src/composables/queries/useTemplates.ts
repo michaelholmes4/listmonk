@@ -31,3 +31,6 @@ export const usePreviewTemplate = () =>
     mutationFn: (v: { id: number } | { type: string; body: string }) =>
       'id' in v ? api.previewTemplate(v.id) : api.previewTemplateBody(v.type, v.body),
   })
+
+/** Fetch a template's full body on demand (e.g. importing a visual template into a campaign). */
+export const useFetchTemplate = () => useMutation({ mutationFn: (id: number) => api.getTemplate(id) })
