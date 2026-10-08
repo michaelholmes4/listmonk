@@ -396,6 +396,7 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
           @update:body="setFieldValue('body', $event)"
           @update:body-source="setFieldValue('bodySource', $event)"
           @update:template-id="setFieldValue('templateId', $event)"
+          @save="submit"
         />
 
         <div class="flex flex-wrap items-start justify-between gap-4 text-sm">

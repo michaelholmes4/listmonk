@@ -56,5 +56,8 @@
   "web.campaigns.help.content": "Pick a format, a template and write the message. Switching format converts the content, which can lose formatting, so you are asked first. F9 previews it.",
   "web.campaigns.help.lock": "Once a campaign is running, finished or cancelled its content is locked. Pausing it makes it editable again.",
   "web.analytics.pick": "Choose one or more campaigns and a date range to see their views, clicks, bounces and links.",
-  "web.common.search": "Search"
+  "web.common.search": "Search",
+  "web.campaigns.trackLink": "Track link?",
+  "web.campaigns.sourceCode": "Source code",
+  "web.campaigns.insertHTML": "Insert HTML"
 }

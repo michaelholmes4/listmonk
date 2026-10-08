@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useConvertCampaignContent, usePreviewCampaignBody } from '@/composables/queries/useCampaigns'
 import { useTemplates } from '@/composables/queries/useTemplates'
 import { convertContent } from './convert'
+import RichtextEditor from './richtext/RichtextEditor.vue'
 import { contentTypes, type ContentType } from './schema'
 
 /**
@@ -21,6 +22,7 @@ import { contentTypes, type ContentType } from './schema'
  * preview. Everything is bound with v-model so the page's form stays the single source of truth.
  */
 const props = defineProps<{ campaignId: number; title: string; disabled?: boolean }>()
+const emit = defineEmits<{ save: [] }>()
 const contentType = defineModel<ContentType>('contentType', { required: true })
 const body = defineModel<string>('body', { required: true })
 const bodySource = defineModel<string | null>('bodySource', { default: null })
@@ -128,8 +130,9 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
       </Button>
     </div>
 
-    <!-- richtext and visual get their own editors; until those land they edit the HTML directly. -->
-    <CodeEditor v-if="contentType === 'html' || contentType === 'richtext' || contentType === 'visual'" v-model="body" lang="html" :readonly="disabled" class="h-[60vh]" />
+    <RichtextEditor v-if="contentType === 'richtext'" v-model="body" :disabled="disabled" @save="emit('save')" @preview="showPreview" />
+    <!-- The visual editor lands next; until then it edits the HTML directly. -->
+    <CodeEditor v-else-if="contentType === 'html' || contentType === 'visual'" v-model="body" lang="html" :readonly="disabled" class="h-[60vh]" />
     <CodeEditor v-else-if="contentType === 'markdown'" v-model="body" lang="markdown" :readonly="disabled" class="h-[60vh]" />
     <Textarea v-else v-model="body" :disabled="disabled" class="h-[60vh] font-mono text-sm" name="content" />
 
