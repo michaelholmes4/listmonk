@@ -8,6 +8,7 @@ export type ServerConfig = Schemas['ServerConfig']
 export type User = Schemas['User']
 export type About = Schemas['About']
 export type DashboardCount = Schemas['DashboardCount']
+export type DashboardChart = Schemas['DashboardChart']
 
 /** A language pack is a flat key -> message map (the spec types every key; this is simpler). */
 export type LanguagePack = Record<string, string>

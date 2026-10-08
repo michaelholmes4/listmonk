@@ -15,8 +15,6 @@
   "web.commands.preferences": "Preferences",
   "web.commands.open": "Open command palette",
   "web.dashboard.title": "Dashboard",
-  "web.dashboard.messages": "Messages sent",
-  "web.dashboard.updated": "Counts refresh periodically.",
   "web.errors.notFoundTitle": "Page not found",
   "web.errors.notFoundBody": "This page doesn't exist in the new admin yet.",
   "web.errors.goHome": "Back to dashboard",
@@ -29,5 +27,6 @@
   "web.common.cancel": "Cancel",
   "web.common.confirm": "Confirm",
   "web.common.save": "Save",
-  "web.common.help": "Help"
+  "web.common.help": "Help",
+  "web.dashboard.noData": "No data in the last 30 days."
 }

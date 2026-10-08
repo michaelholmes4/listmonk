@@ -3560,11 +3560,13 @@ components:
 
     DashboardChart:
       type: object
+      required: [link_clicks, campaign_views]
       properties:
         link_clicks:
           type: array
           items:
             type: object
+            required: [count, date]
             properties:
               count:
                 type: integer
@@ -3574,6 +3576,7 @@ components:
           type: array
           items:
             type: object
+            required: [count, date]
             properties:
               count:
                 type: integer

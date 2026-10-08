@@ -1599,13 +1599,13 @@ export interface components {
             };
         };
         DashboardChart: {
-            link_clicks?: {
-                count?: number;
-                date?: string;
+            link_clicks: {
+                count: number;
+                date: string;
             }[];
-            campaign_views?: {
-                count?: number;
-                date?: string;
+            campaign_views: {
+                count: number;
+                date: string;
             }[];
         };
         DashboardCount: {

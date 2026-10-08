@@ -20,6 +20,17 @@ test('dashboard shows counts and the shell renders', async ({ page }) => {
   await expect(page).toHaveTitle(/Dashboard · /)
 })
 
+test('dashboard breakdowns and charts load independently', async ({ page }) => {
+  await page.goto('/app/')
+  for (const chart of ['views', 'clicks']) {
+    const card = page.locator(`[data-cy=chart-${chart}]`)
+    await expect(card.locator('[data-slot=skeleton]')).toHaveCount(0)
+    // Either a chart (when the last 30 days have data) or the empty state, never a blank card.
+    await expect(card.locator('svg').or(card.getByText('No data in the last 30 days.')).first()).toBeVisible()
+  }
+  await expect(page.locator('[data-cy=lists]')).toContainText('Public')
+})
+
 test('unported screens link to the classic admin', async ({ page }) => {
   await page.goto('/app/')
   await page.locator('[data-sidebar=menu-button]', { hasText: 'Lists' }).click()

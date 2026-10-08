@@ -6,7 +6,7 @@ Routes derive from `frontend/src/router/index.js`.
 
 | Done | Route | Classic view | Notes |
 |:---:|---|---|---|
-| ◐ | `/` dashboard | Dashboard | Counts only. Charts (campaign views, link clicks) not yet |
+| ◐ | `/` dashboard | Dashboard | Counts, breakdowns and both charts done. Left: "slow queries cached" note (needs `app.cache_slow_queries` from `/api/settings`) and the global refresh action |
 | ☐ | `/lists` | Lists | |
 | ☐ | `/lists/:id` | List form | |
 | ☐ | `/lists/forms` | Forms generator | |
