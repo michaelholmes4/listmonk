@@ -25,7 +25,7 @@ test('build, save, publish and watch an automation', async ({ page, request }) =
   let id = 0
   try {
     // --- Create from the list. -------------------------------------------------------------------------
-    await page.goto('/app/automations')
+    await page.goto('/admin/automations')
     await page.getByRole('button', { name: 'New' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(name)
@@ -102,7 +102,7 @@ test('an incomplete flow is flagged and cannot be published', async ({ page, req
   test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
   const a = (await (await request.post('/api/automations', { data: { name: `E2E incomplete ${Date.now()}`, settings: {} } })).json()).data
   try {
-    await page.goto(`/app/automations/${a.id}`)
+    await page.goto(`/admin/automations/${a.id}`)
     await page.locator('[data-cy=add-trigger]').click()
     await page.locator('[data-cy=add-trigger-list_joined]').click()
     await closeSheet(page) // no list chosen
@@ -130,7 +130,7 @@ test('an email step: write the email in the step, publish, and it is sent', asyn
   const list = (await (await request.post('/api/lists', { data: { name: `E2E mail topic ${stamp}`, type: 'private', optin: 'single' } })).json()).data
   const a = (await (await request.post('/api/automations', { data: { name: `E2E mail ${stamp}`, settings: {} } })).json()).data
   try {
-    await page.goto(`/app/automations/${a.id}`)
+    await page.goto(`/admin/automations/${a.id}`)
     const sheet = page.locator('[data-cy=step-sheet]')
 
     await page.locator('[data-cy=add-trigger]').click()

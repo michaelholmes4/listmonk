@@ -1,8 +1,8 @@
 # Parity with the classic admin UI
 
-A row is checked only when **every** action available in the classic view works in the new one.
-Until then the sidebar item links to the classic screen (`legacy` in `src/nav.ts`).
-Routes derive from `frontend/src/router/index.js`.
+A row is checked only when **every** action available in the classic view worked in the new one. All rows
+are checked and the classic UI is gone (Phase 7); this records what was ported. Routes derived from the
+classic `frontend/src/router/index.js` (deleted; see git history before the "Retire the classic UI" commit).
 
 | Done | Route | Classic view | Notes |
 |:---:|---|---|---|

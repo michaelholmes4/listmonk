@@ -11,5 +11,5 @@ Fork of listmonk adding a Vue 3 + shadcn-vue admin UI (`web/`) and marketing aut
 - Keep AGPL notices; credit listmonk and libredesk in NOTICE.
 
 ## Dev
-- Devcontainer: `make dev` (Go API :9000, new UI :5173, old UI `make run-frontend` :8080, Mailpit :8025).
+- Devcontainer: `make dev` (Go API :9000, admin UI :5173 with hot reload, Mailpit :8025). The UI is served by the backend at /admin (built into `web/dist`); /app redirects there.
 - Go tests: `make test`.

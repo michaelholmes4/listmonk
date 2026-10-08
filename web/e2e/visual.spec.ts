@@ -19,7 +19,7 @@ const builder = (page: Page) => page.frameLocator('[data-cy=visual-editor] ifram
 test('visual: markdown converts to blocks, saves source+HTML, and reopens clean', async ({ page }) => {
   const { list, id } = await setup(page, { content_type: 'markdown', body: '# Hello visual\n\nsome text' })
   try {
-    await page.goto(`/app/campaigns/${id}?tab=content`)
+    await page.goto(`/admin/campaigns/${id}?tab=content`)
     await page.locator('[data-cy=format]').click()
     await page.locator('[data-cy=check-visual]').click()
     await page.getByRole('button', { name: 'Confirm' }).click()
@@ -54,7 +54,7 @@ test('visual: import a visual template replaces the content', async ({ page }) =
   ).data
   const { list, id } = await setup(page, { content_type: 'visual', body: '<p>old</p>', body_source: JSON.stringify(doc('Old heading')) })
   try {
-    await page.goto(`/app/campaigns/${id}?tab=content`)
+    await page.goto(`/admin/campaigns/${id}?tab=content`)
     await expect(builder(page).getByText('Old heading').first()).toBeVisible({ timeout: 20_000 })
 
     await page.locator('[data-cy=btn-select-visual-tpl]').click()
@@ -84,7 +84,7 @@ test('visual templates: edit in the builder page, preview, and saving keeps the 
     ).json()
   ).data
   try {
-    await page.goto(`/app/campaigns/templates/${tpl.id}`)
+    await page.goto(`/admin/campaigns/templates/${tpl.id}`)
     await expect(builder(page).getByText('Tpl heading').first()).toBeVisible({ timeout: 20_000 })
 
     await page.getByRole('button', { name: /Preview/ }).click()
@@ -104,7 +104,7 @@ test('visual templates: edit in the builder page, preview, and saving keeps the 
 })
 
 test('visual templates: a new one starts from the builder', async ({ page }) => {
-  await page.goto('/app/campaigns/templates/new')
+  await page.goto('/admin/campaigns/templates/new')
   await page.getByLabel('Type').click()
   await page.getByRole('option', { name: /visual/i }).click()
   await expect(page.locator('[data-cy=visual-editor] iframe')).toBeVisible()

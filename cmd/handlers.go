@@ -75,9 +75,9 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
 		g.GET(path.Join(uriAdmin, "/*"), a.AdminPage)
 
-		// librelist: new UI.
-		g.GET(uriWeb, a.WebPage)
-		g.GET(uriWeb+"/*", a.WebPage)
+		// librelist: the UI used to live at /app.
+		g.GET(uriLegacyWeb, a.LegacyWebRedirect)
+		g.GET(uriLegacyWeb+"/*", a.LegacyWebRedirect)
 	}
 
 	// =================================================================

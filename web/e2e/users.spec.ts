@@ -23,7 +23,7 @@ test('users: create, edit, delete a person', async ({ page }) => {
   const username = `e2e_user_${id}`
   const role = await makeRole(page, `E2E role ${id}`)
   try {
-    await page.goto('/app/users')
+    await page.goto('/admin/users')
     await expect(page.getByRole('heading', { name: /^Users/ })).toBeVisible()
     await page.getByRole('button', { name: 'New' }).click()
     await expect(page).toHaveURL(/\/users\/new$/)
@@ -41,7 +41,7 @@ test('users: create, edit, delete a person', async ({ page }) => {
     await page.getByLabel('E-mail').fill(`${username}@example.com`)
     await page.getByLabel('Name', { exact: true }).fill('E2E Person')
     await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page).toHaveURL(/\/app\/users$/)
+    await expect(page).toHaveURL(/\/admin\/users$/)
 
     const row = page.getByRole('row', { name: new RegExp(username) })
     await expect(row).toBeVisible()
@@ -54,7 +54,7 @@ test('users: create, edit, delete a person', async ({ page }) => {
     await page.getByRole('combobox').nth(0).click() // status
     await page.getByRole('option', { name: 'Disabled' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page).toHaveURL(/\/app\/users$/)
+    await expect(page).toHaveURL(/\/admin\/users$/)
     await expect(page.getByRole('row', { name: new RegExp(username) })).toContainText('Disabled')
 
     // Delete
@@ -73,7 +73,7 @@ test('users: an API user is shown its token once, and the token works', async ({
   const username = `e2e_api_${id}`
   const role = await makeRole(page, `E2E api role ${id}`)
   try {
-    await page.goto('/app/users/new')
+    await page.goto('/admin/users/new')
     await page.getByRole('button', { name: 'API' }).click()
     // API users have no email or password.
     await expect(page.getByLabel('E-mail')).toHaveCount(0)
@@ -95,7 +95,7 @@ test('users: an API user is shown its token once, and the token works', async ({
     await api.dispose()
 
     await page.getByRole('button', { name: 'Close' }).click()
-    await expect(page).toHaveURL(/\/app\/users$/)
+    await expect(page).toHaveURL(/\/admin\/users$/)
     await expect(page.getByRole('row', { name: new RegExp(username) })).toContainText('API')
   } finally {
     for (const u of await rows(page.request, '/api/users')) if (u.username === username) await page.request.delete(`/api/users/${u.id}`)
@@ -106,7 +106,7 @@ test('users: an API user is shown its token once, and the token works', async ({
 test('user roles: create, clone, edit permissions, delete; Super Admin is read-only', async ({ page }) => {
   const name = `E2E urole ${stamp()}`
   try {
-    await page.goto('/app/users/roles/users')
+    await page.goto('/admin/users/roles/users')
     await expect(page.getByRole('heading', { name: /^User roles/ })).toBeVisible()
 
     // Super Admin can be opened but not changed or deleted.
@@ -167,7 +167,7 @@ test('list roles: pick lists, set view/manage, save', async ({ page }) => {
   const name = `E2E lrole ${id}`
   const list = (await (await page.request.post('/api/lists', { data: { name: `E2E rolelist ${id}`, type: 'private', optin: 'single' } })).json()).data
   try {
-    await page.goto('/app/users/roles/lists')
+    await page.goto('/admin/users/roles/lists')
     await expect(page.getByRole('heading', { name: /^List roles/ })).toBeVisible()
     await page.getByRole('button', { name: 'New' }).click()
     await expect(page).toHaveURL(/\/users\/roles\/lists\/new$/)
@@ -210,7 +210,7 @@ test('users: a user can pick a list role', async ({ page }) => {
   const role = await makeRole(page, `E2E role ${id}`)
   const lr = (await (await page.request.post('/api/roles/lists', { data: { name: `E2E lr ${id}`, lists: [] } })).json()).data
   try {
-    await page.goto('/app/users/new')
+    await page.goto('/admin/users/new')
     await page.getByLabel('Username', { exact: true }).fill(username)
     await page.getByLabel('E-mail').fill(`${username}@example.com`)
     await page.locator('[data-cy=user-role]').click()
@@ -218,7 +218,7 @@ test('users: a user can pick a list role', async ({ page }) => {
     await page.locator('[data-cy=list-role]').click()
     await page.getByRole('option', { name: `E2E lr ${id}` }).click()
     await page.getByRole('button', { name: 'Save' }).click()
-    await expect(page).toHaveURL(/\/app\/users$/)
+    await expect(page).toHaveURL(/\/admin\/users$/)
     await expect(page.getByRole('row', { name: new RegExp(username) })).toContainText(`E2E lr ${id}`)
   } finally {
     for (const u of await rows(page.request, '/api/users')) if (u.username === username) await page.request.delete(`/api/users/${u.id}`)
@@ -271,11 +271,11 @@ test('profile: edit details; turn two-factor on with a real code, and off with t
     throw e
   })
   try {
-    await me.goto('/admin/login?next=/app/user/profile')
+    await me.goto('/admin/login?next=/admin/user/profile')
     await me.fill('input[name=username]', username)
     await me.fill('input[name=password]', password)
     await me.click('button[type=submit]')
-    await expect(me).toHaveURL(/\/app\/user\/profile$/)
+    await expect(me).toHaveURL(/\/admin\/user\/profile$/)
     await expect(me.getByRole('heading', { name: `@${username}` })).toBeVisible()
 
     // Details

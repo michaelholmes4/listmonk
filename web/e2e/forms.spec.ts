@@ -16,7 +16,7 @@ test('forms: ticking a public list generates its embed HTML', async ({ page }) =
   const { id, uuid } = (await res.json()).data
 
   try {
-    await page.goto('/app/lists/forms')
+    await page.goto('/admin/lists/forms')
     await expect(page.getByRole('heading', { name: 'Forms' })).toBeVisible()
     await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 

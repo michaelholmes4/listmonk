@@ -26,7 +26,7 @@ const saved = async (page: Page, id: number) => (await (await page.request.get(`
 test('richtext: type, save with Ctrl+S inside the editor, edit the source', async ({ page }) => {
   const { list, id } = await setup(page, '<p>hello</p>')
   try {
-    await page.goto(`/app/campaigns/${id}?tab=content`)
+    await page.goto(`/admin/campaigns/${id}?tab=content`)
     const frame = page.frameLocator('iframe.tox-edit-area__iframe')
     await expect(frame.locator('body')).toContainText('hello')
 
@@ -52,7 +52,7 @@ test('richtext: type, save with Ctrl+S inside the editor, edit the source', asyn
 test('richtext: a tracked link is stored with the @TrackLink suffix and reads back as tracked', async ({ page }) => {
   const { list, id } = await setup(page, '<p>visit our site</p>')
   try {
-    await page.goto(`/app/campaigns/${id}?tab=content`)
+    await page.goto(`/admin/campaigns/${id}?tab=content`)
     const frame = page.frameLocator('iframe.tox-edit-area__iframe')
     await expect(frame.locator('body')).toContainText('visit our site')
     await frame.locator('body').click()
@@ -83,7 +83,7 @@ test('richtext: a tracked link is stored with the @TrackLink suffix and reads ba
 test('richtext: switching the theme rebuilds the editor with the matching skin', async ({ page }) => {
   const { list, id } = await setup(page, '<p>themed</p>')
   try {
-    await page.goto(`/app/campaigns/${id}?tab=content`)
+    await page.goto(`/admin/campaigns/${id}?tab=content`)
     await expect(page.locator('.tox-tinymce')).toBeVisible()
     const light = await page.evaluate(() => document.getElementById('tinymce-skin')?.textContent?.length ?? 0)
 

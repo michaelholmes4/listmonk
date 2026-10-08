@@ -13,7 +13,7 @@ test.beforeEach(({ page }) => {
 test('lists: create, edit, archive, delete', async ({ page }) => {
   const name = `E2E list ${Date.now()}`
 
-  await page.goto('/app/lists')
+  await page.goto('/admin/lists')
   await expect(page.getByRole('heading', { name: /^Lists/ })).toBeVisible()
   await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
@@ -30,7 +30,7 @@ test('lists: create, edit, archive, delete', async ({ page }) => {
   await page.getByPlaceholder('Tags').press('Enter')
   await page.getByRole('button', { name: 'Save' }).click()
   // Saving goes back to the list the user came from.
-  await expect(page).toHaveURL(/\/app\/lists$/)
+  await expect(page).toHaveURL(/\/admin\/lists$/)
 
   // Search finds it, with its badges and the opt-in campaign shortcut
   await page.getByLabel('Name', { exact: true }).fill(name.replace(/\d+$/, ''))
@@ -52,7 +52,7 @@ test('lists: create, edit, archive, delete', async ({ page }) => {
   // Archive: it leaves the active view and shows in the archived one
   await page.getByRole('switch').click()
   await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/\/app\/lists/)
+  await expect(page).toHaveURL(/\/admin\/lists/)
   // Going back restored the search that was active before editing (it lives in the URL).
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name.replace(/\d+$/, '').trim())
   await expect(page.getByRole('row', { name: new RegExp(name) })).toHaveCount(0)
@@ -80,7 +80,7 @@ test('lists: bulk delete only removes the selected lists', async ({ page }) => {
   const keep = await page.request.post('/api/lists', { data: { name: `${tag} keep`, type: 'private', optin: 'single' } })
   const keepId = (await keep.json()).data.id
 
-  await page.goto('/app/lists')
+  await page.goto('/admin/lists')
   await page.getByLabel('Name', { exact: true }).fill(tag)
   await page.getByLabel('Name', { exact: true }).press('Enter')
   await expect(page.getByRole('row')).toHaveCount(4) // header + 3

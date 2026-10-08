@@ -13,11 +13,10 @@
     "ghcr.io/devcontainers/features/node:1": { "version": "22", "pnpmVersion": "latest", "nodeGypDependencies": false },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "forwardPorts": [9000, 5173, 8080, 8025, 5432],
+  "forwardPorts": [9000, 5173, 8025, 5432],
   "portsAttributes": {
     "9000": { "label": "Go API + embedded UI" },
-    "5173": { "label": "New UI (Vite, /app)" },
-    "8080": { "label": "Old UI (Vite)" },
+    "5173": { "label": "Admin UI (Vite, /admin)" },
     "8025": { "label": "Mailpit" }
   },
   "postCreateCommand": "bash .devcontainer/post-create.sh",

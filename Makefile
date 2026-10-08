@@ -10,21 +10,13 @@ BUILDSTR := ${VERSION} (\#${LAST_COMMIT} $(BUILDDATE))
 YARN ?= yarn
 GOPATH ?= $(HOME)/go
 STUFFBIN ?= $(GOPATH)/bin/stuffbin
-FRONTEND_YARN_MODULES = frontend/node_modules
-FRONTEND_DIST = frontend/dist
-FRONTEND_EMAIL_BUILDER_DIST_FINAL = frontend/public/static/email-builder
-FRONTEND_DEPS = \
-	$(FRONTEND_YARN_MODULES) \
-	$(FRONTEND_EMAIL_BUILDER_DIST_FINAL) \
-	frontend/index.html \
-	frontend/package.json \
-	frontend/vite.config.js \
-	frontend/.eslintrc.js \
-	$(shell find frontend/fontello frontend/public frontend/src -type f)
-
+# librelist: the admin UI is web/ (pnpm). Only the visual email builder (a React app, used inside
+# the campaign editor) is still built with yarn, from frontend/email-builder, and its output is
+# copied into web/public so the UI serves it at /admin/static/email-builder.
 FRONTEND_EMAIL_BUILDER = frontend/email-builder
 FRONTEND_EMAIL_BUILDER_YARN_MODULES = $(FRONTEND_EMAIL_BUILDER)/node_modules
 FRONTEND_EMAIL_BUILDER_DIST = $(FRONTEND_EMAIL_BUILDER)/dist
+FRONTEND_EMAIL_BUILDER_DIST_FINAL = web/public/static/email-builder
 FRONTEND_EMAIL_BUILDER_DEPS = \
 	$(FRONTEND_EMAIL_BUILDER_YARN_MODULES) \
 	$(FRONTEND_EMAIL_BUILDER)/package.json \
@@ -37,8 +29,7 @@ STATIC := config.toml.sample \
 	schema.sql queries:/queries permissions.json \
 	static/public:/public \
 	static/email-templates \
-	frontend/dist:/admin \
-	web/dist:/app \
+	web/dist:/admin \
 	i18n:/i18n
 
 SQL := $(shell find . -type f -name "*.sql") $(shell find queries -type f -name "*.sql")
@@ -50,49 +41,32 @@ build: $(BIN)
 $(STUFFBIN):
 	go install github.com/knadh/stuffbin/...
 
-$(FRONTEND_YARN_MODULES): frontend/package.json frontend/yarn.lock
-	cd frontend && $(YARN) install
-	touch -c $(FRONTEND_YARN_MODULES)
-
-$(FRONTEND_EMAIL_BUILDER_YARN_MODULES): frontend/package.json frontend/yarn.lock
+$(FRONTEND_EMAIL_BUILDER_YARN_MODULES): $(FRONTEND_EMAIL_BUILDER)/package.json $(FRONTEND_EMAIL_BUILDER)/yarn.lock
 	cd $(FRONTEND_EMAIL_BUILDER) && $(YARN) install
 	touch -c $(FRONTEND_EMAIL_BUILDER_YARN_MODULES)
-
-# Build the backend to ./listmonk.
-$(BIN): $(SRC) go.mod go.sum schema.sql $(SQL) permissions.json
-	CGO_ENABLED=0 go build -o ${BIN} -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}'" ./cmd
-
-# Run the backend in dev mode. The frontend assets in dev mode are loaded from disk from frontend/dist.
-.PHONY: run
-run:
-	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'main.frontendDir=frontend/dist'" ./cmd
-
-# Build the JS frontend into frontend/dist.
-$(FRONTEND_DIST): $(FRONTEND_DEPS)
-	export VUE_APP_VERSION="${VERSION}" && cd frontend && $(YARN) build
-	touch -c $(FRONTEND_DIST)
 
 # Build the JS email-builder dist.
 $(FRONTEND_EMAIL_BUILDER_DIST): $(FRONTEND_EMAIL_BUILDER_DEPS)
 	export VUE_APP_VERSION="${VERSION}" && cd $(FRONTEND_EMAIL_BUILDER) && $(YARN) build
 	touch -c $(FRONTEND_EMAIL_BUILDER_DIST)
 
-# Copy the build assets to frontend.
+# Copy the built email-builder into the UI.
 $(FRONTEND_EMAIL_BUILDER_DIST_FINAL): $(FRONTEND_EMAIL_BUILDER_DIST)
 	mkdir -p $(FRONTEND_EMAIL_BUILDER_DIST_FINAL)
 	cp -r $(FRONTEND_EMAIL_BUILDER_DIST)/* $(FRONTEND_EMAIL_BUILDER_DIST_FINAL)
 	touch -c $(FRONTEND_EMAIL_BUILDER_DIST_FINAL)
 
+# Build everything the binary serves: the email builder, then the UI. (Name kept: upstream's
+# goreleaser configs call it.)
 .PHONY: build-frontend
-build-frontend: $(FRONTEND_EMAIL_BUILDER_DIST_FINAL) $(FRONTEND_DIST)
+build-frontend: build-web
 
 .PHONY: build-email-builder
 build-email-builder: $(FRONTEND_EMAIL_BUILDER_DIST_FINAL)
 
-# Run the JS frontend server in dev mode.
+# Run the UI's dev server (the same as run-web).
 .PHONY: run-frontend
-run-frontend: $(FRONTEND_EMAIL_BUILDER_DIST_FINAL)
-	export VUE_APP_VERSION="${VERSION}" && cd frontend && $(YARN) dev
+run-frontend: run-web
 
 # Run Go tests.
 .PHONY: test
@@ -102,12 +76,12 @@ test:
 # Bundle all static assets including the JS frontend into the ./listmonk binary
 # using stuffbin (installed with make deps).
 .PHONY: dist
-dist: $(STUFFBIN) build build-frontend pack-bin
+dist: $(STUFFBIN) build build-web pack-bin
 
 # pack-releases runns stuffbin packing on the given binary. This is used
 # in the .goreleaser post-build hook.
 .PHONY: pack-bin
-pack-bin: build-frontend build-web $(BIN) $(STUFFBIN)
+pack-bin: build-web $(BIN) $(STUFFBIN)
 	$(STUFFBIN) -a stuff -in ${BIN} -out ${BIN} ${STATIC}
 
 # Use goreleaser to do a dry run producing local builds.
@@ -135,7 +109,7 @@ dev-docker: build-dev-docker ## Build and spawns docker containers for the entir
 # Run the backend in docker-dev mode. The frontend assets in dev mode are loaded from disk from frontend/dist.
 .PHONY: run-backend-docker
 run-backend-docker:
-	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'main.frontendDir=frontend/dist'" ./cmd --config=dev/config.toml
+	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}'" ./cmd --config=dev/config.toml
 
 # Tear down the complete local development docker suite.
 .PHONY: rm-dev-docker
@@ -155,16 +129,16 @@ DEV_CONFIG ?= .devcontainer/config.toml
 # Run the Go backend against the devcontainer config.
 .PHONY: run-dev-backend
 run-dev-backend:
-	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'main.frontendDir=frontend/dist'" ./cmd --config=$(DEV_CONFIG)
+	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}'" ./cmd --config=$(DEV_CONFIG)
 
-# Run the new UI (web/) Vite dev server.
+# Run the UI (web/) Vite dev server.
 .PHONY: run-web
-run-web:
+run-web: $(FRONTEND_EMAIL_BUILDER_DIST_FINAL)
 	cd web && pnpm dev
 
-# Build the new UI into web/dist.
+# Build the UI (with the email builder) into web/dist.
 .PHONY: build-web
-build-web:
+build-web: $(FRONTEND_EMAIL_BUILDER_DIST_FINAL)
 	cd web && pnpm install --frozen-lockfile && pnpm build
 
 # Run backend and new UI together.

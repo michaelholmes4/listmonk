@@ -13,6 +13,11 @@ test.beforeEach(({ page }) => {
   })
 })
 
+// Leave only once the server is back for good, so the next spec (or run) never starts while it is down.
+test.afterEach(async ({ page }) => {
+  await settled(page)
+})
+
 type Settings = Record<string, unknown>
 const getSettings = async (page: Page) => (await (await page.request.get('/api/settings')).json()).data as Settings
 const tryGetSettings = async (page: Page): Promise<Settings> => getSettings(page).catch(() => ({}))
@@ -35,13 +40,29 @@ function unmask(s: Settings): Settings {
   return out
 }
 
+/**
+ * A save is answered first and the server reloads a moment later, so a request right after it can
+ * still reach the old process. Wait out that gap, then until the server answers steadily.
+ */
+async function settled(page: Page) {
+  await new Promise((r) => setTimeout(r, 3000))
+  let ok = 0
+  for (let i = 0; i < 80 && ok < 3; i++) {
+    ok = (await page.request.get('/api/health').then((r) => r.ok()).catch(() => false)) ? ok + 1 : 0
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  expect(ok).toBeGreaterThanOrEqual(3)
+}
+
 /** After a save the server reloads; wait until it answers again with the expected value. */
 async function untilSaved(page: Page, key: string, want: unknown) {
   await expect
     .poll(async () => (await tryGetSettings(page))[key], { timeout: 45_000, intervals: [500, 1000] })
     .toEqual(want)
-  // ...and until the page itself has finished its own wait-and-refetch.
-  await expect(page.locator('[data-cy=btn-save]')).toBeDisabled({ timeout: 45_000 })
+  // ...and until it is steady; then a fresh load shows the saved state and nothing left to save.
+  await settled(page)
+  await page.goto('/admin/settings')
+  await expect(page.locator('[data-cy=btn-save]')).toBeDisabled()
 }
 
 test('settings: one save across tabs changes only what was edited', async ({ page }) => {
@@ -53,7 +74,7 @@ test('settings: one save across tabs changes only what was edited', async ({ pag
   let saved = false
 
   try {
-    await page.goto('/app/settings')
+    await page.goto('/admin/settings')
     await expect(page.getByRole('heading', { name: /^Settings/ })).toBeVisible()
     await expect(page.locator('[data-cy=btn-save]')).toBeDisabled()
     await expect(page.getByLabel('Site name')).toHaveValue(before['app.site_name'] as string)
@@ -84,7 +105,7 @@ test('settings: one save across tabs changes only what was edited', async ({ pag
     })
 
     // The page shows the saved values on a fresh load.
-    await page.goto('/app/settings')
+    await page.goto('/admin/settings')
     await expect(page.getByLabel('Site name')).toHaveValue(marker)
   } finally {
     if (saved) {
@@ -103,7 +124,7 @@ test('maintenance: the vacuum schedule saves through the key endpoint and nothin
   const was = before['maintenance.db'] as { vacuum: boolean; vacuum_cron_interval: string }
   let saved = false
   try {
-    await page.goto('/app/settings/maintenance')
+    await page.goto('/admin/settings/maintenance')
     const vac = page.locator('[data-cy=vacuum]')
     await expect(vac.getByLabel('Cron interval')).toHaveValue(was.vacuum_cron_interval || '0 2 * * *')
     await vac.locator('#vacuum').click()

@@ -13,7 +13,7 @@ test.beforeEach(({ page }) => {
 test('subscribers: create, search, edit, delete', async ({ page }) => {
   const email = `e2e-${Date.now()}@example.com`
 
-  await page.goto('/app/subscribers')
+  await page.goto('/admin/subscribers')
   await expect(page.getByRole('heading', { name: /^Subscribers/ })).toBeVisible()
   // First load shows skeleton rows inside the table only, then real rows.
   await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
@@ -26,7 +26,7 @@ test('subscribers: create, search, edit, delete', async ({ page }) => {
   await page.getByLabel('Name', { exact: true }).fill('E2E Person')
   await page.getByRole('button', { name: 'Save' }).click()
   // Saving goes back to the table.
-  await expect(page).toHaveURL(/\/app\/subscribers$/)
+  await expect(page).toHaveURL(/\/admin\/subscribers$/)
 
   // Search (debounced) finds exactly the new subscriber
   await page.getByPlaceholder('E-mail or name').fill(email)
@@ -41,7 +41,7 @@ test('subscribers: create, search, edit, delete', async ({ page }) => {
   await expect(page.getByRole('navigation', { name: 'breadcrumb' }).getByText(email)).toBeVisible()
   await page.getByLabel('Name', { exact: true }).fill('E2E Renamed')
   await page.getByRole('button', { name: 'Save' }).click()
-  await expect(page).toHaveURL(/\/app\/subscribers\?q=/)
+  await expect(page).toHaveURL(/\/admin\/subscribers\?q=/)
   await expect(page.getByPlaceholder('E-mail or name')).toHaveValue(email)
   await expect(row).toContainText('E2E Renamed')
 
@@ -53,7 +53,7 @@ test('subscribers: create, search, edit, delete', async ({ page }) => {
 })
 
 test('subscribers: sorting and invalid attribute JSON', async ({ page }) => {
-  await page.goto('/app/subscribers')
+  await page.goto('/admin/subscribers')
   await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
   const sorted = page.waitForRequest((r) => r.url().includes('/api/subscribers?') && r.url().includes('order_by=email'))
@@ -77,7 +77,7 @@ test('subscribers: bulk blocklist then delete the selection', async ({ page }) =
     expect(res.ok()).toBeTruthy()
   }
 
-  await page.goto('/app/subscribers')
+  await page.goto('/admin/subscribers')
   await page.getByPlaceholder('E-mail or name').fill(tag)
   await expect(page.getByRole('row')).toHaveCount(3) // header + 2
 
@@ -108,7 +108,7 @@ test('subscribers: sort order really flips (server accepts lowercase asc/desc on
   }
 
   try {
-    await page.goto(`/app/subscribers?q=${tag}`)
+    await page.goto(`/admin/subscribers?q=${tag}`)
     const emails = page.getByRole('row').getByRole('button', { name: /@example\.com$/ })
     await expect(emails).toHaveCount(2)
 
@@ -135,7 +135,7 @@ test('subscribers: "select all N" acts on every match, not just the visible page
   const matching = async () => (await (await page.request.get(`/api/subscribers?query=${encodeURIComponent(`subscribers.name='${tag}'`)}&per_page=all`)).json()).data.results as { status: string }[]
 
   // Two rows a page, three matches: the third is only reached by "select all".
-  await page.goto(`/app/subscribers?q=${tag}&size=2`)
+  await page.goto(`/admin/subscribers?q=${tag}&size=2`)
   await expect(page.getByRole('row')).toHaveCount(3)
   await page.getByRole('checkbox', { name: /select all/i }).first().click()
   await expect(page.getByText('2 selected')).toBeVisible()

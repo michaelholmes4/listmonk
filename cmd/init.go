@@ -213,12 +213,6 @@ func initFS(appDir, frontendDir, staticDir, i18nDir string) stuffbin.FileSystem 
 			"./permissions.json:permissions.json",
 		}
 
-		frontendFiles = []string{
-			// Admin frontend's static assets accessible at /admin/* during runtime.
-			// These paths are sourced from frontendDir.
-			"./:/admin",
-		}
-
 		staticFiles = []string{
 			// These paths are joined with staticDir.
 			"./email-templates:static/email-templates",
@@ -257,8 +251,7 @@ func initFS(appDir, frontendDir, staticDir, i18nDir string) stuffbin.FileSystem 
 	files := []string{}
 	if !hasEmbed {
 		files = append(files, joinFSPaths(appDir, appFiles)...)
-		files = append(files, joinFSPaths(frontendDir, frontendFiles)...)
-		files = append(files, webFSFiles()...) // librelist: new UI at /app
+		files = append(files, webFSFiles()...) // librelist: the admin UI (web/) at /admin
 	}
 
 	// Irrespective of the embeds, if there are user specified static or i18n paths,
@@ -956,7 +949,6 @@ func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.Fi
 
 	// Admin (frontend) facing static files.
 	srv.GET("/admin/static/*", echo.WrapHandler(fSrv))
-	srv.GET(uriWeb+"/static/*", echo.WrapHandler(fSrv)) // librelist: new UI assets
 
 	// Public (subscriber) facing media upload files.
 	var (

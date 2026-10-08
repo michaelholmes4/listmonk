@@ -32,7 +32,7 @@ test('campaigns: create, write HTML, save, preview, convert, delete', async ({ p
   const list = await withList(page)
   const name = `E2E camp ${Date.now()}`
   try {
-    await page.goto('/app/campaigns')
+    await page.goto('/admin/campaigns')
     await expect(page.getByRole('heading', { name: /^Campaigns/ })).toBeVisible()
     await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
@@ -67,7 +67,7 @@ test('campaigns: create, write HTML, save, preview, convert, delete', async ({ p
     await expect(page.locator('.cm-content')).not.toContainText('<h1>')
 
     // The list shows it, as a draft, with its list
-    await page.goto('/app/campaigns')
+    await page.goto('/admin/campaigns')
     const row = page.getByRole('row', { name: new RegExp(name) })
     await expect(row).toContainText('Draft')
     await expect(row).toContainText(list.name)
@@ -84,7 +84,7 @@ test('campaigns: schedule, unschedule, and the unsaved-changes guard', async ({ 
   })
   const id = (await created.json()).data.id
   try {
-    await page.goto(`/app/campaigns/${id}`)
+    await page.goto(`/admin/campaigns/${id}`)
     await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name)
 
     // Unsaved edits: leaving asks, "cancel" stays put
@@ -104,12 +104,12 @@ test('campaigns: schedule, unschedule, and the unsaved-changes guard', async ({ 
     await expect(page.locator('[data-cy=btn-schedule]')).toBeVisible()
     await page.locator('[data-cy=btn-schedule]').click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Schedule campaign' }).click()
-    await expect(page).toHaveURL(/\/app\/campaigns$/)
+    await expect(page).toHaveURL(/\/admin\/campaigns$/)
     const row = page.getByRole('row', { name: new RegExp(name) })
     await expect(row).toContainText('Scheduled')
 
     // Back on the edit page the content is locked-ish (scheduled is editable) and can be unscheduled
-    await page.goto(`/app/campaigns/${id}`)
+    await page.goto(`/admin/campaigns/${id}`)
     await page.locator('[data-cy=btn-unschedule]').click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
     await expect(page.getByText('Draft', { exact: true }).first()).toBeVisible()
@@ -126,7 +126,7 @@ test('campaigns: clone from the list, and analytics for it', async ({ page }) =>
   })
   const id = (await created.json()).data.id
   try {
-    await page.goto(`/app/campaigns?q=${encodeURIComponent(name)}`)
+    await page.goto(`/admin/campaigns?q=${encodeURIComponent(name)}`)
     const row = page.getByRole('row', { name: new RegExp(name) })
     await row.getByRole('button', { name: 'Actions' }).click()
     await page.getByRole('menuitem', { name: 'Clone' }).click()
@@ -139,7 +139,7 @@ test('campaigns: clone from the list, and analytics for it', async ({ page }) =>
     await expect(page.locator('.cm-content')).toContainText('keep me')
 
     // Analytics from the row menu: the campaign is preselected, cards render without errors
-    await page.goto(`/app/campaigns?q=${encodeURIComponent(name)}`)
+    await page.goto(`/admin/campaigns?q=${encodeURIComponent(name)}`)
     // The clone sorts first and also matches the name; pick the original.
     await page.getByRole('row').filter({ hasText: name }).filter({ hasNotText: 'Copy of' }).getByRole('button', { name: 'Actions' }).click()
     await page.getByRole('menuitem', { name: 'Analytics' }).click()
@@ -166,7 +166,7 @@ test('campaigns: a test message carries the unsaved form, and arrives when SMTP 
   })
   const id = (await created.json()).data.id
   try {
-    await page.goto(`/app/campaigns/${id}`)
+    await page.goto(`/admin/campaigns/${id}`)
     // Edit without saving: the test message must carry what is in the form, not what is stored.
     const unsaved = `Unsaved subject ${Date.now()}`
     await page.getByLabel('Subject').fill(unsaved)

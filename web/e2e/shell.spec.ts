@@ -13,7 +13,7 @@ test.beforeEach(({ page }) => {
 const ready = (page: Page) => page.locator('[data-sidebar=sidebar]').first().waitFor()
 
 test('dashboard shows counts and the shell renders', async ({ page }) => {
-  await page.goto('/app/')
+  await page.goto('/admin/')
 
   // Tiles load independently; once loaded the skeleton is gone and a number is shown.
   const subscribers = page.locator('[data-slot=card]', { hasText: 'Subscribers' }).first()
@@ -25,7 +25,7 @@ test('dashboard shows counts and the shell renders', async ({ page }) => {
 })
 
 test('dashboard breakdowns and charts load independently', async ({ page }) => {
-  await page.goto('/app/')
+  await page.goto('/admin/')
   for (const chart of ['views', 'clicks']) {
     const card = page.locator(`[data-cy=chart-${chart}]`)
     await expect(card.locator('[data-slot=skeleton]')).toHaveCount(0)
@@ -36,17 +36,17 @@ test('dashboard breakdowns and charts load independently', async ({ page }) => {
 })
 
 test('every sidebar entry is a screen of this app, none hands off to the classic admin', async ({ page }) => {
-  await page.goto('/app/')
+  await page.goto('/admin/')
   for (const group of ['Lists', 'Subscribers', 'Campaigns', 'Users', 'Settings']) {
     await page.locator('[data-sidebar=menu-button]', { hasText: group }).first().click()
   }
   const links = await page.locator('[data-sidebar=sidebar] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))
   expect(links.length).toBeGreaterThan(10)
-  expect(links.filter((h) => !h?.startsWith('/app/'))).toEqual([])
+  expect(links.filter((h) => !h?.startsWith('/admin/'))).toEqual([])
 })
 
 test('command palette opens with ctrl+k and navigates', async ({ page }) => {
-  await page.goto('/app/')
+  await page.goto('/admin/')
   await ready(page)
   await page.keyboard.press('Control+k')
   const input = page.getByPlaceholder('Type a command or search…')
@@ -57,7 +57,7 @@ test('command palette opens with ctrl+k and navigates', async ({ page }) => {
 })
 
 test('theme toggles the .dark class and persists', async ({ page }) => {
-  await page.goto('/app/')
+  await page.goto('/admin/')
   await ready(page)
   await page.keyboard.press('Control+k')
   await page.getByPlaceholder('Type a command or search…').fill('theme')
@@ -68,12 +68,12 @@ test('theme toggles the .dark class and persists', async ({ page }) => {
 })
 
 test('unknown routes render the in-app 404 (not a server error)', async ({ page }) => {
-  await page.goto('/app/nope/nothing')
+  await page.goto('/admin/nope/nothing')
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
 })
 
 test('the refresh button refetches what the page shows', async ({ page }) => {
-  await page.goto('/app/')
+  await page.goto('/admin/')
   await expect(page.getByRole('link', { name: 'Dashboard' }).first()).toBeVisible()
   const counts = page.waitForRequest((r) => r.url().includes('/api/dashboard/counts'), { timeout: 15_000 })
   await page.locator('[data-cy=btn-refresh]').click()

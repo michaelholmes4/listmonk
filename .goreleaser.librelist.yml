@@ -10,8 +10,8 @@ env:
 
 before:
   hooks:
-    # Both UIs are built once here; the post-build hook below only packs them into each binary.
-    - make build-frontend build-web
+    # The UI is built once here; the post-build hook below only packs it into each binary.
+    - make build-web
 
 builds:
   - id: listmonk

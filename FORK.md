@@ -8,7 +8,7 @@ git fetch upstream
 git merge upstream/master        # or a release tag
 ```
 Known conflict hotspots (the only upstream files we edit):
-- `cmd/handlers.go` (routes), `cmd/init.go` (wiring), `cmd/upgrade.go` (fork-migration call)
+- `cmd/handlers.go` (routes; `/app` redirect), `cmd/init.go` (wiring; the UI is mapped to `/admin` from `web/dist`), `cmd/upgrade.go` (fork-migration call)
 - `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list and the dashboard counts)
 - `internal/core/core.go`, `subscribers.go`, `subscriptions.go` (automation trigger hooks: `Hooks.OnSubscriptionsConfirmed`
   / `OnAttribsChanged`, and one `forkBegin`/`forkEnd` pair around each mutation; the logic is in `fork_hooks.go`)
@@ -62,8 +62,17 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
 Fork migrations are a separate sequence in `internal/migrations/fork/`, tracked under the
 settings key `fork_migrations`, so upstream version numbers never collide with ours.
 
-## After the old UI is retired
-Upstream changes under `frontend/src/` become "port to `web/`" tasks during each merge.
+## The classic UI is gone
+`frontend/` is deleted except `frontend/email-builder` (the React visual email builder; `make build-email-builder`
+copies its build into `web/public/static/email-builder`). The admin UI is `web/`, served at `/admin`; `/app` redirects.
+
+When merging upstream, expect modify/delete conflicts on `frontend/**`: resolve them by deleting the file, and turn
+what the upstream change did into a "port to `web/`" task. `web/PARITY.md` lists what was ported. Upstream's
+Cypress tests (`frontend/cypress`) are gone too; `web/e2e` (Playwright) replaces them.
+
+Upstream's `.goreleaser.yml`, `.goreleaser-nightly.yml` and the `dev/` Docker suite still name `make build-frontend` /
+`make run-frontend`; both are kept as aliases of `build-web` / `run-web`, but the Docker suite (`dev/`) is not maintained
+here and its `front` service no longer applies.
 
 ## Releasing
 Tag the fork `vX.Y.Z-librelist.N` (for example `v6.2.0-librelist.1`); upstream's own `v*` tags, which come in

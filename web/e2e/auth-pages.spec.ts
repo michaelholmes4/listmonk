@@ -11,7 +11,7 @@ const font = (page: import('@playwright/test').Page, sel: string) =>
     .evaluate((el) => getComputedStyle(el).fontFamily)
 
 test('login page uses the new theme and shows errors inline', async ({ page }) => {
-  await page.goto('/admin/login?next=/app/')
+  await page.goto('/admin/login?next=/admin/')
   expect(await font(page, 'body')).toContain('Geist')
 
   await page.fill('input[name=username]', 'admin')
@@ -19,7 +19,7 @@ test('login page uses the new theme and shows errors inline', async ({ page }) =
   await page.click('button[type=submit]')
   await expect(page.locator('.error')).toBeVisible()
   // `next` survives a failed attempt, so a successful retry still lands in the new UI.
-  await expect(page.locator('input[name=next]')).toHaveValue(/^\/app\/?$/)
+  await expect(page.locator('input[name=next]')).toHaveValue(/^\/admin\/?$/)
 })
 
 test('forgot password page is themed too', async ({ page }) => {
@@ -32,7 +32,17 @@ test('public subscriber pages are left alone', async ({ page }) => {
   expect(await font(page, 'body')).not.toContain('Geist')
 })
 
-test('unauthenticated /app redirects to login and returns after', async ({ page }) => {
-  await page.goto('/app/')
-  await expect(page).toHaveURL(/\/admin\/login\?next=%2Fapp%2F/)
+test('unauthenticated /admin redirects to login and returns after', async ({ page }) => {
+  await page.goto('/admin/')
+  await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2F/)
+})
+
+test.describe('signed in', () => {
+  test.use({ storageState: 'e2e/.auth/state.json' })
+
+  test('the old /app address redirects to /admin, keeping the path and query', async ({ request }) => {
+    const res = await request.get('/app/campaigns?q=x', { maxRedirects: 0 })
+    expect(res.status()).toBe(302)
+    expect(res.headers().location).toBe('/admin/campaigns?q=x')
+  })
 })

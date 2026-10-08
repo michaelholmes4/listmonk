@@ -18,7 +18,7 @@ test('import: CSV into a preselected list, progress, then done', async ({ page }
 
   try {
     // "Import" on a list row passes ?list_id=; the list is preselected.
-    await page.goto(`/app/subscribers/import?list_id=${listId}`)
+    await page.goto(`/admin/subscribers/import?list_id=${listId}`)
     await expect(page.getByRole('heading', { name: 'Import subscribers' })).toBeVisible()
     await expect(page.getByText(`Import ${tag}`)).toBeVisible()
 
@@ -50,7 +50,7 @@ test('import: CSV into a preselected list, progress, then done', async ({ page }
 })
 
 test('import: subscribe mode needs a list, blocklist mode does not', async ({ page }) => {
-  await page.goto('/app/subscribers/import')
+  await page.goto('/admin/subscribers/import')
   const csv = { name: 'x.csv', mimeType: 'text/csv', buffer: Buffer.from('email\na@example.com\n') }
   await page.locator('input[type=file]').setInputFiles(csv)
   await expect(page.getByRole('button', { name: 'Upload' })).toBeDisabled()

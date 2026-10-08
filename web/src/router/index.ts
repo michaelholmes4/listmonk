@@ -19,7 +19,7 @@ declare module 'vue-router' {
 }
 
 export const router = createRouter({
-  // Vite `base` is /app/; the backend serves the SPA for every /app/* path.
+  // Vite `base` is /admin/; the backend serves the SPA for every /admin/* path.
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {

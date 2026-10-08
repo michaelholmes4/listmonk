@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, ChevronsUpDown, Code, LogOut, Monitor, Moon, PanelLeft, Sun, UserRound } from '@lucide/vue'
+import { Check, ChevronsUpDown, Code, LogOut, Monitor, Moon, Sun, UserRound } from '@lucide/vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -83,9 +83,6 @@ const themes = [
           <DropdownMenuGroup>
             <DropdownMenuItem as-child>
               <RouterLink :to="{ name: 'profile' }"><UserRound />{{ t('users.profile') }}</RouterLink>
-            </DropdownMenuItem>
-            <DropdownMenuItem as-child>
-              <a href="/admin/"><PanelLeft />{{ t('web.user.classicAdmin') }}</a>
             </DropdownMenuItem>
             <DropdownMenuItem v-if="source" as-child>
               <a :href="source" target="_blank" rel="noopener noreferrer" data-cy="source-link"><Code />{{ t('web.user.sourceCode') }}</a>

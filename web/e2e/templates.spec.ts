@@ -22,7 +22,7 @@ async function cleanup(page: import('@playwright/test').Page, prefix: string) {
 test('templates: create, validate, preview, clone, delete', async ({ page }) => {
   const name = `E2E tpl ${Date.now()}`
   try {
-    await page.goto('/app/campaigns/templates')
+    await page.goto('/admin/campaigns/templates')
     await expect(page.getByRole('heading', { name: /^Templates/ })).toBeVisible()
     await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
@@ -84,7 +84,7 @@ test('templates: the default template cannot be deleted, and "set default" moves
   const id = (await created.json()).data.id
 
   try {
-    await page.goto('/app/campaigns/templates')
+    await page.goto('/admin/campaigns/templates')
     const defaultRow = page.getByRole('row').filter({ hasText: 'Default' }).first()
     await defaultRow.getByRole('button', { name: 'Actions' }).click()
     await expect(page.getByRole('menuitem', { name: 'Delete' })).toHaveCount(0)

@@ -11,7 +11,7 @@ test.beforeEach(({ page }) => {
 })
 
 test('settings: validation stays on the page and finds the tab with the problem', async ({ page }) => {
-  await page.goto('/app/settings')
+  await page.goto('/admin/settings')
   await page.locator('[data-cy=tab-smtp]').click()
   await page.getByLabel('Idle timeout').first().fill('soon')
 
@@ -28,19 +28,19 @@ test('settings: validation stays on the page and finds the tab with the problem'
 })
 
 test('settings: leaving with unsaved edits asks first', async ({ page }) => {
-  await page.goto('/app/settings')
+  await page.goto('/admin/settings')
   await page.getByLabel('Site name').fill('unsaved change')
   await page.getByRole('link', { name: 'Logs' }).click()
   await expect(page.getByRole('alertdialog')).toBeVisible()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click()
-  await expect(page).toHaveURL(/\/app\/settings/)
+  await expect(page).toHaveURL(/\/admin\/settings/)
   await page.getByRole('link', { name: 'Logs' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: /Discard/ }).click()
-  await expect(page).toHaveURL(/\/app\/settings\/logs$/)
+  await expect(page).toHaveURL(/\/admin\/settings\/logs$/)
 })
 
 test('settings: a half-edited secret is refused before anything is sent', async ({ page }) => {
-  await page.goto('/app/settings?tab=smtp')
+  await page.goto('/admin/settings?tab=smtp')
   const pwd = page.locator('[data-cy=smtp-0]').getByLabel('Password')
   await expect(pwd).toBeVisible()
 
@@ -54,7 +54,7 @@ test('settings: a half-edited secret is refused before anything is sent', async 
 })
 
 test('settings: the SMTP test reports a connection that fails', async ({ page }) => {
-  await page.goto('/app/settings?tab=smtp')
+  await page.goto('/admin/settings?tab=smtp')
   const card = page.locator('[data-cy=smtp-0]')
   await card.getByLabel('Host', { exact: true }).fill('localhost')
   await card.getByLabel('Port', { exact: true }).fill('1')
@@ -71,7 +71,7 @@ test('settings: the SMTP test reports a connection that fails', async ({ page })
 })
 
 test('settings: blocks can be added and removed without saving', async ({ page }) => {
-  await page.goto('/app/settings?tab=smtp')
+  await page.goto('/admin/settings?tab=smtp')
   await expect(page.locator('[data-cy=smtp-0]')).toBeVisible()
   const before = await page.locator('section[data-cy^=smtp-]').count()
   await page.locator('[data-cy=smtp-add]').click()
@@ -89,13 +89,13 @@ test('settings: blocks can be added and removed without saving', async ({ page }
 })
 
 test('logs: shows the server log', async ({ page }) => {
-  await page.goto('/app/settings/logs')
+  await page.goto('/admin/settings/logs')
   await expect(page.getByRole('heading', { name: 'Logs' })).toBeVisible()
   await expect(page.locator('[data-cy=log]')).toContainText(/\w/, { timeout: 15_000 })
 })
 
 test('maintenance: dated cleanups send the right request, exports download', async ({ page }) => {
-  await page.goto('/app/settings/maintenance')
+  await page.goto('/admin/settings/maintenance')
   await expect(page.getByRole('heading', { name: 'Maintenance' })).toBeVisible()
 
   // Cleaning a date from before anything existed is safe against real data.
@@ -132,7 +132,7 @@ test('maintenance: orphan and blocklisted cleanups are confirmed and report the 
       await route.fulfill({ json: { data: { count: 7 } } })
     },
   )
-  await page.goto('/app/settings/maintenance')
+  await page.goto('/admin/settings/maintenance')
   const card = page.locator('[data-cy=gc-subscribers]')
   await card.getByRole('button', { name: 'Delete' }).click()
   // Nothing happens until confirmed.
@@ -150,7 +150,7 @@ test('maintenance: orphan and blocklisted cleanups are confirmed and report the 
 })
 
 test('maintenance: the vacuum schedule is checked before saving', async ({ page }) => {
-  await page.goto('/app/settings/maintenance')
+  await page.goto('/admin/settings/maintenance')
   const vac = page.locator('[data-cy=vacuum]')
   await expect(vac.getByLabel('Cron interval')).toBeVisible()
   await vac.locator('#vacuum').click()
@@ -187,7 +187,7 @@ test('notices: a pending restart, a new release and project messages show above 
     },
   )
 
-  await page.goto('/app/')
+  await page.goto('/admin/')
   const restart = page.locator('[data-cy=notice-restart]')
   await expect(restart).toContainText('Pause all running campaigns and restart the app')
   await expect(page.locator('[data-cy=notice-update]')).toContainText('v99.0.0')
@@ -203,7 +203,7 @@ test('notices: a pending restart, a new release and project messages show above 
 })
 
 test('notices: nothing shows when there is nothing to say', async ({ page }) => {
-  await page.goto('/app/')
+  await page.goto('/admin/')
   await expect(page.getByRole('link', { name: 'Dashboard' }).first()).toBeVisible()
   await expect(page.locator('[data-cy=notice-restart]')).toHaveCount(0)
 })
@@ -220,7 +220,7 @@ test('the slow-queries footnote shows on the dashboard and lists when caching is
       await route.fulfill({ response: res, json: body })
     },
   )
-  for (const path of ['/app/', '/app/lists']) {
+  for (const path of ['/admin/', '/admin/lists']) {
     await page.goto(path)
     await expect(page.locator('[data-cy=slow-queries-note]')).toContainText('Slow queries are being cached')
   }

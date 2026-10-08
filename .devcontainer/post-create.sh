@@ -13,11 +13,12 @@ sudo mkdir -p /go/pkg/sumdb && sudo chown -R "$(id -u):$(id -g)" /go/pkg/sumdb
 
 go mod download
 
-# Old UI (Vue 2). Needs yarn 1.x.
+# The visual email builder (React) is the one part still built with yarn 1.x.
 corepack enable
-(cd frontend && yarn install --frozen-lockfile)
+(cd frontend/email-builder && yarn install --frozen-lockfile)
+make build-email-builder
 
-# New UI (shadcn-vue). Exists from Phase 2 onward.
+# The admin UI (shadcn-vue).
 if [ -f web/package.json ]; then
   (cd web && pnpm install --frozen-lockfile)
   # Browser + system libs for the Playwright smoke tests (`pnpm -C web test:e2e`).

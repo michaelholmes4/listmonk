@@ -57,9 +57,9 @@ async function mockBounces(page: Page) {
 
 test('bounces: rows, details and filter chips', async ({ page }) => {
   await mockBounces(page)
-  await page.goto('/app/subscribers/bounces')
+  await page.goto('/admin/subscribers/bounces')
   await expect(page.getByRole('heading', { name: /^Bounces/ })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'one@example.com' })).toHaveAttribute('href', /\/app\/subscribers\/7$/)
+  await expect(page.getByRole('link', { name: 'one@example.com' })).toHaveAttribute('href', /\/admin\/subscribers\/7$/)
 
   // Details dialog shows the raw meta
   await page.getByRole('row', { name: /one@example.com/ }).getByRole('button', { name: 'Actions' }).click()
@@ -79,7 +79,7 @@ test('bounces: rows, details and filter chips', async ({ page }) => {
 
 test('bounces: delete and blocklist go out by explicit IDs', async ({ page }) => {
   const writes = await mockBounces(page)
-  await page.goto('/app/subscribers/bounces')
+  await page.goto('/admin/subscribers/bounces')
   await page.getByRole('checkbox', { name: /select all/i }).first().click()
   await expect(page.getByText('2 selected')).toBeVisible()
 
@@ -102,7 +102,7 @@ test('bounces: delete and blocklist go out by explicit IDs', async ({ page }) =>
 
 test('bounces: "select all N" resolves the filtered IDs instead of using delete-all', async ({ page }) => {
   const writes = await mockBounces(page)
-  await page.goto('/app/subscribers/bounces')
+  await page.goto('/admin/subscribers/bounces')
   await page.getByRole('checkbox', { name: /select all/i }).first().click()
   await page.getByRole('button', { name: 'Select all 3' }).click()
   await expect(page.getByText('3 selected')).toBeVisible()

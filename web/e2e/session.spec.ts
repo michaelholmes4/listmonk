@@ -10,7 +10,7 @@ test('an invalid session sends the user to the login page', async ({ page }) => 
       body: JSON.stringify({ message: 'invalid session' }),
     }),
   )
-  await page.goto('/app/')
+  await page.goto('/admin/')
   await expect(page).toHaveURL(/\/admin\/login\?next=/)
 })
 
@@ -22,7 +22,7 @@ test('a real permission error is not mistaken for a lost session', async ({ page
       body: JSON.stringify({ message: 'permission denied: settings:get' }),
     }),
   )
-  await page.goto('/app/')
+  await page.goto('/admin/')
   await expect(page.getByText('Failed to load: permission denied')).toBeVisible()
-  await expect(page).toHaveURL(/\/app\/?$/)
+  await expect(page).toHaveURL(/\/admin\/?$/)
 })
