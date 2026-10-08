@@ -575,7 +575,8 @@ export interface paths {
         put?: never;
         /** @description handles campaign creation */
         post: operations["createCampaign"];
-        delete?: never;
+        /** @description deletes campaigns by id, or every campaign matching `query` (or all of them with `all`). The by-query form ignores the status and tag filters of the list. */
+        delete: operations["deleteCampaigns"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1971,109 +1972,107 @@ export interface components {
         };
         Campaign: {
             id?: number;
+            uuid?: string;
             created_at?: string;
             updated_at?: string;
-            CampaignID?: number;
-            views?: number;
-            clicks?: number;
-            lists?: {
-                id?: number;
-                name?: string;
-            }[];
-            started_at?: string;
-            to_send?: number;
-            sent?: number;
-            uuid?: string;
             /** @enum {string} */
             type?: "regular" | "optin";
             name?: string;
             subject?: string;
             from_email?: string;
-            body?: string;
-            send_at?: string;
-            status?: string;
             /** @enum {string} */
-            content_type?: "richtext" | "html" | "markdown" | "plain";
-            tags?: string[];
-            template_id?: number;
+            status?: "draft" | "scheduled" | "running" | "paused" | "cancelled" | "finished";
+            /** @enum {string} */
+            content_type?: "richtext" | "html" | "markdown" | "plain" | "visual";
+            /** @description Left out of list responses when no_body is set. */
+            body?: string;
+            /** @description JSON source of the visual (email-builder) editor. */
+            body_source?: string | null;
+            altbody?: string | null;
+            send_at?: string | null;
+            started_at?: string | null;
             messenger?: string;
+            template_id?: number | null;
+            tags?: string[];
+            headers?: {
+                [key: string]: string;
+            }[];
+            attribs?: {
+                [key: string]: unknown;
+            };
+            archive?: boolean;
+            archive_slug?: string | null;
+            archive_template_id?: number | null;
+            archive_meta?: {
+                [key: string]: unknown;
+            };
+            views?: number;
+            clicks?: number;
+            bounces?: number;
+            to_send?: number;
+            sent?: number;
+            lists?: {
+                id?: number;
+                name?: string;
+            }[];
+            media?: {
+                id?: number;
+                filename?: string;
+            }[];
         };
-        CampaignContentRequest: {
-            id?: number;
-            created_at?: string;
-            updated_at?: string;
-            CampaignID?: number;
-            views?: number;
-            clicks?: number;
-            lists?: {
-                id?: number;
-                name?: string;
-            }[];
-            started_at?: string;
-            to_send?: number;
-            sent?: number;
-            uuid?: string;
-            /** @enum {string} */
-            type?: "regular" | "optin";
-            name?: string;
-            subject?: string;
-            from_email?: string;
-            body?: string;
-            send_at?: string;
-            status?: string;
-            /** @enum {string} */
-            content_type?: "richtext" | "html" | "markdown" | "plain";
-            tags?: string[];
-            template_id?: number;
-            messenger?: string;
+        CampaignContentRequest: components["schemas"]["Campaign"] & {
+            /** @description Content type to convert from. */
             from?: string;
+            /** @description Content type to convert to. */
             to?: string;
         };
         CampaignRequest: {
-            name?: string;
-            subject?: string;
-            lists?: number[];
+            name: string;
+            subject: string;
+            lists: number[];
+            /** @description Defaults to the app's from address. */
             from_email?: string;
-            content_type?: string;
+            /** @enum {string} */
+            type?: "regular" | "optin";
+            /** @enum {string} */
+            content_type?: "richtext" | "html" | "markdown" | "plain" | "visual";
             messenger?: string;
-            type?: string;
             tags?: string[];
-            send_later?: boolean;
-            send_at?: {
-                headers?: Record<string, never>[];
-                template_id?: number;
-            };
-        };
-        CampaignUpdate: {
-            name?: string;
-            subject?: string;
-            lists?: number[];
-            from_email?: string;
-            messenger?: string;
-            type?: string;
-            tags?: string[];
-            send_later?: boolean;
-            send_at?: Record<string, never>;
-            headers?: Record<string, never>[];
             template_id?: number;
-            content_type?: string;
             body?: string;
+            body_source?: string;
             altbody?: string;
+            send_later?: boolean;
+            send_at?: string | null;
+            headers?: {
+                [key: string]: string;
+            }[];
             archive?: boolean;
+            archive_slug?: string;
             archive_template_id?: number;
-            archive_meta?: Record<string, never>;
+            archive_meta?: {
+                [key: string]: unknown;
+            };
+            /** @description Ids of media files to attach. */
+            media?: number[];
         };
+        CampaignUpdate: components["schemas"]["CampaignRequest"];
+        /** @description Live progress of a running campaign. */
         CampaignStats: {
             id?: number;
             status?: string;
             to_send?: number;
             sent?: number;
-            /** Format: date */
-            started_at?: string;
-            /** Format: date */
-            updated_at?: string;
+            started_at?: string | null;
+            updated_at?: string | null;
+            /** @description Messages per minute over the last minute. */
             rate?: number;
+            /** @description Messages per minute since the campaign started. */
             net_rate?: number;
+        };
+        CampaignAnalyticsLink: {
+            url?: string;
+            count?: number;
         };
         CampaignAnalyticsCount: {
             campaign_id?: number;
@@ -3412,7 +3411,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Filter campaigns by status. Multiple status values can be specified by repeating the parameter */
-                status?: ("scheduled" | "running" | "paused" | "cancelled")[];
+                status?: ("draft" | "scheduled" | "running" | "paused" | "cancelled" | "finished")[];
                 /** @description When set to true, returns response without body content */
                 no_body?: boolean;
                 /** @description Page number for paginated results. */
@@ -3420,12 +3419,12 @@ export interface operations {
                 /** @description Number of items per page. Use an integer for specific page size or 'all' to retrieve all results */
                 per_page?: number | "all";
                 /** @description Filter campaigns by tags. Multiple tags can be specified by repeating the parameter */
-                tags?: string[];
-                /** @description Determines the sort order of results. ASC for ascending, DESC for descending order */
+                tag?: string[];
+                /** @description Determines the sort order of results (lowercase). */
                 order?: "asc" | "desc";
-                /** @description Specifies the field by which to sort the campaigns. Available options are 'name', 'status', 'created_at', and 'updated_at' */
+                /** @description Specifies the field by which to sort the campaigns. */
                 order_by?: "name" | "status" | "created_at" | "updated_at";
-                /** @description SQL query expression to filter campaigns by custom criteria */
+                /** @description Search campaigns by name or subject. */
                 query?: string;
             };
             header?: never;
@@ -3474,7 +3473,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data?: components["schemas"]["CampaignUpdate"];
+                        data?: components["schemas"]["Campaign"];
+                    };
+                };
+            };
+        };
+    };
+    deleteCampaigns: {
+        parameters: {
+            query?: {
+                id?: number[];
+                query?: string;
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
                     };
                 };
             };
@@ -3591,30 +3616,30 @@ export interface operations {
     getCampaignAnalytics: {
         parameters: {
             query: {
-                /** @description start value of date range */
+                /** @description start of the date range (ISO 8601) */
                 from: string;
                 /** @description end value of date range */
                 to: string;
-                /** @description campaign id/s to retrive view counts */
-                id: string;
+                /** @description campaign ids (repeat the parameter for several) */
+                id: number[];
             };
             header?: never;
             path: {
-                /** @description type of stats, either links, view, click or bounce */
+                /** @description type of stats. `links` returns clicks per URL; the others return counts over time. */
                 type: "links" | "views" | "clicks" | "bounces";
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description list of stats for given set of campaign ids */
+            /** @description stats for the given campaigns */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data?: components["schemas"]["CampaignAnalyticsCount"][];
+                        data?: (components["schemas"]["CampaignAnalyticsCount"] | components["schemas"]["CampaignAnalyticsLink"])[];
                     };
                 };
             };

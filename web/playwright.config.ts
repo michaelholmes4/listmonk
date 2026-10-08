@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test'
 // compose stack). Credentials: LISTMONK_ADMIN_USER / LISTMONK_ADMIN_PASSWORD.
 export default defineConfig({
   testDir: './e2e',
+  // Against the Vite dev server the first visit to a route compiles it on demand, which can be slow.
+  expect: { timeout: 10_000 },
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:9000',
     trace: 'retain-on-failure',

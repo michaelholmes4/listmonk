@@ -37,8 +37,8 @@ test('dashboard breakdowns and charts load independently', async ({ page }) => {
 
 test('unported screens link to the classic admin', async ({ page }) => {
   await page.goto('/app/')
-  await page.locator('[data-sidebar=menu-button]', { hasText: 'Campaigns' }).click()
-  await expect(page.getByRole('link', { name: 'All campaigns' })).toHaveAttribute('href', '/admin/campaigns')
+  await page.locator('[data-sidebar=menu-button]', { hasText: 'Users' }).click()
+  await expect(page.getByRole('link', { name: 'User roles' })).toHaveAttribute('href', '/admin/users/roles/users')
 })
 
 test('command palette opens with ctrl+k and navigates', async ({ page }) => {

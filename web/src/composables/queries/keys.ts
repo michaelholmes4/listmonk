@@ -20,5 +20,11 @@ export const keys = {
   bounces: { all: ['bounces'] as const, page: (q: unknown) => ['bounces', 'page', q] as const },
   templates: { all: ['templates'] as const, detail: (id: number) => ['templates', 'detail', id] as const },
   media: { all: ['media'] as const, page: (q: unknown) => ['media', 'page', q] as const },
+  campaigns: {
+    all: ['campaigns'] as const,
+    page: (q: unknown) => ['campaigns', 'page', q] as const,
+    detail: (id: number) => ['campaigns', 'detail', id] as const,
+    running: ['campaigns', 'running'] as const,
+  },
   dashboard: { counts: ['dashboard', 'counts'] as const, charts: ['dashboard', 'charts'] as const },
 }

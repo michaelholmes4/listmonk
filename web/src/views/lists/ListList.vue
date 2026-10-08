@@ -108,7 +108,7 @@ function createOptin() {
   const l = optinList.value!
   optinCampaign.mutate(
     { list: { id: l.id!, name: l.name! }, t },
-    { onSuccess: (c) => window.location.assign(`/admin/campaigns/${c.id}#content`) },
+    { onSuccess: (c) => router.push({ name: 'campaign', params: { id: c.id }, query: { tab: 'content' } }) },
   )
 }
 

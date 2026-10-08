@@ -1343,7 +1343,7 @@ paths:
             type: array
             items:
               type: string
-              enum: ["scheduled", "running", "paused", "cancelled"]
+              enum: ["draft", "scheduled", "running", "paused", "cancelled", "finished"]
         - in: query
           name: no_body
           description: When set to true, returns response without body content
@@ -1368,7 +1368,7 @@ paths:
                 enum: ["all"]
                 description: Return all results without pagination
         - in: query
-          name: tags
+          name: tag
           description: Filter campaigns by tags. Multiple tags can be specified by repeating the parameter
           required: false
           schema:
@@ -1377,21 +1377,21 @@ paths:
               type: string
         - in: query
           name: order
-          description: Determines the sort order of results. ASC for ascending, DESC for descending order
+          description: Determines the sort order of results (lowercase).
           required: false
           schema:
             type: string
             enum: ["asc", "desc"]
         - in: query
           name: order_by
-          description: Specifies the field by which to sort the campaigns. Available options are 'name', 'status', 'created_at', and 'updated_at'
+          description: Specifies the field by which to sort the campaigns.
           required: false
           schema:
             type: string
             enum: ["name", "status", "created_at", "updated_at"]
         - in: query
           name: query
-          description: SQL query expression to filter campaigns by custom criteria
+          description: Search campaigns by name or subject.
           required: false
           schema:
             type: string
@@ -1442,7 +1442,40 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: "#/components/schemas/CampaignUpdate"
+                    $ref: "#/components/schemas/Campaign"
+    delete:
+      description: deletes campaigns by id, or every campaign matching `query` (or all of them with `all`). The by-query form ignores the status and tag filters of the list.
+      operationId: deleteCampaigns
+      tags:
+        - Campaigns
+      parameters:
+        - in: query
+          name: id
+          required: false
+          schema:
+            type: array
+            items:
+              type: integer
+        - in: query
+          name: query
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: all
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
 
   "/campaigns/{id}":
     get:
@@ -1562,17 +1595,16 @@ paths:
         - in: path
           required: true
           name: type
-          description: type of stats, either links, view, click or bounce
+          description: type of stats. `links` returns clicks per URL; the others return counts over time.
           schema:
             type: string
             enum: [links, views, clicks, bounces]
         - in: query
           required: true
           name: from
-          description: start value of date range
+          description: start of the date range (ISO 8601)
           schema:
             type: string
-            format: date
         - in: query
           required: true
           name: to
@@ -1581,13 +1613,15 @@ paths:
             type: string
         - in: query
           name: id
-          description: campaign id/s to retrive view counts
+          description: campaign ids (repeat the parameter for several)
           required: true
           schema:
-            type: string
+            type: array
+            items:
+              type: integer
       responses:
         "200":
-          description: list of stats for given set of campaign ids
+          description: stats for the given campaigns
           content:
             application/json:
               schema:
@@ -1596,7 +1630,9 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/CampaignAnalyticsCount"
+                      oneOf:
+                        - $ref: "#/components/schemas/CampaignAnalyticsCount"
+                        - $ref: "#/components/schemas/CampaignAnalyticsLink"
 
   "/campaigns/{id}/preview":
     get:
@@ -4361,32 +4397,11 @@ components:
       properties:
         id:
           type: integer
+        uuid:
+          type: string
         created_at:
           type: string
         updated_at:
-          type: string
-        CampaignID:
-          type: integer
-        views:
-          type: integer
-        clicks:
-          type: integer
-        lists:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: integer
-              name:
-                type: string
-        started_at:
-          type: string
-        to_send:
-          type: integer
-        sent:
-          type: integer
-        uuid:
           type: string
         type:
           type: string
@@ -4397,124 +4412,101 @@ components:
           type: string
         from_email:
           type: string
-        body:
-          type: string
-        send_at:
-          type: string
         status:
           type: string
+          enum: [draft, scheduled, running, paused, cancelled, finished]
         content_type:
           type: string
-          enum: [richtext, html, markdown, plain]
+          enum: [richtext, html, markdown, plain, visual]
+        body:
+          type: string
+          description: Left out of list responses when no_body is set.
+        body_source:
+          type: string
+          nullable: true
+          description: JSON source of the visual (email-builder) editor.
+        altbody:
+          type: string
+          nullable: true
+        send_at:
+          type: string
+          nullable: true
+        started_at:
+          type: string
+          nullable: true
+        messenger:
+          type: string
+        template_id:
+          type: integer
+          nullable: true
         tags:
           type: array
           items:
             type: string
-        template_id:
-          type: integer
-        messenger:
+        headers:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+        attribs:
+          type: object
+          additionalProperties: true
+        archive:
+          type: boolean
+        archive_slug:
           type: string
+          nullable: true
+        archive_template_id:
+          type: integer
+          nullable: true
+        archive_meta:
+          type: object
+          additionalProperties: true
+        views:
+          type: integer
+        clicks:
+          type: integer
+        bounces:
+          type: integer
+        to_send:
+          type: integer
+        sent:
+          type: integer
+        lists:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+        media:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              filename:
+                type: string
 
     CampaignContentRequest:
-      type: object
-      properties:
-        id:
-          type: integer
-        created_at:
-          type: string
-        updated_at:
-          type: string
-        CampaignID:
-          type: integer
-        views:
-          type: integer
-        clicks:
-          type: integer
-        lists:
-          type: array
-          items:
-            type: object
-            properties:
-              id:
-                type: integer
-              name:
-                type: string
-        started_at:
-          type: string
-        to_send:
-          type: integer
-        sent:
-          type: integer
-        uuid:
-          type: string
-        type:
-          type: string
-          enum: [regular, optin]
-        name:
-          type: string
-        subject:
-          type: string
-        from_email:
-          type: string
-        body:
-          type: string
-        send_at:
-          type: string
-        status:
-          type: string
-        content_type:
-          type: string
-          enum: [richtext, html, markdown, plain]
-        tags:
-          type: array
-          items:
-            type: string
-        template_id:
-          type: integer
-        messenger:
-          type: string
-        from:
-          type: string
-        to:
-          type: string
+      allOf:
+        - $ref: "#/components/schemas/Campaign"
+        - type: object
+          properties:
+            from:
+              type: string
+              description: Content type to convert from.
+            to:
+              type: string
+              description: Content type to convert to.
 
     CampaignRequest:
       type: object
-      properties:
-        name:
-          type: string
-        subject:
-          type: string
-        lists:
-          type: array
-          items:
-            type: number
-        from_email:
-          type: string
-        content_type:
-          type: string
-        messenger:
-          type: string
-        type:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        send_later:
-          type: boolean
-        send_at:
-          type: object
-          properties:
-            headers:
-              type: array
-              items:
-                type: object
-            template_id:
-              type: number
-
-    CampaignUpdate:
-      type: object
+      required: [name, subject, lists]
       properties:
         name:
           type: string
@@ -4526,39 +4518,59 @@ components:
             type: integer
         from_email:
           type: string
-        messenger:
-          type: string
+          description: Defaults to the app's from address.
         type:
+          type: string
+          enum: [regular, optin]
+        content_type:
+          type: string
+          enum: [richtext, html, markdown, plain, visual]
+        messenger:
           type: string
         tags:
           type: array
           items:
             type: string
+        template_id:
+          type: integer
+        body:
+          type: string
+        body_source:
+          type: string
+        altbody:
+          type: string
         send_later:
           type: boolean
         send_at:
-          type: object
+          type: string
+          nullable: true
         headers:
           type: array
           items:
             type: object
-        template_id:
-          type: integer
-        content_type:
-          type: string
-        body:
-          type: string
-        altbody:
-          type: string
+            additionalProperties:
+              type: string
         archive:
           type: boolean
+        archive_slug:
+          type: string
         archive_template_id:
           type: integer
         archive_meta:
           type: object
+          additionalProperties: true
+        media:
+          type: array
+          description: Ids of media files to attach.
+          items:
+            type: integer
+
+    CampaignUpdate:
+      $ref: "#/components/schemas/CampaignRequest"
 
     CampaignStats:
       type: object
+      description: Live progress of a running campaign.
       properties:
         id:
           type: integer
@@ -4570,13 +4582,23 @@ components:
           type: integer
         started_at:
           type: string
-          format: date
+          nullable: true
         updated_at:
           type: string
-          format: date
+          nullable: true
         rate:
           type: integer
+          description: Messages per minute over the last minute.
         net_rate:
+          type: integer
+          description: Messages per minute since the campaign started.
+
+    CampaignAnalyticsLink:
+      type: object
+      properties:
+        url:
+          type: string
+        count:
           type: integer
 
     CampaignAnalyticsCount:

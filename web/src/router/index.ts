@@ -53,6 +53,42 @@ export const router = createRouter({
       meta: { title: 'globals.terms.list', parents: [{ title: 'globals.terms.lists', to: { name: 'lists' } }] },
     },
     {
+      path: '/campaigns',
+      name: 'campaigns',
+      component: () => import('@/views/campaigns/CampaignList.vue'),
+      meta: { title: 'globals.terms.campaigns', perms: ['campaigns:get_all', 'campaigns:get'] },
+    },
+    {
+      path: '/campaigns/new',
+      name: 'campaign-new',
+      component: () => import('@/views/campaigns/CampaignCreate.vue'),
+      meta: {
+        title: 'campaigns.newCampaign',
+        parents: [{ title: 'globals.terms.campaigns', to: { name: 'campaigns' } }],
+        perms: ['campaigns:manage'],
+      },
+    },
+    {
+      path: '/campaigns/:id(\\d+)',
+      name: 'campaign',
+      component: () => import('@/views/campaigns/CampaignEdit.vue'),
+      meta: {
+        title: 'globals.terms.campaign',
+        parents: [{ title: 'globals.terms.campaigns', to: { name: 'campaigns' } }],
+        perms: ['campaigns:get_all', 'campaigns:get'],
+      },
+    },
+    {
+      path: '/campaigns/analytics',
+      name: 'campaign-analytics',
+      component: () => import('@/views/campaigns/CampaignAnalytics.vue'),
+      meta: {
+        title: 'globals.terms.analytics',
+        parents: [{ title: 'globals.terms.campaigns', to: { name: 'campaigns' } }],
+        perms: ['campaigns:get_analytics'],
+      },
+    },
+    {
       path: '/campaigns/media',
       name: 'media',
       component: () => import('@/views/media/MediaList.vue'),
