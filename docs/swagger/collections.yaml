@@ -51,6 +51,10 @@ tags:
     description: Transactional API
     externalDocs:
       url: https://listmonk.app/docs/apis/transactional/
+  - name: Users
+    description: Users API
+  - name: Roles
+    description: Roles API
   - name: Maintenance
     description: Maintenance API
   - name: Public
@@ -2192,6 +2196,400 @@ paths:
                   data:
                     $ref: "#/components/schemas/Template"
 
+  /users:
+    get:
+      tags:
+        - Users
+      description: returns all users (both people and API users).
+      operationId: getUsers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+    post:
+      tags:
+        - Users
+      description: creates a user. For an API user the response carries the one-time token in `password`.
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+    delete:
+      tags:
+        - Users
+      description: deletes users by id.
+      operationId: deleteUsers
+      parameters:
+        - in: query
+          name: id
+          required: true
+          description: User ids to delete. Repeat in the query for multiple values.
+          schema:
+            type: array
+            items:
+              type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+
+  "/users/{id}":
+    get:
+      tags:
+        - Users
+      description: returns one user.
+      operationId: getUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The user id.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+    put:
+      tags:
+        - Users
+      description: updates a user. An empty password leaves the current one untouched.
+      operationId: updateUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The user id.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+    delete:
+      tags:
+        - Users
+      description: deletes one user.
+      operationId: deleteUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The user id.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+
+  "/users/{id}/twofa/totp":
+    get:
+      tags:
+        - Users
+      description: generates a new TOTP secret and QR code to enrol an authenticator app. Nothing is stored until the code is confirmed.
+      operationId: getTOTPSetup
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The id of the logged in user.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/TOTPSetup"
+
+  "/users/{id}/twofa":
+    put:
+      tags:
+        - Users
+      description: enables TOTP two-factor authentication after verifying a code from the authenticator app.
+      operationId: enableTOTP
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The id of the logged in user.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [secret, code]
+              properties:
+                secret:
+                  type: string
+                code:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+    delete:
+      tags:
+        - Users
+      description: disables TOTP two-factor authentication; the user's password is required.
+      operationId: disableTOTP
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The id of the logged in user.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+
+  /roles/users:
+    get:
+      tags:
+        - Roles
+      description: returns all user roles.
+      operationId: getUserRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Role"
+    post:
+      tags:
+        - Roles
+      description: creates a user role.
+      operationId: createUserRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Role"
+
+  "/roles/users/{id}":
+    put:
+      tags:
+        - Roles
+      description: updates a user role. The Super Admin role (id 1) cannot be changed.
+      operationId: updateUserRole
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The role id.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Role"
+
+  /roles/lists:
+    get:
+      tags:
+        - Roles
+      description: returns all list roles.
+      operationId: getListRoles
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ListRole"
+    post:
+      tags:
+        - Roles
+      description: creates a list role.
+      operationId: createListRole
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListRoleRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ListRole"
+
+  "/roles/lists/{id}":
+    put:
+      tags:
+        - Roles
+      description: updates a list role.
+      operationId: updateListRole
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The role id.
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListRoleRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ListRole"
+
+  "/roles/{id}":
+    delete:
+      tags:
+        - Roles
+      description: deletes a user or list role. The Super Admin role (id 1) cannot be deleted.
+      operationId: deleteRole
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The role id.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+
   /tx:
     post:
       tags:
@@ -3611,6 +4009,10 @@ components:
       properties:
         id:
           type: integer
+        password:
+          type: string
+          nullable: true
+          description: The access token, present only in the response that creates an API user (shown once).
         created_at:
           type: string
           nullable: true
@@ -3677,6 +4079,125 @@ components:
                     type: array
                     items:
                       type: string
+
+    UserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        type:
+          type: string
+          enum: [user, api]
+        status:
+          type: string
+          enum: [enabled, disabled]
+        password_login:
+          type: boolean
+        password:
+          type: string
+          nullable: true
+        password2:
+          type: string
+          nullable: true
+        user_role_id:
+          type: integer
+        list_role_id:
+          type: integer
+          nullable: true
+
+    TOTPSetup:
+      type: object
+      properties:
+        secret:
+          type: string
+        qr:
+          type: string
+          description: PNG image, base64 encoded.
+
+    ListPermission:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: ["list:get", "list:manage"]
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          nullable: true
+        type:
+          type: string
+        name:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+
+    RoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    ListRole:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        lists:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListPermission"
+
+    ListRoleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        lists:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              permissions:
+                type: array
+                items:
+                  type: string
+                  enum: ["list:get", "list:manage"]
 
     About:
       type: object

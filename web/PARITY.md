@@ -20,10 +20,10 @@ Routes derive from `frontend/src/router/index.js`.
 | ☑ | `/campaigns/media` | Media | Search, multi-file upload, delete, paging (page and search in the URL). `MediaGallery` has a `selectable` mode for the campaign editor's picker |
 | ☑ | `/campaigns/templates` | Templates | List (client-side sort), create/edit pages, preview (also of unsaved edits, F9), clone, set default, delete. Visual templates are edited with the email-builder |
 | ☑ | `/campaigns/analytics` | Analytics | Campaign picker, date range, views/clicks/bounces/links series and totals, top links, per-campaign charts |
-| ☐ | `/users` | Users | |
-| ☐ | `/users/roles/users` | User roles | |
-| ☐ | `/users/roles/lists` | List roles | |
-| ☐ | `/user/profile` | Profile | |
+| ☑ | `/users` | Users | Client-side sort, create/edit pages (person or API user, password login, user and list role), delete. A new API user is shown its one-time token (verified to authenticate). The classic search box is omitted: `GET /api/users` takes no query, so it never filtered |
+| ☑ | `/users/roles/users` | User roles | List, create/edit pages with the grouped permission grid (select/none, SQL-query warning), clone, delete; Super Admin is view-only |
+| ☑ | `/users/roles/lists` | List roles | List, create/edit pages (add lists, view/manage per list), clone, delete. The classic "lists:*_all overrides" warning never rendered (it read an empty field) and is omitted |
+| ☑ | `/user/profile` | Profile | Name, email, password change, TOTP two-factor on (QR, secret, code) and off (password). Needed a backend fix: DELETE bodies were never parsed, so turning 2FA off failed in both UIs (`utils.FormValue`) |
 | ☐ | `/settings` | Settings | all tabs, in `AdminSplitLayout` |
 | ☐ | `/settings/logs` | Logs | |
 | ☐ | `/settings/maintenance` | Maintenance | |
@@ -42,5 +42,5 @@ Routes derive from `frontend/src/router/index.js`.
 
 ## OpenAPI spec gaps
 
-`pnpm spec:coverage` lists routes missing from `docs/swagger/collections.yaml` (users, roles,
-a few misc). Document each when its screen is ported.
+`pnpm spec:coverage` lists routes missing from `docs/swagger/collections.yaml` (a few misc: settings by key,
+exports, subscriber PATCH). Document each when its screen is ported.

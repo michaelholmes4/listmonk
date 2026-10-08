@@ -58,5 +58,14 @@
   "web.common.search": "Search",
   "web.campaigns.trackLink": "Track link?",
   "web.campaigns.sourceCode": "Source code",
-  "web.campaigns.insertHTML": "Insert HTML"
+  "web.campaigns.insertHTML": "Insert HTML",
+  "web.users.help.what": "Users are the people who sign in to this admin. Each has one user role (what they can do) and optionally one list role (which lists they can see and manage).",
+  "web.users.help.api": "API users have no password. Creating one shows its access token once; copy it then, it cannot be shown again.",
+  "web.users.help.roles": "Roles are managed under User roles and List roles. A user without a list role can only reach lists through their user role.",
+  "web.roles.help.user": "A user role is a set of permissions. The Super Admin role has everything and cannot be changed.",
+  "web.roles.help.list": "A list role grants view and manage access to specific lists. It applies on top of the list permissions in the user role.",
+  "web.roles.highRisk": "High risk: allows running raw SQL against subscribers",
+  "web.roles.noLists": "No lists added yet.",
+  "web.profile.passwordHelp": "Leave blank to keep your current password. Changing it signs out your other sessions.",
+  "web.profile.codeInvalid": "That code didn't work. Check the code and try again."
 }

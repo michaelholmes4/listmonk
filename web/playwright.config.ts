@@ -7,6 +7,8 @@ export default defineConfig({
   // Against the Vite dev server the first visit to a route compiles it on demand, which can be slow.
   expect: { timeout: 10_000 },
   use: {
+    // A wrong locator should fail on its own, well before the test timeout hides it behind cleanup errors.
+    actionTimeout: 10_000,
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:9000',
     trace: 'retain-on-failure',
   },

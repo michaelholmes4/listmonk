@@ -133,20 +133,20 @@ export const navigation: NavGroup[] = [
     icon: ShieldUser,
     perms: ['users:*', 'roles:*'],
     children: [
-      { key: 'all-users', label: 'globals.terms.users', icon: Users, perms: ['users:get'], legacy: '/admin/users' },
+      { key: 'all-users', label: 'globals.terms.users', icon: Users, perms: ['users:get'], to: { name: 'users' } },
       {
         key: 'user-roles',
         label: 'users.userRoles',
         icon: ShieldUser,
         perms: ['roles:get'],
-        legacy: '/admin/users/roles/users',
+        to: { name: 'user-roles' },
       },
       {
         key: 'list-roles',
         label: 'users.listRoles',
         icon: List,
         perms: ['roles:get'],
-        legacy: '/admin/users/roles/lists',
+        to: { name: 'list-roles' },
       },
     ],
   },

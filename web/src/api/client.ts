@@ -74,11 +74,19 @@ export const api = {
   async put<T>(url: string, body?: unknown, cfg?: Config): Promise<T> {
     return (await http.put<{ data: T }>(url, body, cfg)).data.data
   },
+  /** PUT url-encoded form fields (the TOTP endpoints read form values, not JSON). */
+  async putForm<T>(url: string, fields: Record<string, string>, cfg?: Config): Promise<T> {
+    return (await http.put<{ data: T }>(url, new URLSearchParams(fields), cfg)).data.data
+  },
   async patch<T>(url: string, body?: unknown, cfg?: Config): Promise<T> {
     return (await http.patch<{ data: T }>(url, body, cfg)).data.data
   },
   async delete<T>(url: string, params?: Params, cfg?: Config): Promise<T> {
     return (await http.delete<{ data: T }>(url, { params, ...cfg })).data.data
+  },
+  /** DELETE with url-encoded form fields in the body. */
+  async deleteForm<T>(url: string, fields: Record<string, string>, cfg?: Config): Promise<T> {
+    return (await http.delete<{ data: T }>(url, { data: new URLSearchParams(fields), ...cfg })).data.data
   },
   async raw<T>(url: string, params?: Params, cfg?: Config): Promise<T> {
     return (await http.get<T>(url, { params, ...cfg })).data

@@ -319,7 +319,7 @@ func (a *App) EnableTOTP(c echo.Context) error {
 func (a *App) DisableTOTP(c echo.Context) error {
 	var (
 		u        = c.Get(auth.UserHTTPCtxKey).(auth.User)
-		password = c.FormValue("password")
+		password = utils.FormValue(c, "password")
 	)
 
 	// TOTP isn't enabled.

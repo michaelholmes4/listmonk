@@ -862,6 +862,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description returns all users (both people and API users). */
+        get: operations["getUsers"];
+        put?: never;
+        /** @description creates a user. For an API user the response carries the one-time token in `password`. */
+        post: operations["createUser"];
+        /** @description deletes users by id. */
+        delete: operations["deleteUsers"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description returns one user. */
+        get: operations["getUser"];
+        /** @description updates a user. An empty password leaves the current one untouched. */
+        put: operations["updateUser"];
+        post?: never;
+        /** @description deletes one user. */
+        delete: operations["deleteUser"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/twofa/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description generates a new TOTP secret and QR code to enrol an authenticator app. Nothing is stored until the code is confirmed. */
+        get: operations["getTOTPSetup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/twofa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description enables TOTP two-factor authentication after verifying a code from the authenticator app. */
+        put: operations["enableTOTP"];
+        post?: never;
+        /** @description disables TOTP two-factor authentication; the user's password is required. */
+        delete: operations["disableTOTP"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description returns all user roles. */
+        get: operations["getUserRoles"];
+        put?: never;
+        /** @description creates a user role. */
+        post: operations["createUserRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description updates a user role. The Super Admin role (id 1) cannot be changed. */
+        put: operations["updateUserRole"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description returns all list roles. */
+        get: operations["getListRoles"];
+        put?: never;
+        /** @description creates a list role. */
+        post: operations["createListRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/lists/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description updates a list role. */
+        put: operations["updateListRole"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/roles/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description deletes a user or list role. The Super Admin role (id 1) cannot be deleted. */
+        delete: operations["deleteRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tx": {
         parameters: {
             query?: never;
@@ -1587,6 +1747,8 @@ export interface components {
         } | null;
         User: {
             id?: number;
+            /** @description The access token, present only in the response that creates an API user (shown once). */
+            password?: string | null;
             created_at?: string | null;
             updated_at?: string | null;
             username?: string;
@@ -1616,6 +1778,56 @@ export interface components {
                     permissions?: string[];
                 }[];
             } | null;
+        };
+        UserRequest: {
+            username?: string;
+            name?: string;
+            email?: string;
+            /** @enum {string} */
+            type?: "user" | "api";
+            /** @enum {string} */
+            status?: "enabled" | "disabled";
+            password_login?: boolean;
+            password?: string | null;
+            password2?: string | null;
+            user_role_id?: number;
+            list_role_id?: number | null;
+        };
+        TOTPSetup: {
+            secret?: string;
+            /** @description PNG image, base64 encoded. */
+            qr?: string;
+        };
+        ListPermission: {
+            id?: number;
+            name?: string;
+            permissions?: ("list:get" | "list:manage")[];
+        };
+        Role: {
+            id?: number;
+            created_at?: string | null;
+            updated_at?: string | null;
+            type?: string;
+            name?: string | null;
+            permissions?: string[];
+        };
+        RoleRequest: {
+            name?: string;
+            permissions?: string[];
+        };
+        ListRole: {
+            id?: number;
+            created_at?: string | null;
+            updated_at?: string | null;
+            name?: string | null;
+            lists?: components["schemas"]["ListPermission"][];
+        };
+        ListRoleRequest: {
+            name?: string;
+            lists?: {
+                id?: number;
+                permissions?: ("list:get" | "list:manage")[];
+            }[];
         };
         About: {
             version?: string;
@@ -4186,6 +4398,425 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: components["schemas"]["Template"];
+                    };
+                };
+            };
+        };
+    };
+    getUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["User"][];
+                    };
+                };
+            };
+        };
+    };
+    createUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["User"];
+                    };
+                };
+            };
+        };
+    };
+    deleteUsers: {
+        parameters: {
+            query: {
+                /** @description User ids to delete. Repeat in the query for multiple values. */
+                id: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    getUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The user id. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["User"];
+                    };
+                };
+            };
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The user id. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["User"];
+                    };
+                };
+            };
+        };
+    };
+    deleteUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The user id. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    getTOTPSetup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the logged in user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["TOTPSetup"];
+                    };
+                };
+            };
+        };
+    };
+    enableTOTP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the logged in user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    secret: string;
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    disableTOTP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The id of the logged in user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    getUserRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Role"][];
+                    };
+                };
+            };
+        };
+    };
+    createUserRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Role"];
+                    };
+                };
+            };
+        };
+    };
+    updateUserRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The role id. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["Role"];
+                    };
+                };
+            };
+        };
+    };
+    getListRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["ListRole"][];
+                    };
+                };
+            };
+        };
+    };
+    createListRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["ListRole"];
+                    };
+                };
+            };
+        };
+    };
+    updateListRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The role id. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["ListRole"];
+                    };
+                };
+            };
+        };
+    };
+    deleteRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The role id. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
                     };
                 };
             };

@@ -80,7 +80,7 @@ const themes = [
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuItem as-child>
-              <a href="/admin/user/profile"><UserRound />{{ t('users.profile') }}</a>
+              <RouterLink :to="{ name: 'profile' }"><UserRound />{{ t('users.profile') }}</RouterLink>
             </DropdownMenuItem>
             <DropdownMenuItem as-child>
               <a href="/admin/"><PanelLeft />{{ t('web.user.classicAdmin') }}</a>

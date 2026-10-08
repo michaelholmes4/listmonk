@@ -11,6 +11,7 @@ Known conflict hotspots (the only upstream files we edit):
 - `cmd/handlers.go` (routes), `cmd/init.go` (wiring), `cmd/upgrade.go` (fork-migration call)
 - `queries/campaigns.sql` (exclude `automation` campaigns from the manager and default list)
 - `internal/core/subscribers.go` (automation trigger hooks)
+- `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
 - `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`)
 - `.devcontainer/*`, `.gitignore`
