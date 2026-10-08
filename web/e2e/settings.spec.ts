@@ -207,3 +207,21 @@ test('notices: nothing shows when there is nothing to say', async ({ page }) => 
   await expect(page.getByRole('link', { name: 'Dashboard' }).first()).toBeVisible()
   await expect(page.locator('[data-cy=notice-restart]')).toHaveCount(0)
 })
+
+test('the slow-queries footnote shows on the dashboard and lists when caching is on', async ({ page }) => {
+  // Stubbed: turning caching on for real means saving settings (a server reload).
+  await page.route(
+    (url) => url.pathname === '/api/settings',
+    async (route) => {
+      if (route.request().method() !== 'GET') return route.continue()
+      const res = await route.fetch()
+      const body = await res.json()
+      body.data['app.cache_slow_queries'] = true
+      await route.fulfill({ response: res, json: body })
+    },
+  )
+  for (const path of ['/app/', '/app/lists']) {
+    await page.goto(path)
+    await expect(page.locator('[data-cy=slow-queries-note]')).toContainText('Slow queries are being cached')
+  }
+})

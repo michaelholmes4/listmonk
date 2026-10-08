@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlowQueriesNote from '@/components/SlowQueriesNote.vue'
 import { Mail, Rocket, Users, List } from '@lucide/vue'
 import { format } from 'date-fns'
 import { computed, type Component } from 'vue'
@@ -117,5 +118,7 @@ const chartCards = computed(() => [
         </CardContent>
       </Card>
     </div>
+
+    <SlowQueriesNote />
   </div>
 </template>

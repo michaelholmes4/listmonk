@@ -1,0 +1,78 @@
+# librelist release: the same binary and Docker image layout as upstream (a drop-in for the
+# listmonk image), but published only to GHCR, for linux amd64/arm64. Used by
+# .github/workflows/librelist-release.yml; upstream's .goreleaser.yml is left untouched.
+project_name: librelist
+
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+  # GITHUB_ORG is the repository owner, set by the workflow.
+
+before:
+  hooks:
+    # Both UIs are built once here; the post-build hook below only packs them into each binary.
+    - make build-frontend build-web
+
+builds:
+  - id: listmonk
+    binary: listmonk
+    main: ./cmd
+    goos: [linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X "main.buildString={{ .Tag }} ({{ .ShortCommit }} {{ .Date }}, {{ .Os }}/{{ .Arch }})" -X "main.versionString={{ .Tag }}"
+    hooks:
+      post: make pack-bin-only BIN={{ .Path }}
+
+archives:
+  - formats: [tar.gz]
+    files:
+      - README.md
+      - LICENSE
+      - NOTICE
+
+dockers:
+  - use: buildx
+    goos: linux
+    goarch: amd64
+    ids: [listmonk]
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:{{ .Tag }}-amd64"
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=AGPL-3.0
+    dockerfile: Dockerfile
+    extra_files:
+      - config.toml.sample
+      - docker-entrypoint.sh
+  - use: buildx
+    goos: linux
+    goarch: arm64
+    ids: [listmonk]
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8"
+    build_flag_templates:
+      - --platform=linux/arm64/v8
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.source=https://github.com/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=AGPL-3.0
+    dockerfile: Dockerfile
+    extra_files:
+      - config.toml.sample
+      - docker-entrypoint.sh
+
+docker_manifests:
+  - name_template: "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:{{ .Tag }}"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8"
+  - name_template: "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:latest"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_ORG }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8"

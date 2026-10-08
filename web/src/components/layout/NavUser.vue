@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, ChevronsUpDown, LogOut, Monitor, Moon, PanelLeft, Sun, UserRound } from '@lucide/vue'
+import { Check, ChevronsUpDown, Code, LogOut, Monitor, Moon, PanelLeft, Sun, UserRound } from '@lucide/vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -16,10 +16,12 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/c
 import { Skeleton } from '@/components/ui/skeleton'
 import { useLogout, useProfile } from '@/composables/queries/useProfile'
 import { useTheme } from '@/composables/useTheme'
+import { sourceLink } from '@/lib/source'
 
 const { t } = useI18n()
 const { isMobile } = useSidebar()
 const { data: profile, isPending } = useProfile()
+const source = sourceLink()
 const logout = useLogout()
 const theme = useTheme()
 
@@ -84,6 +86,9 @@ const themes = [
             </DropdownMenuItem>
             <DropdownMenuItem as-child>
               <a href="/admin/"><PanelLeft />{{ t('web.user.classicAdmin') }}</a>
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="source" as-child>
+              <a :href="source" target="_blank" rel="noopener noreferrer" data-cy="source-link"><Code />{{ t('web.user.sourceCode') }}</a>
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />

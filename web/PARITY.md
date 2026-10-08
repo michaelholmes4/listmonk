@@ -6,8 +6,8 @@ Routes derive from `frontend/src/router/index.js`.
 
 | Done | Route | Classic view | Notes |
 |:---:|---|---|---|
-| ◐ | `/` dashboard | Dashboard | Counts, breakdowns and both charts done. Left: "slow queries cached" note (needs `app.cache_slow_queries` from `/api/settings`) and the global refresh action |
-| ◐ | `/lists` | Lists | Search, archived view, sort, paging, create/edit/delete, bulk delete ("select all N" resolves IDs first; the backend's delete-by-query ignores the status filter), send-campaign and import shortcuts. Left: "slow queries cached" note (needs `app.cache_slow_queries`) |
+| ☑ | `/` dashboard | Dashboard | Counts, breakdowns and both charts, each loading on its own; slow-queries footnote. The classic UI's page-refresh action is the refresh button in the header (refetches whatever is on screen) |
+| ☑ | `/lists` | Lists | Search, archived view, sort, paging, create/edit/delete, bulk delete ("select all N" resolves IDs first; the backend's delete-by-query ignores the status filter), send-campaign and import shortcuts, slow-queries footnote |
 | ☑ | `/lists/:id` | List form | Page (+ `/lists/new`): name, type, opt-in, tags, description, archive; read-only without `list:manage` |
 | ☑ | `/lists/forms` | Forms generator | Read-only CodeMirror view; list names and descriptions are HTML-escaped (the classic generator pasted them raw) |
 | ◐ | `/subscribers` | Subscribers | Search, advanced SQL query (gated by `subscribers:sql_query`), list/status filter, sort, paging, export, bulk blocklist/delete/manage lists, row actions. e2e covers by-ID bulk; the "select all N" by-query path is not covered yet |
@@ -38,7 +38,7 @@ Routes derive from `frontend/src/router/index.js`.
 - [x] Login, 2FA, forgot/reset, OIDC: **decision: keep the server-rendered pages** (they are the security boundary) and theme them with `librelist-auth.css`. They return to `/app` when `next` says so; the default `next` stays `/admin` until Phase 7. Upstream's `SanitizeURI` drops query strings from `next`
 - [x] "Settings changed, restart needed" flow: save waits for the reload; `GlobalNotices` shows the restart banner (with a Restart action) when campaigns blocked the automatic reload
 - [x] Update notice and project messages (`GlobalNotices`), and the legacy-admin-credentials warning
-- [ ] Source-code link (AGPL §13). The classic UI has none in v6.2 and the fork has no public repo URL yet; add it to the user menu once `origin` exists
+- [x] Source-code link (AGPL §13): shown in the user menu when `VITE_SOURCE_URL` is set at build time (the release workflow sets it to the repository); hidden otherwise, since the classic UI has none and local builds have no public URL
 
 ## OpenAPI spec gaps
 

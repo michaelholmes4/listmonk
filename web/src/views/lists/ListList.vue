@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import SlowQueriesNote from '@/components/SlowQueriesNote.vue'
 import { Plus, Search, Trash2 } from '@lucide/vue'
 import type { PaginationState, RowSelectionState, SortingState } from '@tanstack/vue-table'
 import { computed, ref, watch } from 'vue'
@@ -179,6 +180,8 @@ const columns = createColumns({
       :loading="isPending"
       :row-id="(l: List) => String(l.id)"
     />
+
+    <SlowQueriesNote />
   </div>
 
   <ConfirmDialog

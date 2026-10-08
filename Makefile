@@ -171,3 +171,9 @@ build-web:
 .PHONY: dev
 dev:
 	$(MAKE) run-dev-backend & $(MAKE) run-web & wait
+
+# Pack the already-built frontends into BIN. The goreleaser hook uses this so the UIs are built
+# once (in `before`) instead of once per target.
+.PHONY: pack-bin-only
+pack-bin-only: $(STUFFBIN)
+	$(STUFFBIN) -a stuff -in ${BIN} -out ${BIN} ${STATIC}

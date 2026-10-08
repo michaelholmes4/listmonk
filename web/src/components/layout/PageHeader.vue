@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { RefreshCw } from '@lucide/vue'
+import { useIsFetching, useQueryClient } from '@tanstack/vue-query'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -10,6 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { dynamicTitle } from '@/lib/page-title'
@@ -19,6 +22,11 @@ const route = useRoute()
 
 // Crumbs come from route meta, so a view never builds its own header.
 const parents = computed(() => route.meta.parents ?? [])
+
+// Refetch everything on the page. Editing screens refetch fine too: forms with unsaved edits keep them.
+const qc = useQueryClient()
+const fetching = useIsFetching()
+const refresh = () => qc.invalidateQueries({ type: 'active' })
 </script>
 
 <template>
@@ -45,5 +53,8 @@ const parents = computed(() => route.meta.parents ?? [])
     </Breadcrumb>
     <!-- Views can put page-level actions here via <Teleport to="#page-actions">. -->
     <div id="page-actions" class="ml-auto flex items-center gap-2" />
+    <Button variant="ghost" size="icon-sm" :title="t('globals.buttons.refresh')" :aria-label="t('globals.buttons.refresh')" data-cy="btn-refresh" @click="refresh">
+      <RefreshCw :class="fetching > 0 && 'animate-spin'" />
+    </Button>
   </header>
 </template>

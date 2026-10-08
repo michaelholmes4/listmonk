@@ -38,3 +38,19 @@ settings key `fork_migrations`, so upstream version numbers never collide with o
 
 ## After the old UI is retired
 Upstream changes under `frontend/src/` become "port to `web/`" tasks during each merge.
+
+## Releasing
+Tag the fork `vX.Y.Z-librelist.N` (for example `v6.2.0-librelist.1`); upstream's own `v*` tags, which come in
+with merges, never match. `.github/workflows/librelist-release.yml` then runs GoReleaser with
+`.goreleaser.librelist.yml` (upstream's `.goreleaser.yml` is untouched): both UIs are built once, packed into the
+binary with `make pack-bin-only`, and `ghcr.io/<owner>/librelist:<tag>` (linux amd64/arm64) is pushed. The
+`VITE_SOURCE_URL` it sets is the "Source code" link in the admin (AGPL §13).
+
+The image is a drop-in for `listmonk/listmonk` in an existing compose file: change `image:`, back up with
+`pg_dump`, then run `./listmonk --upgrade --yes` (upstream migrations first, then the fork's). Try the upgrade on
+a restored copy of the production database first.
+
+`.github/workflows/librelist-ci.yml` lints, type-checks, tests and builds `web/` and vets the Go code on every
+push and pull request. The GoReleaser config and the workflows are syntax-checked only so far; the first tag is
+their real test. A single binary packed with `make pack-bin-only` was verified to serve `/app` (index, deep links
+and hashed assets) and `/admin` from its embedded files.

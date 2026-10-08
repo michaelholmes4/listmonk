@@ -71,3 +71,11 @@ test('unknown routes render the in-app 404 (not a server error)', async ({ page 
   await page.goto('/app/nope/nothing')
   await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible()
 })
+
+test('the refresh button refetches what the page shows', async ({ page }) => {
+  await page.goto('/app/')
+  await expect(page.getByRole('link', { name: 'Dashboard' }).first()).toBeVisible()
+  const counts = page.waitForRequest((r) => r.url().includes('/api/dashboard/counts'), { timeout: 15_000 })
+  await page.locator('[data-cy=btn-refresh]').click()
+  await counts
+})
