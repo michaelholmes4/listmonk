@@ -698,7 +698,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Bounce"
+                      $ref: "#/components/schemas/BounceRecord"
 
     delete:
       description: deletes a subscriber's bounce records
@@ -722,6 +722,30 @@ paths:
                 properties:
                   data:
                     type: boolean
+
+  "/subscribers/{id}/activity":
+    get:
+      description: campaign views and link clicks of a subscriber
+      operationId: getSubscriberActivity
+      tags:
+        - Subscribers
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: subscriber id
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: the subscriber's activity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SubscriberActivity"
 
   "/subscribers/{id}/optin":
     post:
@@ -3956,6 +3980,101 @@ components:
                 type: string
               updated_at:
                 type: string
+              optin:
+                type: string
+                enum: [single, double]
+              description:
+                type: string
+              subscription_created_at:
+                type: string
+              subscription_updated_at:
+                type: string
+              subscription_meta:
+                type: object
+                additionalProperties: true
+
+    BounceRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        source:
+          type: string
+        meta:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+        email:
+          type: string
+        subscriber_uuid:
+          type: string
+        subscriber_id:
+          type: integer
+        subscriber_status:
+          type: string
+        campaign_uuid:
+          type: string
+        campaign:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+
+    SubscriberActivity:
+      type: object
+      properties:
+        campaign_views:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                nullable: true
+              uuid:
+                type: string
+                nullable: true
+              name:
+                type: string
+                nullable: true
+              subject:
+                type: string
+                nullable: true
+              view_count:
+                type: integer
+              last_viewed_at:
+                type: string
+        link_clicks:
+          type: array
+          items:
+            type: object
+            properties:
+              link_id:
+                type: integer
+              url:
+                type: string
+              campaign_id:
+                type: integer
+                nullable: true
+              campaign_uuid:
+                type: string
+                nullable: true
+              campaign_name:
+                type: string
+                nullable: true
+              campaign_subject:
+                type: string
+                nullable: true
+              click_count:
+                type: integer
+              last_clicked_at:
+                type: string
 
     NewSubscriber:
       type: object
@@ -4008,6 +4127,20 @@ components:
       properties:
         query:
           type: string
+        search:
+          type: string
+          description: Simple name/e-mail search, alternative to `query`.
+        list_ids:
+          type: array
+          description: Restrict a by-query operation to subscribers of these lists.
+          items:
+            type: integer
+        subscription_status:
+          type: string
+          description: Restrict a by-query operation to this subscription status (with list_ids).
+        all:
+          type: boolean
+          description: Required to delete every subscriber when query and search are both empty.
         ids:
           type: array
           description: The ids of the subscribers to be modified.
@@ -4018,7 +4151,7 @@ components:
           enum: [add, remove, unsubscribe]
           description: Whether to add, remove, or unsubscribe the users.
         target_list_ids:
-          type: integer
+          type: array
           description: The ids of the lists to be modified.
           items:
             type: integer

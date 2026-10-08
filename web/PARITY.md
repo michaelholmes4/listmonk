@@ -10,9 +10,9 @@ Routes derive from `frontend/src/router/index.js`.
 | ☐ | `/lists` | Lists | |
 | ☐ | `/lists/:id` | List form | |
 | ☐ | `/lists/forms` | Forms generator | |
-| ☐ | `/subscribers` | Subscribers | incl. SQL query builder, bulk actions |
-| ☐ | `/subscribers/:id` | Subscriber form | |
-| ☐ | `/subscribers/lists/:listID` | Subscribers of a list | |
+| ◐ | `/subscribers` | Subscribers | Search, advanced SQL query (gated by `subscribers:sql_query`), list/status filter, sort, paging, export, bulk blocklist/delete/manage lists, row actions. e2e covers by-ID bulk; the "select all N" by-query path is not covered yet |
+| ☑ | `/subscribers/:id` | Subscriber form | Sheet over the table: lists, preconfirm, send opt-in, subscriptions, bounces, activity, attributes |
+| ☑ | `/subscribers/lists/:listID` | Subscribers of a list | Same view; `?subscription_status=` honoured |
 | ☐ | `/subscribers/import` | Import | CSV + progress |
 | ☐ | `/subscribers/bounces` | Bounces | |
 | ☐ | `/campaigns` | Campaigns | |

@@ -72,7 +72,7 @@ export const navigation: NavGroup[] = [
         label: 'menu.allSubscribers',
         icon: Users,
         perms: ['subscribers:get_all', 'subscribers:get'],
-        legacy: '/admin/subscribers',
+        to: { name: 'subscribers' },
       },
       {
         key: 'import',

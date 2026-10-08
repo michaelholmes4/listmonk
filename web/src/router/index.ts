@@ -27,6 +27,20 @@ export const router = createRouter({
       component: () => import('@/views/DashboardView.vue'),
       meta: { title: 'menu.dashboard' },
     },
+    ...[
+      { path: '/subscribers', name: 'subscribers' },
+      { path: '/subscribers/new', name: 'subscribers-new' },
+      { path: '/subscribers/:id(\\d+)', name: 'subscriber' },
+      { path: '/subscribers/lists/:listID(\\d+)', name: 'subscribers-list' },
+    ].map((r) => ({
+      ...r,
+      // The edit/new sheet is the same view with the sheet open, so closing it keeps the table state.
+      component: () => import('@/views/subscribers/SubscribersView.vue'),
+      meta: {
+        title: 'globals.terms.subscribers',
+        perms: ['subscribers:get_all', 'subscribers:get'],
+      },
+    })),
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',

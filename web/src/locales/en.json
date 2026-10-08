@@ -28,5 +28,11 @@
   "web.common.confirm": "Confirm",
   "web.common.save": "Save",
   "web.common.help": "Help",
-  "web.dashboard.noData": "No data in the last 30 days."
+  "web.dashboard.noData": "No data in the last 30 days.",
+  "web.common.copy": "Copy",
+  "web.common.actions": "Actions",
+  "web.common.view": "View",
+  "web.common.all": "All",
+  "web.common.refreshing": "Refreshing…",
+  "web.subscribers.campaignDeleted": "Campaign deleted"
 }

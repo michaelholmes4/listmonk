@@ -351,6 +351,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/subscribers/{id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description campaign views and link clicks of a subscriber */
+        get: operations["getSubscriberActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/subscribers/{id}/optin": {
         parameters: {
             query?: never;
@@ -1785,6 +1802,52 @@ export interface components {
                 tags?: string[];
                 created_at?: string;
                 updated_at?: string;
+                /** @enum {string} */
+                optin?: "single" | "double";
+                description?: string;
+                subscription_created_at?: string;
+                subscription_updated_at?: string;
+                subscription_meta?: {
+                    [key: string]: unknown;
+                };
+            }[];
+        };
+        BounceRecord: {
+            id?: number;
+            type?: string;
+            source?: string;
+            meta?: {
+                [key: string]: unknown;
+            };
+            created_at?: string;
+            email?: string;
+            subscriber_uuid?: string;
+            subscriber_id?: number;
+            subscriber_status?: string;
+            campaign_uuid?: string;
+            campaign?: {
+                id?: number;
+                name?: string;
+            } | null;
+        };
+        SubscriberActivity: {
+            campaign_views?: {
+                id?: number | null;
+                uuid?: string | null;
+                name?: string | null;
+                subject?: string | null;
+                view_count?: number;
+                last_viewed_at?: string;
+            }[];
+            link_clicks?: {
+                link_id?: number;
+                url?: string;
+                campaign_id?: number | null;
+                campaign_uuid?: string | null;
+                campaign_name?: string | null;
+                campaign_subject?: string | null;
+                click_count?: number;
+                last_clicked_at?: string;
             }[];
         };
         NewSubscriber: {
@@ -1811,6 +1874,14 @@ export interface components {
         };
         SubscriberQueryRequest: {
             query?: string;
+            /** @description Simple name/e-mail search, alternative to `query`. */
+            search?: string;
+            /** @description Restrict a by-query operation to subscribers of these lists. */
+            list_ids?: number[];
+            /** @description Restrict a by-query operation to this subscription status (with list_ids). */
+            subscription_status?: string;
+            /** @description Required to delete every subscriber when query and search are both empty. */
+            all?: boolean;
             /** @description The ids of the subscribers to be modified. */
             ids?: number[];
             /**
@@ -1819,7 +1890,7 @@ export interface components {
              */
             action?: "add" | "remove" | "unsubscribe";
             /** @description The ids of the lists to be modified. */
-            target_list_ids?: number;
+            target_list_ids?: number[];
             /**
              * @description confirmed, unconfirmed, or unsubscribed status.
              * @enum {string}
@@ -2718,7 +2789,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        data?: components["schemas"]["Bounce"][];
+                        data?: components["schemas"]["BounceRecord"][];
                     };
                 };
             };
@@ -2744,6 +2815,31 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    getSubscriberActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description subscriber id */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description the subscriber's activity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SubscriberActivity"];
                     };
                 };
             };

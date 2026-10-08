@@ -21,3 +21,11 @@ export interface Paginated<T> {
   per_page: number
   page: number
 }
+
+export type Subscriber = Schemas['Subscriber']
+export type SubscriberList = NonNullable<Subscriber['lists']>[number]
+export type NewSubscriber = Schemas['NewSubscriber']
+export type SubscriberActivity = Schemas['SubscriberActivity']
+export type BounceRecord = Schemas['BounceRecord']
+export type SubscriberBulkRequest = Schemas['SubscriberQueryRequest']
+export type List = Schemas['List']
