@@ -35,7 +35,7 @@ Routes derive from `frontend/src/router/index.js`.
 - [x] i18n from `/api/lang/:lang`
 - [x] Dark mode
 - [x] Command palette + provider registry
-- [ ] Login in the new UI (TOTP, OIDC). For now the server-rendered `/admin/login` is used and returns to `/app`
+- [x] Login, 2FA, forgot/reset, OIDC: **decision: keep the server-rendered pages** (they are the security boundary) and theme them with `librelist-auth.css`. They return to `/app` when `next` says so; the default `next` stays `/admin` until Phase 7. Upstream's `SanitizeURI` drops query strings from `next`
 - [ ] "Settings changed, restart needed" flow (`/api/config` `needs_restart`, `/api/admin/reload`)
 - [ ] Global "about" / update notice
 - [ ] Source-code link (AGPL §13). The classic UI has none in v6.2 and the fork has no public repo URL yet; add it to the user menu once `origin` exists

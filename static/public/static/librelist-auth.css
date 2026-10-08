@@ -1,0 +1,207 @@
+/*
+ * librelist: theme for the server-rendered admin auth pages (login, first-time setup, 2FA,
+ * forgot/reset password), matching the new UI in web/. Everything is scoped to pages that
+ * contain `section.login`, so the public subscriber pages that share style.css are untouched.
+ *
+ * Token values mirror web/src/assets/main.css (adapted from libredesk, AGPL-3.0; see NOTICE).
+ * Keep the two in sync. Geist is SIL OFL 1.1 (fonts/geist-latin-wght-normal.woff2).
+ */
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fonts/geist-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+body:has(section.login) {
+  --background: hsl(0 0% 99.2%);
+  --foreground: hsl(0 0% 1%);
+  --card: hsl(0 0% 100%);
+  --primary: hsl(152 39% 30%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(0 0% 96%);
+  --muted-foreground: hsl(0 0% 27%);
+  --accent: hsl(0 0% 95%);
+  --destructive: hsl(2 47% 46%);
+  --border: hsl(0 0% 91%);
+  --input: hsl(0 0% 85%);
+  --ring: hsl(151 41% 45%);
+
+  background: var(--secondary);
+  color: var(--foreground);
+  font-family: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  body:has(section.login) {
+    --background: hsl(120 2.6% 7.6%);
+    --foreground: hsl(150 6% 93%);
+    --card: hsl(120 2% 10%);
+    --primary: hsl(152 58% 54%);
+    --primary-foreground: hsl(120 2.6% 7.6%);
+    --secondary: hsl(120 3% 4%);
+    --muted-foreground: hsl(120 1% 74%);
+    --accent: hsl(150 3% 15%);
+    --destructive: hsl(4 92% 74%);
+    --border: hsl(150 2% 16%);
+    --input: hsl(150 2% 19%);
+    --ring: hsl(152 45% 33%);
+    color-scheme: dark;
+  }
+}
+
+/* The bundled wordmark is black-on-transparent; flip it in dark mode. A custom logo (Settings →
+   Appearance) is left as the admin uploaded it. */
+@media (prefers-color-scheme: dark) {
+  body:has(section.login) .header .logo img[src^="/public/static/logo.svg"] {
+    filter: invert(1) hue-rotate(180deg);
+  }
+}
+
+/* The card. */
+body:has(section.login) .container.wrap {
+  max-width: 400px;
+  margin-top: 12vh;
+  padding: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+}
+body:has(section.login) .header {
+  padding: 0;
+  margin-bottom: 24px;
+  border-bottom-color: var(--border);
+}
+body:has(section.login) .header .logo img {
+  max-height: 32px;
+  width: auto;
+}
+
+body:has(section.login) h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+body:has(section.login) section.login > p {
+  margin: 0 0 16px;
+  color: var(--muted-foreground);
+}
+
+body:has(section.login) label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+body:has(section.login) form p {
+  margin: 0 0 16px;
+}
+
+body:has(section.login) input[type="text"],
+body:has(section.login) input[type="email"],
+body:has(section.login) input[type="password"] {
+  height: 36px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--input);
+  border-radius: 6px;
+  box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+  font: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+body:has(section.login) input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
+}
+body:has(section.login) input[name="totp_code"] {
+  height: 48px;
+  font-size: 24px;
+  letter-spacing: 6px;
+}
+
+body:has(section.login) .button {
+  min-width: 0;
+  height: 36px;
+  padding: 0 16px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 500;
+  transition: opacity 0.15s, background-color 0.15s;
+}
+body:has(section.login) .button:hover {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  opacity: 0.9;
+}
+body:has(section.login) .button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
+}
+body:has(section.login) .button.button-outline {
+  background: transparent;
+  color: var(--foreground);
+  border-color: var(--input);
+}
+body:has(section.login) .button.button-outline:hover {
+  background: var(--accent);
+  color: var(--foreground);
+  opacity: 1;
+}
+body:has(section.login) .login .submit {
+  margin-top: 24px;
+}
+body:has(section.login) .login button img {
+  max-width: 20px;
+  margin-right: 8px;
+}
+
+body:has(section.login) .error {
+  display: block;
+  padding: 8px 12px;
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Quiet links, like .link-style in the app. */
+body:has(section.login) a {
+  color: var(--muted-foreground);
+  text-underline-offset: 4px;
+}
+body:has(section.login) a:hover {
+  color: var(--foreground);
+}
+body:has(section.login) footer.container {
+  margin-top: 16px;
+  color: var(--muted-foreground);
+}
+body:has(section.login) footer a {
+  color: inherit;
+}
+
+@media screen and (max-width: 650px) {
+  body:has(section.login) .container.wrap {
+    margin: 0 16px;
+    margin-top: 6vh;
+    max-width: none;
+    padding: 24px;
+  }
+  body:has(section.login) footer.container {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+}

@@ -2,8 +2,12 @@ import { expect, test, type Page } from '@playwright/test'
 
 // Any console error or uncaught exception during a test is a failure.
 test.beforeEach(({ page }) => {
-  page.on('pageerror', (e) => { throw e })
-  page.on('console', (m) => { if (m.type() === 'error') throw new Error(m.text()) })
+  page.on('pageerror', (e) => {
+    throw e
+  })
+  page.on('console', (m) => {
+    if (m.type() === 'error') throw new Error(m.text())
+  })
 })
 
 const ready = (page: Page) => page.locator('[data-sidebar=sidebar]').first().waitFor()

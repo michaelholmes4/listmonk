@@ -12,6 +12,7 @@ Known conflict hotspots (the only upstream files we edit):
 - `queries/campaigns.sql` (exclude `automation` campaigns from the manager and default list)
 - `internal/core/subscribers.go` (automation trigger hooks)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
+- `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`)
 - `.devcontainer/*`, `.gitignore`
 
 The hooks are one-liners that call into `cmd/web.go` (`/app` routes, `webFSFiles()`), so a
@@ -22,9 +23,13 @@ conflict there is resolved by re-adding the line.
 TS types in `web/src/api/schema.d.ts`; after a merge run `pnpm -C web gen:api` and
 `pnpm -C web spec:coverage`.
 
+Admin login, 2FA, forgot/reset and OIDC stay server-rendered (the security boundary); the new UI only
+themes them via `static/public/static/librelist-auth.css`, scoped to `section.login` so the public
+subscriber pages are untouched. Post-login `next` still defaults to `/admin` until Phase 7.
+
 Everything else we add lives in new files: `web/`, `internal/automation/`,
 `internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/track.go`,
-`cmd/web.go`.
+`cmd/web.go`, `static/public/static/librelist-auth.css`.
 
 ## Migrations
 Fork migrations are a separate sequence in `internal/migrations/fork/`, tracked under the
