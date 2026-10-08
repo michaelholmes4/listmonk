@@ -38,6 +38,7 @@ STATIC := config.toml.sample \
 	static/public:/public \
 	static/email-templates \
 	frontend/dist:/admin \
+	web/dist:/app \
 	i18n:/i18n
 
 SQL := $(shell find . -type f -name "*.sql") $(shell find queries -type f -name "*.sql")
@@ -106,7 +107,7 @@ dist: $(STUFFBIN) build build-frontend pack-bin
 # pack-releases runns stuffbin packing on the given binary. This is used
 # in the .goreleaser post-build hook.
 .PHONY: pack-bin
-pack-bin: build-frontend $(BIN) $(STUFFBIN)
+pack-bin: build-frontend build-web $(BIN) $(STUFFBIN)
 	$(STUFFBIN) -a stuff -in ${BIN} -out ${BIN} ${STATIC}
 
 # Use goreleaser to do a dry run producing local builds.

@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
+
+/*
+ ---break---
+ */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn-vue/tailwind.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --color-canvas: var(--canvas);
+  --color-foreground-lighter: var(--foreground-lighter);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-600: var(--warning-600);
+  --color-link: var(--link);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+/*
+ * Theme tokens. Values are adapted from libredesk's DESIGN.md (AGPL-3.0, see NOTICE).
+ * This is the ONLY place colours are defined: feature code uses the token classes
+ * (bg-success, text-muted-foreground, ...) and never a raw palette colour.
+ */
+:root {
+  --background: hsl(0 0% 99.2%);
+  --foreground: hsl(0 0% 1%);
+  --foreground-lighter: hsl(0 0% 41%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(0 0% 1%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(0 0% 1%);
+  --primary: hsl(152 39% 30%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(0 0% 96%);
+  --secondary-foreground: hsl(0 0% 1%);
+  --muted: hsl(0 0% 96%);
+  --muted-foreground: hsl(0 0% 27%);
+  --accent: hsl(0 0% 95%);
+  --accent-foreground: hsl(0 0% 1%);
+  --destructive: hsl(2 47% 46%);
+  --destructive-foreground: hsl(9 100% 99%);
+  --success: hsl(142 72% 37%);
+  --success-foreground: hsl(0 0% 98%);
+  --warning: hsl(39 85% 43%);
+  --warning-foreground: hsl(24 45% 2%);
+  --warning-600: hsl(35 92% 33%);
+  --link: hsl(210 100% 40%);
+  --border: hsl(0 0% 91%);
+  --input: hsl(0 0% 85%);
+  --ring: hsl(151 41% 45%);
+  --canvas: hsl(0 0% 82%);
+  --chart-1: var(--primary);
+  --chart-2: var(--success);
+  --chart-3: var(--warning);
+  --chart-4: var(--link);
+  --chart-5: var(--muted-foreground);
+  --radius: 0.5rem;
+  --sidebar: var(--background);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+.dark {
+  --background: hsl(120 2.6% 7.6%);
+  --foreground: hsl(150 6% 93%);
+  --foreground-lighter: hsl(150 1% 60%);
+  --card: hsl(120 2% 10%);
+  --card-foreground: hsl(150 6% 93%);
+  --popover: hsl(120 2% 12%);
+  --popover-foreground: hsl(150 6% 93%);
+  --primary: hsl(152 58% 54%);
+  --primary-foreground: hsl(120 2.6% 7.6%);
+  --secondary: hsl(150 3% 12%);
+  --secondary-foreground: hsl(150 6% 93%);
+  --muted: hsl(150 3% 13%);
+  --muted-foreground: hsl(120 1% 74%);
+  --accent: hsl(150 3% 15%);
+  --accent-foreground: hsl(150 6% 93%);
+  --destructive: hsl(4 92% 74%);
+  --destructive-foreground: hsl(12 38% 3%);
+  --success: hsl(142 55% 55%);
+  --success-foreground: hsl(142 40% 10%);
+  --warning: hsl(36 87% 62%);
+  --warning-foreground: hsl(24 45% 2%);
+  --warning-600: hsl(36 87% 62%);
+  --link: hsl(210 90% 66%);
+  --border: hsl(150 2% 16%);
+  --input: hsl(150 2% 19%);
+  --ring: hsl(152 45% 33%);
+  --canvas: hsl(120 3% 4%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+/* Standard card surface. */
+@utility box {
+  @apply rounded-lg border shadow-sm;
+}
+
+/* Sidebar group headers. */
+@utility sidebar-section-label {
+  @apply text-xs font-medium tracking-wider text-muted-foreground uppercase;
+}
+
+/* UI links; deliberately not brand coloured so chrome stays quiet. */
+@utility link-style {
+  @apply text-muted-foreground underline underline-offset-4 hover:text-foreground;
+}
+/*
+ ---break---
+ */
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

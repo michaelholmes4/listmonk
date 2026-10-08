@@ -258,6 +258,7 @@ func initFS(appDir, frontendDir, staticDir, i18nDir string) stuffbin.FileSystem 
 	if !hasEmbed {
 		files = append(files, joinFSPaths(appDir, appFiles)...)
 		files = append(files, joinFSPaths(frontendDir, frontendFiles)...)
+		files = append(files, webFSFiles()...) // librelist: new UI at /app
 	}
 
 	// Irrespective of the embeds, if there are user specified static or i18n paths,
@@ -955,6 +956,7 @@ func initHTTPServer(cfg *Config, urlCfg *UrlConfig, i *i18n.I18n, fs stuffbin.Fi
 
 	// Admin (frontend) facing static files.
 	srv.GET("/admin/static/*", echo.WrapHandler(fSrv))
+	srv.GET(uriWeb+"/static/*", echo.WrapHandler(fSrv)) // librelist: new UI assets
 
 	// Public (subscriber) facing media upload files.
 	var (

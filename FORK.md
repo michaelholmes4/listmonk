@@ -14,8 +14,17 @@ Known conflict hotspots (the only upstream files we edit):
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
 - `.devcontainer/*`, `.gitignore`
 
+The hooks are one-liners that call into `cmd/web.go` (`/app` routes, `webFSFiles()`), so a
+conflict there is resolved by re-adding the line.
+
+`docs/swagger/collections.yaml` is patched where it was wrong or missing (unwrapped `ServerConfig`,
+`DashboardCount`, `ImportStatus`; added `/profile`, `/logout`, `/about`). These feed the generated
+TS types in `web/src/api/schema.d.ts`; after a merge run `pnpm -C web gen:api` and
+`pnpm -C web spec:coverage`.
+
 Everything else we add lives in new files: `web/`, `internal/automation/`,
-`internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/track.go`.
+`internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/track.go`,
+`cmd/web.go`.
 
 ## Migrations
 Fork migrations are a separate sequence in `internal/migrations/fork/`, tracked under the

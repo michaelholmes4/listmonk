@@ -228,6 +228,86 @@ paths:
                   data:
                     type: boolean
 
+  /profile:
+    get:
+      tags:
+        - Admin
+      description: returns the logged in user's profile, including the user role permissions.
+      operationId: getUserProfile
+      responses:
+        "200":
+          description: The logged in user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+    put:
+      tags:
+        - Admin
+      description: updates the logged in user's own profile.
+      operationId: updateUserProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                password2:
+                  type: string
+                avatar:
+                  type: string
+      responses:
+        "200":
+          description: The updated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/User"
+
+  /logout:
+    post:
+      tags:
+        - Admin
+      description: destroys the current session.
+      operationId: logout
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+
+  /about:
+    get:
+      tags:
+        - Admin
+      description: returns version, build and host information. Unlike other endpoints, the response is not wrapped in a "data" key.
+      operationId: getAboutInfo
+      responses:
+        "200":
+          description: About info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/About"
+
   /logs:
     get:
       tags:
@@ -3272,29 +3352,210 @@ components:
     ServerConfig:
       type: object
       properties:
-        data:
+        root_url:
+          type: string
+        from_email:
+          type: string
+        public_subscription:
           type: object
           properties:
-            messengers:
+            enabled:
+              type: boolean
+            captcha_enabled:
+              type: boolean
+            captcha_provider:
+              type: string
+              nullable: true
+            captcha_key:
+              type: string
+              nullable: true
+            altcha_complexity:
+              type: integer
+            redirect_urls:
+              type: array
+              nullable: true
+              items:
+                type: string
+        privacy:
+          type: object
+          properties:
+            disable_tracking:
+              type: boolean
+            individual_tracking:
+              type: boolean
+        media_provider:
+          type: string
+        messengers:
+          type: array
+          items:
+            type: string
+        langs:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+        lang:
+          type: string
+        permissions:
+          description: The permission groups defined in permissions.json.
+          type: array
+          items:
+            type: object
+            properties:
+              group:
+                type: string
+              permissions:
+                type: array
+                items:
+                  type: string
+        update:
+          $ref: "#/components/schemas/AppUpdate"
+        needs_restart:
+          type: boolean
+        has_legacy_user:
+          type: boolean
+        version:
+          type: string
+
+    AppUpdate:
+      type: object
+      nullable: true
+      properties:
+        update:
+          type: object
+          properties:
+            release_version:
+              type: string
+            release_date:
+              type: string
+            url:
+              type: string
+            description:
+              type: string
+            is_new:
+              type: boolean
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              title:
+                type: string
+              description:
+                type: string
+              url:
+                type: string
+              priority:
+                type: string
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          nullable: true
+        username:
+          type: string
+        password_login:
+          type: boolean
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+        type:
+          type: string
+          enum: [user, api]
+        status:
+          type: string
+          enum: [enabled, disabled]
+        avatar:
+          type: string
+          nullable: true
+        twofa_type:
+          type: string
+        loggedin_at:
+          type: string
+          nullable: true
+        user_role_id:
+          type: integer
+        list_role_id:
+          type: integer
+          nullable: true
+        user_role:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            permissions:
               type: array
               items:
                 type: string
-            langs:
+        list_role:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            lists:
               type: array
               items:
                 type: object
                 properties:
-                  code:
-                    type: string
+                  id:
+                    type: integer
                   name:
                     type: string
-            lang:
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+
+    About:
+      type: object
+      properties:
+        version:
+          type: string
+        build:
+          type: string
+        go_version:
+          type: string
+        go_arch:
+          type: string
+        database:
+          type: object
+        system:
+          type: object
+          properties:
+            num_cpu:
+              type: integer
+            memory_alloc_mb:
+              type: integer
+            memory_from_os_mb:
+              type: integer
+        host:
+          type: object
+          properties:
+            os:
               type: string
-            update:
+            arch:
               type: string
-            needs_restart:
-              type: boolean
-            version:
+            hostname:
               type: string
 
     DashboardChart:
@@ -3322,43 +3583,41 @@ components:
     DashboardCount:
       type: object
       properties:
-        data:
+        subscribers:
           type: object
           properties:
-            subscribers:
-              type: object
-              properties:
-                total:
-                  type: integer
-                blocklisted:
-                  type: object
-                orphans:
-                  type: integer
-            lists:
-              type: object
-              properties:
-                total:
-                  type: integer
-                private:
-                  type: integer
-                public:
-                  type: integer
-                optin_single:
-                  type: integer
-                optin_double:
-                  type: integer
-            campaigns:
-              type: object
-              properties:
-                total:
-                  type: integer
-                by_status:
-                  type: object
-                  properties:
-                    draft:
-                      type: integer
-            messages:
+            total:
               type: integer
+            blocklisted:
+              type: integer
+              nullable: true
+            orphans:
+              type: integer
+        lists:
+          type: object
+          properties:
+            total:
+              type: integer
+            private:
+              type: integer
+            public:
+              type: integer
+            optin_single:
+              type: integer
+            optin_double:
+              type: integer
+        campaigns:
+          type: object
+          properties:
+            total:
+              type: integer
+            by_status:
+              description: Campaign count keyed by status (draft, scheduled, running, paused, finished, cancelled).
+              type: object
+              additionalProperties:
+                type: integer
+        messages:
+          type: integer
 
     SMTPSettings:
       type: object
@@ -3848,17 +4107,14 @@ components:
     ImportStatus:
       type: object
       properties:
-        data:
-          type: object
-          properties:
-            name:
-              type: string
-            total:
-              type: integer
-            imported:
-              type: integer
-            status:
-              type: string
+        name:
+          type: string
+        total:
+          type: integer
+        imported:
+          type: integer
+        status:
+          type: string
 
     Campaign:
       type: object
