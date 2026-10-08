@@ -125,3 +125,31 @@ test('subscribers: sort order really flips (server accepts lowercase asc/desc on
     if (ids.length) await page.request.delete(`/api/subscribers?${ids.map((i) => `id=${i}`).join('&')}`)
   }
 })
+
+test('subscribers: "select all N" acts on every match, not just the visible page', async ({ page }) => {
+  const tag = `byquery${Date.now()}`
+  for (const i of [1, 2, 3]) {
+    const res = await page.request.post('/api/subscribers', { data: { email: `${tag}-${i}@example.com`, name: tag, status: 'enabled', lists: [] } })
+    expect(res.ok()).toBeTruthy()
+  }
+  const matching = async () => (await (await page.request.get(`/api/subscribers?query=${encodeURIComponent(`subscribers.name='${tag}'`)}&per_page=all`)).json()).data.results as { status: string }[]
+
+  // Two rows a page, three matches: the third is only reached by "select all".
+  await page.goto(`/app/subscribers?q=${tag}&size=2`)
+  await expect(page.getByRole('row')).toHaveCount(3)
+  await page.getByRole('checkbox', { name: /select all/i }).first().click()
+  await expect(page.getByText('2 selected')).toBeVisible()
+  await page.getByRole('button', { name: /select all 3/i }).click()
+  await expect(page.getByText('3 selected')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Blocklisted' }).click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
+  await expect(page.getByRole('alertdialog')).toBeHidden()
+  await expect.poll(async () => (await matching()).map((s) => s.status)).toEqual(['blocklisted', 'blocklisted', 'blocklisted'])
+
+  await page.getByRole('checkbox', { name: /select all/i }).first().click()
+  await page.getByRole('button', { name: /select all 3/i }).click()
+  await page.getByRole('button', { name: 'Delete' }).first().click()
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
+  await expect.poll(async () => (await matching()).length).toBe(0)
+})
