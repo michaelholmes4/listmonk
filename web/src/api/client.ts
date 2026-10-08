@@ -9,6 +9,15 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
   }
+
+  /**
+   * True when the request failed for lack of a valid session. listmonk's API auth middleware
+   * answers a missing/expired session cookie with 403 "invalid session" (not 401); other 403s
+   * are real permission errors.
+   */
+  get unauthenticated(): boolean {
+    return this.status === 401 || (this.status === 403 && this.message === 'invalid session')
+  }
 }
 
 // The app uses the session cookie from the (server-rendered) login page, same as the old UI.
@@ -39,11 +48,12 @@ http.interceptors.response.use(
     if (!axios.isAxiosError(err)) throw err
 
     const status = err.response?.status ?? 0
-    // Session expired mid-use: go through the server-rendered login, which returns here.
-    if (status === 401) window.location.assign(loginURL())
-
     const body = err.response?.data as { message?: string } | undefined
-    throw new ApiError(body?.message || err.message, status)
+
+    const apiErr = new ApiError(body?.message || err.message, status)
+    // No session or session expired: go through the server-rendered login, which returns here.
+    if (apiErr.unauthenticated) window.location.assign(loginURL())
+    throw apiErr
   },
 )
 

@@ -11,7 +11,7 @@ import { queryClient } from './lib/query-client'
 import { router } from './router'
 
 // The shell needs the user's permissions and language pack to render anything meaningful, so
-// those two load first (a failure on 401 redirects to login). Everything after this is
+// those two load first (an unauthenticated failure redirects to login). Everything after this is
 // per-component loading with skeletons.
 async function bootstrap() {
   const [config] = await Promise.all([queryClient.fetchQuery(configQuery()), queryClient.fetchQuery(profileQuery())])

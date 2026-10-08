@@ -9,9 +9,9 @@ declare module '@tanstack/vue-query' {
   }
 }
 
-// Redirecting to login is already underway on 401; a toast would just flash.
+// Redirecting to login is already underway when unauthenticated; a toast would just flash.
 const fail = (err: unknown) => {
-  if (err instanceof ApiError && err.status === 401) return
+  if (err instanceof ApiError && err.unauthenticated) return
   toast.error(err instanceof Error ? err.message : String(err))
 }
 
