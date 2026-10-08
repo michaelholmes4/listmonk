@@ -4,6 +4,10 @@
   "service": "app",
   "workspaceFolder": "/workspace",
   "shutdownAction": "stopCompose",
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind"
+  ],
   "features": {
     "ghcr.io/devcontainers/features/go:1": { "version": "1.26" },
     "ghcr.io/devcontainers/features/node:1": { "version": "22", "pnpmVersion": "latest", "nodeGypDependencies": false },
