@@ -147,3 +147,26 @@ rm-dev-docker: build ## Delete the docker containers including DB volumes.
 init-dev-docker: build-dev-docker ## Delete the docker containers including DB volumes.
 	cd dev; \
 	docker compose run --rm backend sh -c "make dist && ./listmonk --install --idempotent --yes --config dev/config.toml"
+
+# ---- librelist fork additions ------------------------------------------------
+DEV_CONFIG ?= .devcontainer/config.toml
+
+# Run the Go backend against the devcontainer config.
+.PHONY: run-dev-backend
+run-dev-backend:
+	CGO_ENABLED=0 go run -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}' -X 'main.frontendDir=frontend/dist'" ./cmd --config=$(DEV_CONFIG)
+
+# Run the new UI (web/) Vite dev server.
+.PHONY: run-web
+run-web:
+	cd web && pnpm dev
+
+# Build the new UI into web/dist.
+.PHONY: build-web
+build-web:
+	cd web && pnpm install --frozen-lockfile && pnpm build
+
+# Run backend and new UI together.
+.PHONY: dev
+dev:
+	$(MAKE) run-dev-backend & $(MAKE) run-web & wait

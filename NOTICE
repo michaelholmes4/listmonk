@@ -1,0 +1,8 @@
+librelist is a fork of listmonk (https://github.com/knadh/listmonk),
+Copyright (c) Kailash Nadh and listmonk contributors, licensed under AGPL-3.0.
+
+Design tokens and UI composition patterns in web/ are adapted from libredesk
+(https://github.com/abhinavxd/libredesk), licensed under AGPL-3.0.
+
+This program is distributed under the GNU Affero General Public License v3.0
+(see LICENSE). Modifications are tracked in the git history of this repository.

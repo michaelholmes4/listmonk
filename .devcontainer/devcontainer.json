@@ -1,8 +1,33 @@
 {
-  "name": "listmonk",
-  "dockerComposeFile": "../dev/docker-compose.yml",
-  "service": "backend",
-  "workspaceFolder": "/app",
-  "forwardPorts": [9000],
-  "postStartCommand": "make dist && ./listmonk --install --idempotent --yes --config dev/config.toml"
+  "name": "librelist",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "features": {
+    "ghcr.io/devcontainers/features/go:1": { "version": "1.26" },
+    "ghcr.io/devcontainers/features/node:1": { "version": "22", "pnpmVersion": "latest", "nodeGypDependencies": false },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [9000, 5173, 8080, 8025, 5432],
+  "portsAttributes": {
+    "9000": { "label": "Go API + embedded UI" },
+    "5173": { "label": "New UI (Vite, /app)" },
+    "8080": { "label": "Old UI (Vite)" },
+    "8025": { "label": "Mailpit" }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "Vue.volar",
+        "bradlc.vscode-tailwindcss",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ckolkman.vscode-postgres"
+      ],
+      "settings": { "go.toolsManagement.autoUpdate": true }
+    }
+  }
 }

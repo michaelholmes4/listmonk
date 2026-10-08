@@ -18,3 +18,8 @@ node_modules
 listmonk
 dist/*
 uploads/
+
+# librelist
+web/node_modules
+web/dist
+!.devcontainer/config.toml
