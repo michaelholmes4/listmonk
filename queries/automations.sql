@@ -1,0 +1,203 @@
+-- librelist marketing automation. Loaded by internal/automation (not by models.Queries).
+
+-- name: automation-insert-automation
+INSERT INTO automations (uuid, name, settings) VALUES ($1, $2, $3) RETURNING *;
+
+-- name: automation-get-automation
+SELECT * FROM automations WHERE id = $1;
+
+-- name: automation-list-automations
+-- $1 search text, $2 statuses (NULL = any), $3 offset, $4 limit. %order% is substituted from a whitelist.
+SELECT a.*,
+    COUNT(*) OVER () AS total,
+    COALESCE(c.active, 0) AS active, COALESCE(c.waiting, 0) AS waiting, COALESCE(c.completed, 0) AS completed,
+    COALESCE(c.exited, 0) AS exited, COALESCE(c.failed, 0) AS failed
+FROM automations a
+LEFT JOIN LATERAL (
+    SELECT COUNT(*) FILTER (WHERE status = 'active') AS active,
+           COUNT(*) FILTER (WHERE status = 'waiting') AS waiting,
+           COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+           COUNT(*) FILTER (WHERE status = 'exited') AS exited,
+           COUNT(*) FILTER (WHERE status = 'failed') AS failed
+    FROM enrollments e WHERE e.automation_id = a.id
+) c ON TRUE
+WHERE ($1 = '' OR a.name ILIKE '%' || $1 || '%')
+  AND ($2::automation_status[] IS NULL OR a.status = ANY($2::automation_status[]))
+ORDER BY %order% OFFSET $3 LIMIT (CASE WHEN $4 < 1 THEN NULL ELSE $4 END);
+
+-- name: automation-update-automation
+UPDATE automations SET name = $2, settings = $3, updated_at = NOW() WHERE id = $1 RETURNING *;
+
+-- name: automation-set-automation-status
+UPDATE automations SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *;
+
+-- name: automation-delete-automation
+DELETE FROM automations WHERE id = $1;
+
+-- name: automation-insert-version
+-- The next version number, with the given graph (a draft until published).
+INSERT INTO automation_versions (automation_id, version, graph)
+VALUES ($1, COALESCE((SELECT MAX(version) FROM automation_versions WHERE automation_id = $1), 0) + 1, $2)
+RETURNING *;
+
+-- name: automation-get-version
+SELECT * FROM automation_versions WHERE id = $1;
+
+-- name: automation-get-draft
+SELECT * FROM automation_versions WHERE automation_id = $1 AND published_at IS NULL;
+
+-- name: automation-list-versions
+SELECT * FROM automation_versions WHERE automation_id = $1 ORDER BY version DESC;
+
+-- name: automation-update-draft
+UPDATE automation_versions SET graph = $2 WHERE id = $1 AND published_at IS NULL RETURNING *;
+
+-- name: automation-publish-version
+UPDATE automation_versions SET published_at = NOW() WHERE id = $1 AND published_at IS NULL RETURNING *;
+
+-- name: automation-set-current-version
+UPDATE automations SET current_version_id = $2, updated_at = NOW() WHERE id = $1;
+
+-- name: automation-delete-triggers
+DELETE FROM automation_triggers WHERE automation_id = $1;
+
+-- name: automation-insert-trigger
+INSERT INTO automation_triggers (automation_id, version_id, type, config) VALUES ($1, $2, $3, $4);
+
+-- name: automation-find-triggers
+-- Who listens for this kind of trigger, only active automations, only their published version.
+SELECT t.automation_id, t.version_id, t.type, t.config, a.settings
+FROM automation_triggers t
+JOIN automations a ON a.id = t.automation_id AND a.current_version_id = t.version_id
+WHERE t.type = $1 AND a.status = 'active';
+
+-- name: automation-insert-enrollment
+-- Fails quietly (no row) if the subscriber is already live in this automation.
+INSERT INTO enrollments (automation_id, version_id, subscriber_id, status, current_node_id, next_run_at, entered_at, context)
+VALUES ($1, $2, $3, 'active', NULL, $5, $5, $4)
+ON CONFLICT (automation_id, subscriber_id) WHERE status IN ('active', 'waiting') DO NOTHING
+RETURNING *;
+
+-- name: automation-get-enrollment
+SELECT * FROM enrollments WHERE id = $1;
+
+-- name: automation-lock-enrollment
+SELECT * FROM enrollments WHERE id = $1 FOR UPDATE;
+
+-- name: automation-update-enrollment
+UPDATE enrollments SET status = $2::enrollment_status, current_node_id = $3, next_run_at = $4, context = $5,
+    exited_at = (CASE WHEN $2::enrollment_status IN ('completed', 'exited', 'failed') THEN NOW() ELSE NULL END),
+    exit_reason = $6
+WHERE id = $1;
+
+-- name: automation-enrollment-history
+-- When the subscriber last entered this automation, and how many times.
+SELECT COALESCE(MAX(entered_at), 'epoch') AS last_entered, COUNT(*) AS entries
+FROM enrollments WHERE automation_id = $1 AND subscriber_id = $2;
+
+-- name: automation-live-enrollment-ids
+SELECT id FROM enrollments WHERE automation_id = $1 AND status IN ('active', 'waiting');
+
+-- name: automation-list-enrollments
+-- $1 automation, $2 statuses (NULL = any), $3 search (email/name), $4 offset, $5 limit.
+SELECT e.*, s.email, s.name AS subscriber_name, COUNT(*) OVER () AS total
+FROM enrollments e
+JOIN subscribers s ON s.id = e.subscriber_id
+WHERE e.automation_id = $1
+  AND ($2::enrollment_status[] IS NULL OR e.status = ANY($2::enrollment_status[]))
+  AND ($3 = '' OR s.email ILIKE '%' || $3 || '%' OR s.name ILIKE '%' || $3 || '%')
+ORDER BY e.entered_at DESC, e.id DESC OFFSET $4 LIMIT (CASE WHEN $5 < 1 THEN NULL ELSE $5 END);
+
+-- name: automation-list-subscriber-enrollments
+SELECT e.*, a.name AS automation_name
+FROM enrollments e JOIN automations a ON a.id = e.automation_id
+WHERE e.subscriber_id = $1 ORDER BY e.entered_at DESC;
+
+-- name: automation-insert-step
+-- The unique (enrollment, node) row is what stops a retried job from running a step twice.
+-- no row back means it had already started.
+INSERT INTO enrollment_steps (enrollment_id, node_id, status) VALUES ($1, $2, $3)
+ON CONFLICT (enrollment_id, node_id) DO NOTHING RETURNING *;
+
+-- name: automation-get-step
+SELECT * FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2;
+
+-- name: automation-update-step
+UPDATE enrollment_steps SET status = $3::TEXT,
+    finished_at = (CASE WHEN $3::TEXT IN ('done', 'skipped', 'failed') THEN NOW() ELSE NULL END),
+    result = $4, error = $5
+WHERE enrollment_id = $1 AND node_id = $2;
+
+-- name: automation-list-steps
+SELECT * FROM enrollment_steps WHERE enrollment_id = $1 ORDER BY started_at, id;
+
+-- name: automation-node-stats
+-- Per step of an automation, how many enrollments reached it, finished it, or are waiting on it.
+SELECT st.node_id,
+    COUNT(*) AS entered,
+    COUNT(*) FILTER (WHERE st.status = 'done') AS done,
+    COUNT(*) FILTER (WHERE st.status = 'skipped') AS skipped,
+    COUNT(*) FILTER (WHERE st.status = 'failed') AS failed,
+    COUNT(*) FILTER (WHERE st.status IN ('waiting', 'sending')) AS waiting
+FROM enrollment_steps st JOIN enrollments e ON e.id = st.enrollment_id
+WHERE e.automation_id = $1 GROUP BY st.node_id;
+
+-- name: automation-insert-event
+-- No row back means this idempotency key was seen before.
+INSERT INTO subscriber_events (subscriber_id, name, properties, idempotency_key, occurred_at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+RETURNING *;
+
+-- name: automation-list-events
+SELECT *, COUNT(*) OVER () AS total FROM subscriber_events
+WHERE subscriber_id = $1 ORDER BY occurred_at DESC, id DESC OFFSET $2 LIMIT (CASE WHEN $3 < 1 THEN NULL ELSE $3 END);
+
+-- name: automation-delete-old-events
+DELETE FROM subscriber_events WHERE occurred_at < $1;
+
+-- name: automation-get-subscriber
+SELECT id, uuid, email, name, attribs, status FROM subscribers WHERE id = $1;
+
+-- name: automation-lock-subscriber-attribs
+SELECT attribs FROM subscribers WHERE id = $1 FOR UPDATE;
+
+-- name: automation-set-subscriber-attribs
+UPDATE subscribers SET attribs = $2, updated_at = NOW() WHERE id = $1;
+
+-- name: automation-consent
+-- What the engine needs to decide whether a message may go, the subscriber's status, and their
+-- subscription to the topic list (if any) with the list's opt-in mode.
+SELECT s.status::TEXT AS subscriber_status,
+       sl.status::TEXT AS subscription_status,
+       l.optin::TEXT AS list_optin
+FROM subscribers s
+LEFT JOIN lists l ON l.id = $2
+LEFT JOIN subscriber_lists sl ON sl.subscriber_id = s.id AND sl.list_id = $2
+WHERE s.id = $1;
+
+-- name: automation-subscribe
+-- Add (or re-activate) a subscription. Returns the previous status so callers can tell a new join.
+WITH prev AS (
+    SELECT status::TEXT AS status FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2
+), up AS (
+    INSERT INTO subscriber_lists (subscriber_id, list_id, status) VALUES ($1, $2, $3::subscription_status)
+    ON CONFLICT (subscriber_id, list_id) DO UPDATE SET status = EXCLUDED.status, updated_at = NOW()
+    RETURNING status::TEXT
+)
+SELECT COALESCE((SELECT status FROM prev), '') AS previous, (SELECT status FROM up) AS current;
+
+-- name: automation-unsubscribe
+UPDATE subscriber_lists SET status = 'unsubscribed', updated_at = NOW() WHERE subscriber_id = $1 AND list_id = $2;
+
+-- name: automation-remove-subscription
+DELETE FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2;
+
+-- name: automation-get-list-optin
+SELECT optin::TEXT FROM lists WHERE id = $1;
+
+-- name: automation-insert-step-campaign
+-- The hidden campaign behind an email step. Never picked up by the campaign manager.
+INSERT INTO campaigns (uuid, name, subject, from_email, body, content_type, messenger, template_id, type, headers, status)
+VALUES ($1, $2, $3, $4, $5, $6::content_type, $7, $8, 'automation', '[]', 'draft')
+RETURNING id;

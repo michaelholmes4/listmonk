@@ -60,6 +60,9 @@ func install(lastVer string, db *sqlx.DB, fs stuffbin.FileSystem, prompt, idempo
 		lo.Fatalf("error migrating DB schema: %v", err)
 	}
 
+	// librelist fork: our tables must exist before the queries (which may use them) are prepared.
+	forkUpgrade(db)
+
 	// Load the queries.
 	q := prepareQueries(qMap, db, ko)
 

@@ -7,6 +7,9 @@ git config --global --add safe.directory /workspace
 
 # The go-mod-cache named volume mounts root-owned; the vscode user must be able to write to it.
 sudo chown -R "$(id -u):$(id -g)" /go/pkg/mod
+# Go's checksum-database cache lives in /go/pkg/sumdb, which is not created or writable by default;
+# without it `go get` of a new module fails verifying go.mod.
+sudo mkdir -p /go/pkg/sumdb && sudo chown -R "$(id -u):$(id -g)" /go/pkg/sumdb
 
 go mod download
 
@@ -27,5 +30,7 @@ mkdir -p uploads
 # Build everything once so the binary has the embedded assets, then install the schema.
 make dist
 ./listmonk --install --idempotent --yes --config .devcontainer/config.toml
+# --install skips an existing database; this brings it up to date (upstream, then librelist's migrations).
+./listmonk --upgrade --yes --config .devcontainer/config.toml
 
 echo "Ready. Run 'make dev' (or 'make run' for the Go API only)."
