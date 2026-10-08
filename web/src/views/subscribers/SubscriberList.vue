@@ -4,7 +4,7 @@ import type { PaginationState, RowSelectionState, SortingState } from '@tanstack
 import { refDebounced } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { exportURL, type SubscriberFilter, type SubscriberQuery } from '@/api/subscribers'
 import type { Subscriber } from '@/api/types'
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useAllLists } from '@/composables/queries/useLists'
+import { useUrlState } from '@/composables/useUrlState'
 import {
   useBulkBlocklist,
   useBulkDelete,
@@ -25,23 +26,15 @@ import {
 import { usePermission } from '@/composables/usePermission'
 import BulkListsDialog from '@/features/subscribers/BulkListsDialog.vue'
 import { createColumns } from '@/features/subscribers/columns'
-import SubscriberSheet from '@/features/subscribers/SubscriberSheet.vue'
 
 const { t, n } = useI18n()
-const route = useRoute()
 const router = useRouter()
 const { can } = usePermission()
 
-// --- Route state: which list we're filtered to, and which subscriber sheet is open. -------------
-const listID = computed(() => (route.params.listID ? Number(route.params.listID) : undefined))
-const subStatus = computed(() => (listID.value ? ((route.query.subscription_status as string) ?? '') : ''))
-const sheetId = computed(() => (route.params.id ? Number(route.params.id) : undefined))
-const sheetOpen = computed({
-  get: () => route.name === 'subscriber' || route.name === 'subscribers-new',
-  set: (o) => {
-    if (!o) router.push(backRoute())
-  },
-})
+// --- URL state: list filter (path), subscription status, search, page and sort (query). -----------
+const url = useUrlState(['subscribers', 'subscribers-list'])
+const listID = computed(() => (url.params.value.listID ? Number(url.params.value.listID) : undefined))
+const subStatus = computed(() => (listID.value ? ((url.query.value.subscription_status as string) ?? '') : ''))
 const backRoute = () => (listID.value ? { name: 'subscribers-list', params: { listID: listID.value } } : { name: 'subscribers' })
 
 const { data: lists } = useAllLists()
@@ -57,34 +50,47 @@ function setStatusFilter(v: unknown) {
 const ALL = '__all'
 
 // --- Search: simple (debounced) or an advanced SQL expression. ----------------------------------
-const searchInput = ref('')
+const urlSearch = url.str('q')
+const urlSql = url.str('sql')
+const searchInput = ref(urlSearch.value)
 const search = refDebounced(searchInput, 300)
-const advanced = ref(false)
-const queryDraft = ref('')
-const queryApplied = ref('')
+watch(search, (v) => (urlSearch.value = v.trim()))
+const advanced = ref(!!urlSql.value)
+const queryDraft = ref(urlSql.value)
 
 function toggleAdvanced() {
   advanced.value = !advanced.value
   if (!advanced.value) {
-    queryDraft.value = queryApplied.value = ''
+    queryDraft.value = ''
+    urlSql.value = ''
     return
   }
   // Carry a simple search over as an equivalent expression.
   const q = searchInput.value.trim().replace(/'/g, "''")
   searchInput.value = ''
+  urlSearch.value = ''
   queryDraft.value = !q ? '' : q.includes('@') && !q.includes(' ') ? `email = '${q.toLowerCase()}'` : `(name ~* '${q}' OR email ~* '${q.toLowerCase()}')`
 }
-const runQuery = () => (queryApplied.value = queryDraft.value.trim())
+const runQuery = () => (urlSql.value = queryDraft.value.trim())
 
-// --- Table state. -------------------------------------------------------------------------------
-const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 20 })
-const sorting = ref<SortingState>([])
+// --- Table state: page and sort live in the URL too (`page`, `size`, `sort=field:asc|desc`). -----
+const pagination = computed<PaginationState>({
+  get: () => ({ pageIndex: url.int('page', 1) - 1, pageSize: url.int('size', 20) }),
+  set: (v) => url.set({ page: v.pageIndex === 0 ? undefined : v.pageIndex + 1, size: v.pageSize === 20 ? undefined : v.pageSize }),
+})
+const sorting = computed<SortingState>({
+  get: () => {
+    const [id, dir] = ((url.query.value.sort as string) ?? '').split(':')
+    return id ? [{ id, desc: dir === 'desc' }] : []
+  },
+  set: (v) => url.set({ sort: v[0] ? `${v[0].id}:${v[0].desc ? 'desc' : 'asc'}` : undefined, page: undefined }),
+})
 const selection = ref<RowSelectionState>({})
 const selectAll = ref(false)
 
 const filter = computed<SubscriberFilter>(() => ({
-  search: advanced.value ? '' : search.value.trim().toLowerCase(),
-  query: advanced.value ? queryApplied.value : '',
+  search: advanced.value ? '' : urlSearch.value.toLowerCase(),
+  query: advanced.value ? urlSql.value : '',
   listIds: listID.value ? [listID.value] : [],
   subscriptionStatus: subStatus.value,
 }))
@@ -102,7 +108,7 @@ const total = computed(() => data.value?.total ?? 0)
 
 // A different filter means different rows: go back to page 1 and drop the selection.
 watch(filter, () => {
-  pagination.value = { ...pagination.value, pageIndex: 0 }
+  url.set({ page: undefined })
   selection.value = {}
   selectAll.value = false
 })
@@ -174,7 +180,7 @@ const columns = createColumns({
 
 <template>
   <Teleport defer to="#page-actions">
-    <Button v-if="can('subscribers:manage')" size="sm" @click="router.push({ name: 'subscribers-new' })">
+    <Button v-if="can('subscribers:manage')" size="sm" @click="router.push({ name: 'subscriber-new' })">
       <Plus />{{ t('globals.buttons.new') }}
     </Button>
   </Teleport>
@@ -274,8 +280,6 @@ const columns = createColumns({
       :row-id="(s: Subscriber) => String(s.id)"
     />
   </div>
-
-  <SubscriberSheet :id="sheetId" v-model:open="sheetOpen" />
 
   <BulkListsDialog v-model:open="bulkListsOpen" :target="target" :count="selectedCount" />
 

@@ -21,11 +21,12 @@ test('subscribers: create, search, edit, delete', async ({ page }) => {
   // Create
   await page.getByRole('button', { name: 'New' }).click()
   await expect(page).toHaveURL(/\/subscribers\/new$/)
-  const sheet = page.getByRole('dialog')
-  await sheet.getByLabel('E-mail').fill(email)
-  await sheet.getByLabel('Name').fill('E2E Person')
-  await sheet.getByRole('button', { name: 'Save' }).click()
-  await expect(sheet).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'New subscriber' })).toBeVisible()
+  await page.getByLabel('E-mail', { exact: true }).fill(email)
+  await page.getByLabel('Name', { exact: true }).fill('E2E Person')
+  await page.getByRole('button', { name: 'Save' }).click()
+  // Saving goes back to the table.
+  await expect(page).toHaveURL(/\/app\/subscribers$/)
 
   // Search (debounced) finds exactly the new subscriber
   await page.getByPlaceholder('E-mail or name').fill(email)
@@ -33,13 +34,15 @@ test('subscribers: create, search, edit, delete', async ({ page }) => {
   await expect(row).toBeVisible()
   await expect(page.getByRole('row')).toHaveCount(2) // header + 1
 
-  // Edit via deep link keeps the table behind the sheet
+  // Edit page: breadcrumb names the subscriber, and going back keeps the search
   await row.getByRole('button', { name: email }).click()
   await expect(page).toHaveURL(/\/subscribers\/\d+$/)
-  await expect(sheet.getByLabel('E-mail')).toHaveValue(email)
-  await sheet.getByLabel('Name').fill('E2E Renamed')
-  await sheet.getByRole('button', { name: 'Save' }).click()
-  await expect(sheet).toBeHidden()
+  await expect(page.getByLabel('E-mail', { exact: true })).toHaveValue(email)
+  await expect(page.getByRole('navigation', { name: 'breadcrumb' }).getByText(email)).toBeVisible()
+  await page.getByLabel('Name', { exact: true }).fill('E2E Renamed')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page).toHaveURL(/\/app\/subscribers\?q=/)
+  await expect(page.getByPlaceholder('E-mail or name')).toHaveValue(email)
   await expect(row).toContainText('E2E Renamed')
 
   // Delete from the row menu
@@ -58,11 +61,10 @@ test('subscribers: sorting and invalid attribute JSON', async ({ page }) => {
   await sorted
 
   await page.getByRole('button', { name: 'New' }).click()
-  const sheet = page.getByRole('dialog')
-  await sheet.getByLabel('E-mail').fill('bad-json@example.com')
-  await sheet.getByLabel('Attributes').fill('[1,2]')
-  await sheet.getByRole('button', { name: 'Save' }).click()
-  await expect(sheet.getByText('Invalid JSON in attributes.')).toBeVisible()
+  await page.getByLabel('E-mail', { exact: true }).fill('bad-json@example.com')
+  await page.getByLabel('Attributes').fill('[1,2]')
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page.getByText('Invalid JSON in attributes.')).toBeVisible()
   await expect(page).toHaveURL(/\/subscribers\/new$/)
 })
 

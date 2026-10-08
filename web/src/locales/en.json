@@ -35,5 +35,12 @@
   "web.common.all": "All",
   "web.common.refreshing": "Refreshing…",
   "web.subscribers.campaignDeleted": "Campaign deleted",
-  "web.common.selectAll": "Select all"
+  "web.common.selectAll": "Select all",
+  "web.lists.help.what": "A list is a group of subscribers. Use lists as topics people opt in to, and send campaigns to one or more of them.",
+  "web.lists.help.private": "Private lists are only visible to admins. Public lists appear on the public subscription page and in subscription forms.",
+  "web.lists.help.archive": "Archive a list to hide it from pickers and public forms without deleting its subscribers.",
+  "web.subscribers.help.what": "A subscriber is one e-mail address. Their subscriptions to lists carry the opt-in status.",
+  "web.subscribers.help.blocklist": "Blocklisting stops all e-mail to this address, whatever lists they are on.",
+  "web.subscribers.help.attribs": "Attributes are free-form JSON you can use in templates and in queries, for example city or plan.",
+  "web.common.learnMore": "Learn more"
 }

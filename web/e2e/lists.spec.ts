@@ -20,16 +20,17 @@ test('lists: create, edit, archive, delete', async ({ page }) => {
   // Create a public double opt-in list with a tag
   await page.getByRole('button', { name: 'New' }).click()
   await expect(page).toHaveURL(/\/lists\/new$/)
-  const sheet = page.getByRole('dialog')
-  await sheet.getByLabel('Name').fill(name)
-  await sheet.getByRole('combobox').first().click()
+  await expect(page.getByRole('heading', { name: 'New list' })).toBeVisible()
+  await page.getByLabel('Name', { exact: true }).fill(name)
+  await page.getByRole('combobox').first().click()
   await page.getByRole('option', { name: 'Public' }).click()
-  await sheet.getByRole('combobox').nth(1).click()
+  await page.getByRole('combobox').nth(1).click()
   await page.getByRole('option', { name: 'Double opt-in' }).click()
-  await sheet.getByPlaceholder('Tags').fill('e2e')
-  await sheet.getByPlaceholder('Tags').press('Enter')
-  await sheet.getByRole('button', { name: 'Save' }).click()
-  await expect(sheet).toBeHidden()
+  await page.getByPlaceholder('Tags').fill('e2e')
+  await page.getByPlaceholder('Tags').press('Enter')
+  await page.getByRole('button', { name: 'Save' }).click()
+  // Saving goes back to the list the user came from.
+  await expect(page).toHaveURL(/\/app\/lists$/)
 
   // Search finds it, with its badges and the opt-in campaign shortcut
   await page.getByLabel('Name', { exact: true }).fill(name.replace(/\d+$/, ''))
@@ -41,15 +42,19 @@ test('lists: create, edit, archive, delete', async ({ page }) => {
   await expect(row).toContainText('e2e')
   await expect(row.getByRole('button', { name: 'Send opt-in campaign' })).toBeVisible()
 
-  // Edit deep link
+  // Edit page: breadcrumb and tab title carry the list's name
   await row.getByRole('button', { name }).click()
   await expect(page).toHaveURL(/\/lists\/\d+$/)
-  await expect(sheet.getByLabel('Name')).toHaveValue(name)
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name)
+  await expect(page.getByRole('navigation', { name: 'breadcrumb' }).getByText(name)).toBeVisible()
+  await expect(page).toHaveTitle(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
 
   // Archive: it leaves the active view and shows in the archived one
-  await sheet.getByRole('switch').click()
-  await sheet.getByRole('button', { name: 'Save' }).click()
-  await expect(sheet).toBeHidden()
+  await page.getByRole('switch').click()
+  await page.getByRole('button', { name: 'Save' }).click()
+  await expect(page).toHaveURL(/\/app\/lists/)
+  // Going back restored the search that was active before editing (it lives in the URL).
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name.replace(/\d+$/, '').trim())
   await expect(page.getByRole('row', { name: new RegExp(name) })).toHaveCount(0)
 
   await page.getByRole('link', { name: /view archived/i }).click()

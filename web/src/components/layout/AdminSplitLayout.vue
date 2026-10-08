@@ -1,14 +1,12 @@
 <script setup lang="ts">
-// Settings-style pages: the form on the left, a help column on the right.
-// Use the `help` slot for explanatory text; it stacks below the content on narrow screens.
+// Admin pages (settings, create/edit forms): content on the left, an explanatory help rail on the
+// right. Not centred and not boxed, like libredesk's AdminSplitLayout; the rail hides below `lg`.
 </script>
 
 <template>
-  <div class="mx-auto grid w-full max-w-6xl gap-8 p-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-    <div class="min-w-0 space-y-6">
-      <slot />
-    </div>
-    <aside class="text-sm text-muted-foreground lg:sticky lg:top-6 lg:self-start">
+  <div class="flex justify-between p-6">
+    <div class="w-full min-w-0 lg:pr-6 xl:w-8/12"><slot /></div>
+    <aside class="hidden w-3/12 space-y-3 p-2 text-sm text-foreground/70 lg:block">
       <slot name="help" />
     </aside>
   </div>

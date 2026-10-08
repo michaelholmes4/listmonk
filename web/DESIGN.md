@@ -87,6 +87,24 @@ src/
   nav.ts                the sidebar tree (mirrors the classic menu, same permission gates)
 ```
 
+## List and edit pages
+
+Modelled on libredesk's admin pages. Editing an object is a **routed page, not a sheet or modal**
+(sheets stay for nothing larger than a confirmation or a bulk-action prompt).
+
+- Routes: `/x` (list), `/x/new` (create), `/x/:id` (edit). Views are `XList`, `XCreate`, `XEdit`;
+  create and edit share one `features/x/Form.vue` (it takes the object, or none to create).
+- Layout: `FormPage` -> `AdminSplitLayout`: a left-aligned form column and a help rail on the
+  right (hidden below `lg`). **No card around the form and nothing centred**; fields sit on the
+  page background in a `grid items-start gap-6 md:grid-cols-2`. Field help is a `FormDescription`
+  under the field; the rail is for the concept behind the screen.
+- One `Save` button, then `Cancel`, at the end of the form (no sticky bar).
+- The breadcrumb is in the shell header, from route `meta.parents`. Detail pages name themselves
+  with `usePageTitle(() => object.name)` so the last crumb and the tab title show the object.
+- Leaving the form (save or cancel) uses `useGoBack(fallback)`, so the list keeps its filters.
+- List pages keep search, page size, page and sort **in the URL** (`useUrlState`), which is what
+  makes "back" restore them and lets a filtered view be shared or reloaded.
+
 ## Adding a screen
 
 1. Add the route in `router/index.ts` with `meta.title` (+ `parents`, `perms`).

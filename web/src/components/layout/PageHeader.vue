@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
+import { dynamicTitle } from '@/lib/page-title'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -38,7 +39,7 @@ const parents = computed(() => route.meta.parents ?? [])
           <BreadcrumbSeparator class="hidden md:block" />
         </template>
         <BreadcrumbItem>
-          <BreadcrumbPage>{{ route.meta.title ? t(route.meta.title) : '' }}</BreadcrumbPage>
+          <BreadcrumbPage>{{ dynamicTitle ?? (route.meta.title ? t(route.meta.title) : '') }}</BreadcrumbPage>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>

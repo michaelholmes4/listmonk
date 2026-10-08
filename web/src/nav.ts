@@ -58,7 +58,7 @@ export const navigation: NavGroup[] = [
     icon: List,
     children: [
       { key: 'lists', label: 'menu.allLists', icon: List, to: { name: 'lists' } },
-      { key: 'forms', label: 'menu.forms', icon: Newspaper, legacy: '/admin/lists/forms' },
+      { key: 'forms', label: 'menu.forms', icon: Newspaper, to: { name: 'forms' } },
     ],
   },
   {

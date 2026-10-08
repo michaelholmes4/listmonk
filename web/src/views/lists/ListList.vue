@@ -3,7 +3,7 @@ import { Plus, Search, Trash2 } from '@lucide/vue'
 import type { PaginationState, RowSelectionState, SortingState } from '@tanstack/vue-table'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import type { ListQuery } from '@/api/lists'
 import type { List } from '@/api/types'
@@ -18,33 +18,34 @@ import {
   useLists,
 } from '@/composables/queries/useLists'
 import { usePermission } from '@/composables/usePermission'
+import { useUrlState } from '@/composables/useUrlState'
 import { createColumns } from '@/features/lists/columns'
-import ListSheet from '@/features/lists/ListSheet.vue'
 
 const { t, n } = useI18n()
-const route = useRoute()
 const router = useRouter()
 const { can, canList } = usePermission()
 
-// --- Route state: archived toggle (?status=) and which sheet is open. ----------------------------
-const status = computed<'active' | 'archived'>(() => (route.query.status === 'archived' ? 'archived' : 'active'))
-const sheetId = computed(() => (route.params.id ? Number(route.params.id) : undefined))
-const sheetOpen = computed({
-  get: () => route.name === 'list' || route.name === 'list-new',
-  set: (o) => {
-    if (!o) router.push({ name: 'lists', query: route.query })
-  },
-})
+// --- URL state: archived toggle, search, page and sort (`status`, `q`, `page`, `size`, `sort`). ---
+const url = useUrlState(['lists'])
+const status = computed<'active' | 'archived'>(() => (url.query.value.status === 'archived' ? 'archived' : 'active'))
+const urlSearch = url.str('q')
+const searchInput = ref(urlSearch.value)
 
-// --- Table state. -------------------------------------------------------------------------------
-const searchInput = ref('')
-const search = ref('') // applied on submit, like the classic screen
-const pagination = ref<PaginationState>({ pageIndex: 0, pageSize: 20 })
-const sorting = ref<SortingState>([])
+const pagination = computed<PaginationState>({
+  get: () => ({ pageIndex: url.int('page', 1) - 1, pageSize: url.int('size', 20) }),
+  set: (v) => url.set({ page: v.pageIndex === 0 ? undefined : v.pageIndex + 1, size: v.pageSize === 20 ? undefined : v.pageSize }),
+})
+const sorting = computed<SortingState>({
+  get: () => {
+    const [id, dir] = ((url.query.value.sort as string) ?? '').split(':')
+    return id ? [{ id, desc: dir === 'desc' }] : []
+  },
+  set: (v) => url.set({ sort: v[0] ? `${v[0].id}:${v[0].desc ? 'desc' : 'asc'}` : undefined, page: undefined }),
+})
 const selection = ref<RowSelectionState>({})
 const selectAll = ref(false)
 
-const filter = computed(() => ({ query: search.value, status: status.value }))
+const filter = computed(() => ({ query: urlSearch.value, status: status.value }))
 const query = computed<ListQuery>(() => ({
   ...filter.value,
   page: pagination.value.pageIndex + 1,
@@ -57,7 +58,7 @@ const { data, isPending } = useLists(query)
 const total = computed(() => data.value?.total ?? 0)
 
 watch(filter, () => {
-  pagination.value = { ...pagination.value, pageIndex: 0 }
+  url.set({ page: undefined })
   selection.value = {}
   selectAll.value = false
 })
@@ -116,7 +117,7 @@ const columns = createColumns({
   n,
   canViewSubscribers: can('subscribers:get_all', 'subscribers:get'),
   canManage: (l) => canList(l.id!, 'list:manage') && can('campaigns:manage'),
-  onEdit: (l) => router.push({ name: 'list', params: { id: l.id }, query: route.query }),
+  onEdit: (l) => router.push({ name: 'list', params: { id: l.id } }),
   onDelete: (l) => (rowToDelete.value = l),
   onOptinCampaign: (l) => (optinList.value = l),
 })
@@ -124,7 +125,7 @@ const columns = createColumns({
 
 <template>
   <Teleport defer to="#page-actions">
-    <Button v-if="can('lists:manage_all')" size="sm" @click="router.push({ name: 'list-new', query: route.query })">
+    <Button v-if="can('lists:manage_all')" size="sm" @click="router.push({ name: 'list-new' })">
       <Plus />{{ t('globals.buttons.new') }}
     </Button>
   </Teleport>
@@ -146,7 +147,7 @@ const columns = createColumns({
     </div>
 
     <div class="flex flex-wrap items-center gap-2">
-      <form class="relative min-w-64 max-w-sm flex-1" @submit.prevent="search = searchInput">
+      <form class="relative min-w-64 max-w-sm flex-1" @submit.prevent="urlSearch = searchInput.trim()">
         <Search class="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground" />
         <Input v-model="searchInput" class="pl-8" :placeholder="t('globals.fields.name')" :aria-label="t('globals.fields.name')" />
       </form>
@@ -179,8 +180,6 @@ const columns = createColumns({
       :row-id="(l: List) => String(l.id)"
     />
   </div>
-
-  <ListSheet :id="sheetId" v-model:open="sheetOpen" />
 
   <ConfirmDialog
     v-model:open="bulkConfirm"

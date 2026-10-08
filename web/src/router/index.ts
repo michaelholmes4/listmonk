@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import { keys } from '@/composables/queries/keys'
 import { i18n } from '@/i18n'
 import { userCan } from '@/lib/permissions'
+import { baseTitle } from '@/lib/page-title'
 import { queryClient } from '@/lib/query-client'
 import type { User } from '@/api/types'
 
@@ -27,30 +28,58 @@ export const router = createRouter({
       component: () => import('@/views/DashboardView.vue'),
       meta: { title: 'menu.dashboard' },
     },
-    ...[
-      { path: '/lists', name: 'lists' },
-      { path: '/lists/new', name: 'list-new' },
-      { path: '/lists/:id(\\d+)', name: 'list' },
-    ].map((r) => ({
-      ...r,
-      // Same pattern as subscribers: the sheet is the list view with the sheet open.
-      component: () => import('@/views/lists/ListsView.vue'),
+    {
+      path: '/lists/forms',
+      name: 'forms',
+      component: () => import('@/views/forms/FormsView.vue'),
+      meta: { title: 'forms.title', parents: [{ title: 'globals.terms.lists', to: { name: 'lists' } }] },
+    },
+    {
+      path: '/lists',
+      name: 'lists',
+      component: () => import('@/views/lists/ListList.vue'),
       meta: { title: 'globals.terms.lists' },
-    })),
+    },
+    {
+      path: '/lists/new',
+      name: 'list-new',
+      component: () => import('@/views/lists/ListCreate.vue'),
+      meta: { title: 'lists.newList', parents: [{ title: 'globals.terms.lists', to: { name: 'lists' } }], perms: ['lists:manage_all'] },
+    },
+    {
+      path: '/lists/:id(\\d+)',
+      name: 'list',
+      component: () => import('@/views/lists/ListEdit.vue'),
+      meta: { title: 'globals.terms.list', parents: [{ title: 'globals.terms.lists', to: { name: 'lists' } }] },
+    },
     ...[
       { path: '/subscribers', name: 'subscribers' },
-      { path: '/subscribers/new', name: 'subscribers-new' },
-      { path: '/subscribers/:id(\\d+)', name: 'subscriber' },
       { path: '/subscribers/lists/:listID(\\d+)', name: 'subscribers-list' },
     ].map((r) => ({
       ...r,
-      // The edit/new sheet is the same view with the sheet open, so closing it keeps the table state.
-      component: () => import('@/views/subscribers/SubscribersView.vue'),
+      component: () => import('@/views/subscribers/SubscriberList.vue'),
+      meta: { title: 'globals.terms.subscribers', perms: ['subscribers:get_all', 'subscribers:get'] },
+    })),
+    {
+      path: '/subscribers/new',
+      name: 'subscriber-new',
+      component: () => import('@/views/subscribers/SubscriberCreate.vue'),
       meta: {
-        title: 'globals.terms.subscribers',
+        title: 'subscribers.newSubscriber',
+        parents: [{ title: 'globals.terms.subscribers', to: { name: 'subscribers' } }],
+        perms: ['subscribers:manage'],
+      },
+    },
+    {
+      path: '/subscribers/:id(\\d+)',
+      name: 'subscriber',
+      component: () => import('@/views/subscribers/SubscriberEdit.vue'),
+      meta: {
+        title: 'globals.terms.subscriber',
+        parents: [{ title: 'globals.terms.subscribers', to: { name: 'subscribers' } }],
         perms: ['subscribers:get_all', 'subscribers:get'],
       },
-    })),
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
@@ -69,7 +98,6 @@ router.beforeEach((to) => {
   }
 })
 
-const baseTitle = document.title
 router.afterEach((to) => {
   document.title = `${i18n.global.t(to.meta.title)} · ${baseTitle}`
 })
