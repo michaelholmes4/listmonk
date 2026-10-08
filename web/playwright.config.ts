@@ -14,6 +14,19 @@ export default defineConfig({
   },
   projects: [
     { name: 'setup', testMatch: /auth\.setup\.ts/ },
-    { name: 'chromium', dependencies: ['setup'], testIgnore: /auth\.setup\.ts/, use: { storageState: 'e2e/.auth/state.json' } },
+    {
+      name: 'chromium',
+      dependencies: ['setup'],
+      testIgnore: [/auth\.setup\.ts/, /restarts\.spec\.ts/],
+      use: { storageState: 'e2e/.auth/state.json' },
+    },
+    // Saving settings reloads the server; those specs run alone, after everything else has finished.
+    {
+      name: 'restarts',
+      dependencies: ['chromium'],
+      testMatch: /restarts\.spec\.ts/,
+      fullyParallel: false,
+      use: { storageState: 'e2e/.auth/state.json' },
+    },
   ],
 })

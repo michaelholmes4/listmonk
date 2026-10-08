@@ -251,6 +251,42 @@ export const router = createRouter({
       },
     },
     {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/settings/SettingsView.vue'),
+      meta: { title: 'globals.terms.settings', perms: ['settings:get'] },
+    },
+    {
+      path: '/settings/maintenance',
+      name: 'maintenance',
+      component: () => import('@/views/maintenance/MaintenanceView.vue'),
+      meta: { title: 'maintenance.title', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['settings:maintain'] },
+    },
+    {
+      path: '/settings/logs',
+      name: 'logs',
+      component: () => import('@/views/logs/LogsView.vue'),
+      meta: { title: 'logs.title', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['settings:get'] },
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/settings/SettingsView.vue'),
+      meta: { title: 'globals.terms.settings', perms: ['settings:get'] },
+    },
+    {
+      path: '/settings/maintenance',
+      name: 'maintenance',
+      component: () => import('@/views/maintenance/MaintenanceView.vue'),
+      meta: { title: 'maintenance.title', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['settings:maintain'] },
+    },
+    {
+      path: '/settings/logs',
+      name: 'logs',
+      component: () => import('@/views/logs/LogsView.vue'),
+      meta: { title: 'logs.title', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['settings:get'] },
+    },
+    {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: () => import('@/views/NotFoundView.vue'),

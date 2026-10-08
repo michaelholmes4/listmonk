@@ -98,7 +98,7 @@ export interface paths {
         };
         /** @description returns settings from DB */
         get: operations["getSettings"];
-        /** @description returns updated settings from the DB. */
+        /** @description saves the settings. The app then reloads itself (`true`); while campaigns are running it does not, and reports `needs_restart` instead. */
         put: operations["updateSettings"];
         post?: never;
         delete?: never;
@@ -1022,7 +1022,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tx": {
+    "/settings/{key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1030,9 +1030,9 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
-        /** @description send message to a subscriber */
-        post: operations["transactWithSubscriber"];
+        /** @description saves one settings key (for example `maintenance.db`); the body is the JSON value. Reloads the app like `PUT /settings`. */
+        put: operations["updateSettingsByKey"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1049,25 +1049,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description garbage collects (deletes) orphaned or blocklisted subscribers. */
+        /** @description deletes orphan (no list) or blocklisted subscribers. */
         delete: operations["deleteGCSubscribers"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/maintenance/analytics/{type}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** @description garbage collects (deletes) campaign analytics. */
-        delete: operations["deleteCampaignAnalyticsByType"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1083,8 +1066,59 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description garbage collects (deletes) orphaned or blocklisted subscribers. */
-        delete: operations["deleteUnconfirmedSubscriptions"];
+        /** @description deletes unconfirmed opt-in subscriptions older than a date. */
+        delete: operations["deleteGCSubscriptions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/maintenance/analytics/{type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description deletes campaign view and/or click records older than a date. */
+        delete: operations["deleteGCCampaignAnalytics"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/maintenance/analytics/{type}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description downloads campaign views or clicks since a date as CSV. */
+        get: operations["exportCampaignAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tx": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description send message to a subscriber */
+        post: operations["transactWithSubscriber"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1829,6 +1863,9 @@ export interface components {
                 permissions?: ("list:get" | "list:manage")[];
             }[];
         };
+        SettingsSaved: boolean | {
+            needs_restart?: boolean;
+        };
         About: {
             version?: string;
             build?: string;
@@ -1894,23 +1931,29 @@ export interface components {
             tls_type?: string;
             tls_skip_verify?: boolean;
         };
+        /** @description An SMTP server block from the settings (not necessarily saved yet) plus the address to send the test to. */
         SMTPTest: {
             uuid?: string;
+            name?: string;
             enabled?: boolean;
             host?: string;
             hello_hostname?: string;
             port?: number;
             auth_protocol?: string;
             username?: string;
-            email_headers?: Record<string, never>[];
+            password?: string;
+            email_headers?: {
+                [key: string]: string;
+            }[];
             max_conns?: number;
             max_msg_retries?: number;
+            msg_retry_delay?: string;
             idle_timeout?: string;
             wait_timeout?: string;
             tls_type?: string;
             tls_skip_verify?: boolean;
-            strEmailHeaders?: string;
-            password?: string;
+            from_addresses?: string[];
+            /** @description Recipient of the test message. */
             email?: string;
         };
         MailBoxBounces: {
@@ -1926,6 +1969,10 @@ export interface components {
             tls_skip_verify?: boolean;
             scan_interval?: string;
         };
+        /**
+         * @description The app settings. Secrets (passwords, keys, tokens) are returned masked with bullet characters;
+         *     send them back unchanged or empty to keep the stored value.
+         */
         Settings: {
             "app.site_name"?: string;
             "app.root_url"?: string;
@@ -1935,6 +1982,8 @@ export interface components {
             "app.notify_emails"?: string[];
             "app.enable_public_subscription_page"?: boolean;
             "app.enable_public_archive"?: boolean;
+            "app.enable_public_archive_rss_content"?: boolean;
+            "app.show_optin_page"?: boolean;
             "app.send_optin_confirmation"?: boolean;
             "app.check_updates"?: boolean;
             "app.lang"?: string;
@@ -1942,47 +1991,140 @@ export interface components {
             "app.concurrency"?: number;
             "app.max_send_errors"?: number;
             "app.message_rate"?: number;
+            "app.cache_slow_queries"?: boolean;
+            "app.cache_slow_queries_interval"?: string;
             "app.message_sliding_window"?: boolean;
             "app.message_sliding_window_duration"?: string;
             "app.message_sliding_window_rate"?: number;
             "privacy.individual_tracking"?: boolean;
+            "privacy.disable_tracking"?: boolean;
             "privacy.unsubscribe_header"?: boolean;
             "privacy.allow_blocklist"?: boolean;
             "privacy.allow_preferences"?: boolean;
             "privacy.allow_export"?: boolean;
             "privacy.allow_wipe"?: boolean;
             "privacy.exportable"?: string[];
-            "privacy.domain_blocklist"?: Record<string, never>[];
+            "privacy.record_optin_ip"?: boolean;
+            "privacy.domain_blocklist"?: string[];
+            "privacy.domain_allowlist"?: string[];
+            "security.captcha"?: {
+                altcha?: {
+                    enabled?: boolean;
+                    complexity?: number;
+                };
+                hcaptcha?: {
+                    enabled?: boolean;
+                    key?: string;
+                    secret?: string;
+                };
+            };
+            "security.oidc"?: {
+                enabled?: boolean;
+                provider_url?: string;
+                provider_name?: string;
+                client_id?: string;
+                client_secret?: string;
+                auto_create_users?: boolean;
+                default_user_role_id?: number | null;
+                default_list_role_id?: number | null;
+            };
+            "security.trusted_urls"?: string[];
             "upload.provider"?: string;
+            "upload.extensions"?: string[];
             "upload.filesystem.upload_path"?: string;
             "upload.filesystem.upload_uri"?: string;
             "upload.s3.url"?: string;
             "upload.s3.public_url"?: string;
             "upload.s3.aws_access_key_id"?: string;
             "upload.s3.aws_default_region"?: string;
+            "upload.s3.aws_secret_access_key"?: string;
             "upload.s3.bucket"?: string;
             "upload.s3.bucket_domain"?: string;
             "upload.s3.bucket_path"?: string;
             "upload.s3.bucket_type"?: string;
             "upload.s3.expiry"?: string;
-            smtp?: components["schemas"]["SMTPSettings"][];
-            messengers?: Record<string, never>[];
+            smtp?: {
+                name?: string;
+                uuid?: string;
+                enabled?: boolean;
+                host?: string;
+                hello_hostname?: string;
+                port?: number;
+                auth_protocol?: string;
+                username?: string;
+                password?: string;
+                email_headers?: {
+                    [key: string]: string;
+                }[];
+                max_conns?: number;
+                max_msg_retries?: number;
+                msg_retry_delay?: string;
+                idle_timeout?: string;
+                wait_timeout?: string;
+                tls_type?: string;
+                tls_skip_verify?: boolean;
+                from_addresses?: string[];
+            }[];
+            messengers?: {
+                uuid?: string;
+                enabled?: boolean;
+                name?: string;
+                root_url?: string;
+                username?: string;
+                password?: string;
+                max_conns?: number;
+                timeout?: string;
+                max_msg_retries?: number;
+            }[];
             "bounce.enabled"?: boolean;
             "bounce.webhooks_enabled"?: boolean;
-            "bounce.count"?: number;
-            "bounce.action"?: string;
+            /** @description Keyed by bounce type (soft, hard, complaint). */
+            "bounce.actions"?: {
+                [key: string]: {
+                    count?: number;
+                    /** @enum {string} */
+                    action?: "none" | "unsubscribe" | "blocklist" | "delete";
+                };
+            };
             "bounce.ses_enabled"?: boolean;
-            "bounce.azure.enabled"?: boolean;
-            "bounce.azure.shared_secret"?: string;
-            "bounce.azure.shared_secret_header"?: string;
             "bounce.sendgrid_enabled"?: boolean;
             "bounce.sendgrid_key"?: string;
-            "bounce.forwardemail_enabled"?: boolean;
-            "bounce.forwardemail_key"?: string;
-            "bounce.postmark_enabled"?: boolean;
-            "bounce.postmark_username"?: string;
-            "bounce.postmark_password"?: string;
-            "bounce.mailboxes"?: components["schemas"]["MailBoxBounces"][];
+            "bounce.azure"?: {
+                enabled?: boolean;
+                shared_secret?: string;
+                shared_secret_header?: string;
+            };
+            "bounce.postmark"?: {
+                enabled?: boolean;
+                username?: string;
+                password?: string;
+            };
+            "bounce.forwardemail"?: {
+                enabled?: boolean;
+                key?: string;
+            };
+            "bounce.lettermint"?: {
+                enabled?: boolean;
+                key?: string;
+            };
+            "bounce.mailboxes"?: {
+                uuid?: string;
+                enabled?: boolean;
+                type?: string;
+                host?: string;
+                port?: number;
+                auth_protocol?: string;
+                return_path?: string;
+                username?: string;
+                password?: string;
+                tls_enabled?: boolean;
+                tls_skip_verify?: boolean;
+                scan_interval?: string;
+            }[];
+            "maintenance.db"?: {
+                vacuum?: boolean;
+                vacuum_cron_interval?: string;
+            };
             "appearance.admin.custom_css"?: string;
             "appearance.admin.custom_js"?: string;
             "appearance.public.custom_css"?: string;
@@ -2513,14 +2655,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description updated settings object */
+            /** @description saved */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        data?: boolean;
+                        data?: components["schemas"]["SettingsSaved"];
                     };
                 };
             };
@@ -4822,6 +4964,142 @@ export interface operations {
             };
         };
     };
+    updateSettingsByKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": unknown;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["SettingsSaved"];
+                    };
+                };
+            };
+        };
+    };
+    deleteGCSubscribers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Which subscribers to delete. */
+                type: "orphan" | "blocklisted";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            count?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteGCSubscriptions: {
+        parameters: {
+            query: {
+                /** @description ISO 8601 timestamp. */
+                before_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            count?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    deleteGCCampaignAnalytics: {
+        parameters: {
+            query: {
+                /** @description ISO 8601 timestamp. */
+                before_date: string;
+            };
+            header?: never;
+            path: {
+                /** @description Which analytics to delete. */
+                type: "all" | "views" | "clicks";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: boolean;
+                    };
+                };
+            };
+        };
+    };
+    exportCampaignAnalytics: {
+        parameters: {
+            query: {
+                /** @description ISO 8601 timestamp. */
+                since: string;
+            };
+            header?: never;
+            path: {
+                /** @description Which records to export. */
+                type: "views" | "clicks";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+        };
+    };
     transactWithSubscriber: {
         parameters: {
             query?: never;
@@ -4844,98 +5122,6 @@ export interface operations {
                 content: {
                     "application/json": {
                         data?: boolean;
-                    };
-                };
-            };
-        };
-    };
-    deleteGCSubscribers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description type of GC collected subscribers */
-                type: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: {
-                            count?: number;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    deleteCampaignAnalyticsByType: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description type of GC collected subscribers */
-                type: string;
-            };
-            cookie?: never;
-        };
-        /** @description date parameter */
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": {
-                    /** Format: date */
-                    before_date?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: boolean;
-                    };
-                };
-            };
-        };
-    };
-    deleteUnconfirmedSubscriptions: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description date parameter */
-        requestBody: {
-            content: {
-                "application/x-www-form-urlencoded": {
-                    /** Format: date */
-                    before_date?: string;
-                };
-            };
-        };
-        responses: {
-            /** @description response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data?: {
-                            count?: number;
-                        };
                     };
                 };
             };

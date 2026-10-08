@@ -11,6 +11,7 @@ import { registerCommandProvider } from '@/lib/commands'
 import { navigation } from '@/nav'
 import AppSidebar from './AppSidebar.vue'
 import CommandPalette from './CommandPalette.vue'
+import GlobalNotices from './GlobalNotices.vue'
 import PageHeader from './PageHeader.vue'
 
 const { t } = useI18n()
@@ -29,7 +30,7 @@ onScopeDispose(
         group: t('web.commands.navigation'),
         label: t(leaf.label),
         icon: leaf.icon,
-        run: () => (leaf.to ? router.push(leaf.to) : window.location.assign(leaf.legacy!)),
+        run: () => router.push(leaf.to),
       })),
   ),
 )
@@ -54,6 +55,7 @@ onScopeDispose(
     <AppSidebar />
     <SidebarInset class="overflow-hidden">
       <PageHeader />
+      <GlobalNotices />
       <main class="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <slot />
       </main>

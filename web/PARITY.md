@@ -24,9 +24,9 @@ Routes derive from `frontend/src/router/index.js`.
 | ☑ | `/users/roles/users` | User roles | List, create/edit pages with the grouped permission grid (select/none, SQL-query warning), clone, delete; Super Admin is view-only |
 | ☑ | `/users/roles/lists` | List roles | List, create/edit pages (add lists, view/manage per list), clone, delete. The classic "lists:*_all overrides" warning never rendered (it read an empty field) and is omitted |
 | ☑ | `/user/profile` | Profile | Name, email, password change, TOTP two-factor on (QR, secret, code) and off (password). Needed a backend fix: DELETE bodies were never parsed, so turning 2FA off failed in both UIs (`utils.FormValue`) |
-| ☐ | `/settings` | Settings | all tabs, in `AdminSplitLayout` |
-| ☐ | `/settings/logs` | Logs | |
-| ☐ | `/settings/maintenance` | Maintenance | |
+| ☑ | `/settings` | Settings | All nine tabs (general, performance, privacy, security, media, mail servers, bounces, messengers, appearance) in `AdminSplitLayout`, tab in the URL, validation that jumps to the broken tab, unsaved-changes guard, Ctrl+S. Secrets stay masked and are only sent when retyped. Saving reloads the server and the page waits for it. A test saves from the UI and checks every other setting is unchanged. Not carried over: nothing found missing |
+| ☑ | `/settings/logs` | Logs | Server log, refreshed every 10 s |
+| ☑ | `/settings/maintenance` | Maintenance | Delete orphan/blocklisted subscribers, unconfirmed subscriptions and analytics (each confirmed), analytics CSV export, scheduled vacuum |
 | ☑ | `404` | Not found | `NotFoundView` |
 
 ## Cross-cutting
@@ -36,8 +36,8 @@ Routes derive from `frontend/src/router/index.js`.
 - [x] Dark mode
 - [x] Command palette + provider registry
 - [x] Login, 2FA, forgot/reset, OIDC: **decision: keep the server-rendered pages** (they are the security boundary) and theme them with `librelist-auth.css`. They return to `/app` when `next` says so; the default `next` stays `/admin` until Phase 7. Upstream's `SanitizeURI` drops query strings from `next`
-- [ ] "Settings changed, restart needed" flow (`/api/config` `needs_restart`, `/api/admin/reload`)
-- [ ] Global "about" / update notice
+- [x] "Settings changed, restart needed" flow: save waits for the reload; `GlobalNotices` shows the restart banner (with a Restart action) when campaigns blocked the automatic reload
+- [x] Update notice and project messages (`GlobalNotices`), and the legacy-admin-credentials warning
 - [ ] Source-code link (AGPL §13). The classic UI has none in v6.2 and the fork has no public repo URL yet; add it to the user menu once `origin` exists
 
 ## OpenAPI spec gaps

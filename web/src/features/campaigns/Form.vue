@@ -5,11 +5,12 @@ import { Clock, Eye, FileUp, Loader2, Mail, Plus, Rocket, Save, X } from '@lucid
 import { useForm } from 'vee-validate'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { z } from 'zod'
 import type { Campaign } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ import {
 } from '@/composables/queries/useCampaigns'
 import { useTemplates } from '@/composables/queries/useTemplates'
 import { usePermission } from '@/composables/usePermission'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import ListPicker from '@/features/lists/ListPicker.vue'
 import MediaPickerDialog from '@/features/media/MediaPickerDialog.vue'
 import ContentEditor from './ContentEditor.vue'
@@ -154,20 +156,7 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
     void submit()
   }
 })
-useEventListener(window, 'beforeunload', (e: BeforeUnloadEvent) => {
-  if (dirty.value) e.preventDefault()
-})
-const leaveOpen = ref(false)
-let leaveDecision: ((ok: boolean) => void) | undefined
-onBeforeRouteLeave(() => {
-  if (!dirty.value || saving.value) return true
-  leaveOpen.value = true
-  return new Promise<boolean>((resolve) => (leaveDecision = resolve))
-})
-function decideLeave(ok: boolean) {
-  leaveOpen.value = false
-  leaveDecision?.(ok)
-}
+const { leaveOpen, decide: decideLeave } = useUnsavedGuard(dirty, saving)
 
 // --- Send a test. ----------------------------------------------------------------------------------
 const testEmails = ref<string[]>([])
@@ -512,12 +501,5 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
   />
   <ConfirmDialog v-model:open="unscheduleOpen" :title="t('campaigns.unSchedule')" :description="values.name" :pending="setStatus.isPending.value" @confirm="unschedule" />
   <ConfirmDialog v-model:open="altRemoveOpen" destructive :title="t('campaigns.removeAltText')" :confirm-label="t('globals.buttons.remove')" @confirm="(setFieldValue('altbody', null), (altRemoveOpen = false))" />
-  <ConfirmDialog
-    :open="leaveOpen"
-    :title="t('globals.messages.confirmDiscard')"
-    :confirm-label="t('web.common.discard')"
-    destructive
-    @update:open="(o: boolean) => !o && decideLeave(false)"
-    @confirm="decideLeave(true)"
-  />
+  <LeaveConfirm :open="leaveOpen" @decide="decideLeave" />
 </template>

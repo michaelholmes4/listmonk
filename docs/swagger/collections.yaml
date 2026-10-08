@@ -173,7 +173,7 @@ paths:
     put:
       tags:
         - Settings
-      description: returns updated settings from the DB.
+      description: saves the settings. The app then reloads itself (`true`); while campaigns are running it does not, and reports `needs_restart` instead.
       operationId: updateSettings
       requestBody:
         description: updated settings field values
@@ -183,14 +183,14 @@ paths:
               $ref: "#/components/schemas/Settings"
       responses:
         "200":
-          description: updated settings object
+          description: saved
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data:
-                    type: boolean
+                    $ref: "#/components/schemas/SettingsSaved"
 
   /settings/smtp/test:
     post:
@@ -2590,6 +2590,148 @@ paths:
                   data:
                     type: boolean
 
+  "/settings/{key}":
+    put:
+      tags:
+        - Settings
+      description: saves one settings key (for example `maintenance.db`); the body is the JSON value. Reloads the app like `PUT /settings`.
+      operationId: updateSettingsByKey
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/SettingsSaved"
+
+  "/maintenance/subscribers/{type}":
+    delete:
+      tags:
+        - Maintenance
+      description: deletes orphan (no list) or blocklisted subscribers.
+      operationId: deleteGCSubscribers
+      parameters:
+        - in: path
+          name: type
+          required: true
+          description: Which subscribers to delete.
+          schema:
+            type: string
+            enum: [orphan, blocklisted]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+
+  /maintenance/subscriptions/unconfirmed:
+    delete:
+      tags:
+        - Maintenance
+      description: deletes unconfirmed opt-in subscriptions older than a date.
+      operationId: deleteGCSubscriptions
+      parameters:
+        - in: query
+          name: before_date
+          required: true
+          description: ISO 8601 timestamp.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+
+  "/maintenance/analytics/{type}":
+    delete:
+      tags:
+        - Maintenance
+      description: deletes campaign view and/or click records older than a date.
+      operationId: deleteGCCampaignAnalytics
+      parameters:
+        - in: path
+          name: type
+          required: true
+          description: Which analytics to delete.
+          schema:
+            type: string
+            enum: [all, views, clicks]
+        - in: query
+          name: before_date
+          required: true
+          description: ISO 8601 timestamp.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: boolean
+
+  "/maintenance/analytics/{type}/export":
+    get:
+      tags:
+        - Maintenance
+      description: downloads campaign views or clicks since a date as CSV.
+      operationId: exportCampaignAnalytics
+      parameters:
+        - in: path
+          name: type
+          required: true
+          description: Which records to export.
+          schema:
+            type: string
+            enum: [views, clicks]
+        - in: query
+          name: since
+          required: true
+          description: ISO 8601 timestamp.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
   /tx:
     post:
       tags:
@@ -2612,99 +2754,6 @@ paths:
                 properties:
                   data:
                     type: boolean
-
-  "/maintenance/subscribers/{type}":
-    delete:
-      description: garbage collects (deletes) orphaned or blocklisted subscribers.
-      operationId: deleteGCSubscribers
-      tags:
-        - Maintenance
-      parameters:
-        - in: path
-          name: type
-          description: type of GC collected subscribers
-          schema:
-            type: string
-          required: true
-      responses:
-        "200":
-          description: response
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      count:
-                        type: integer
-
-  "/maintenance/analytics/{type}":
-    delete:
-      description: garbage collects (deletes) campaign analytics.
-      operationId: deleteCampaignAnalyticsByType
-      tags:
-        - Maintenance
-      requestBody:
-        description: date parameter
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                before_date:
-                  type: string
-                  format: date
-      parameters:
-        - in: path
-          name: type
-          description: type of GC collected subscribers
-          schema:
-            type: string
-          required: true
-      responses:
-        "200":
-          description: response
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: boolean
-
-  "/maintenance/subscriptions/unconfirmed":
-    delete:
-      description: garbage collects (deletes) orphaned or blocklisted subscribers.
-      operationId: deleteUnconfirmedSubscriptions
-      tags:
-        - Maintenance
-      requestBody:
-        required: true
-        description: date parameter
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                before_date:
-                  type: string
-                  format: date
-      responses:
-        "200":
-          description: response
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      count:
-                        type: integer
 
   "/public/lists":
     get:
@@ -4199,6 +4248,16 @@ components:
                   type: string
                   enum: ["list:get", "list:manage"]
 
+    SettingsSaved:
+      oneOf:
+        - type: boolean
+          description: Saved; the app is reloading.
+        - type: object
+          description: Saved, but campaigns are running so the app did not reload.
+          properties:
+            needs_restart:
+              type: boolean
+
     About:
       type: object
       properties:
@@ -4331,8 +4390,11 @@ components:
 
     SMTPTest:
       type: object
+      description: An SMTP server block from the settings (not necessarily saved yet) plus the address to send the test to.
       properties:
         uuid:
+          type: string
+        name:
           type: string
         enabled:
           type: boolean
@@ -4346,14 +4408,20 @@ components:
           type: string
         username:
           type: string
+        password:
+          type: string
         email_headers:
           type: array
           items:
             type: object
+            additionalProperties:
+              type: string
         max_conns:
           type: integer
         max_msg_retries:
           type: integer
+        msg_retry_delay:
+          type: string
         idle_timeout:
           type: string
         wait_timeout:
@@ -4362,12 +4430,13 @@ components:
           type: string
         tls_skip_verify:
           type: boolean
-        strEmailHeaders:
-          type: string
-        password:
-          type: string
+        from_addresses:
+          type: array
+          items:
+            type: string
         email:
           type: string
+          description: Recipient of the test message.
 
     MailBoxBounces:
       type: object
@@ -4397,138 +4466,324 @@ components:
 
     Settings:
       type: object
+      description: |
+        The app settings. Secrets (passwords, keys, tokens) are returned masked with bullet characters;
+        send them back unchanged or empty to keep the stored value.
       properties:
-        app.site_name:
+        "app.site_name":
           type: string
-        app.root_url:
+        "app.root_url":
           type: string
-        app.logo_url:
+        "app.logo_url":
           type: string
-        app.favicon_url:
+        "app.favicon_url":
           type: string
-        app.from_email:
+        "app.from_email":
           type: string
-        app.notify_emails:
+        "app.notify_emails":
           type: array
           items:
             type: string
-        app.enable_public_subscription_page:
+        "app.enable_public_subscription_page":
           type: boolean
-        app.enable_public_archive:
+        "app.enable_public_archive":
           type: boolean
-        app.send_optin_confirmation:
+        "app.enable_public_archive_rss_content":
           type: boolean
-        app.check_updates:
+        "app.show_optin_page":
           type: boolean
-        app.lang:
+        "app.send_optin_confirmation":
+          type: boolean
+        "app.check_updates":
+          type: boolean
+        "app.lang":
           type: string
-        app.batch_size:
+        "app.batch_size":
           type: integer
-        app.concurrency:
+        "app.concurrency":
           type: integer
-        app.max_send_errors:
+        "app.max_send_errors":
           type: integer
-        app.message_rate:
+        "app.message_rate":
           type: integer
-        app.message_sliding_window:
+        "app.cache_slow_queries":
           type: boolean
-        app.message_sliding_window_duration:
+        "app.cache_slow_queries_interval":
           type: string
-        app.message_sliding_window_rate:
+        "app.message_sliding_window":
+          type: boolean
+        "app.message_sliding_window_duration":
+          type: string
+        "app.message_sliding_window_rate":
           type: integer
-        privacy.individual_tracking:
+        "privacy.individual_tracking":
           type: boolean
-        privacy.unsubscribe_header:
+        "privacy.disable_tracking":
           type: boolean
-        privacy.allow_blocklist:
+        "privacy.unsubscribe_header":
           type: boolean
-        privacy.allow_preferences:
+        "privacy.allow_blocklist":
           type: boolean
-        privacy.allow_export:
+        "privacy.allow_preferences":
           type: boolean
-        privacy.allow_wipe:
+        "privacy.allow_export":
           type: boolean
-        privacy.exportable:
+        "privacy.allow_wipe":
+          type: boolean
+        "privacy.exportable":
           type: array
           items:
             type: string
-        privacy.domain_blocklist:
+        "privacy.record_optin_ip":
+          type: boolean
+        "privacy.domain_blocklist":
+          type: array
+          items:
+            type: string
+        "privacy.domain_allowlist":
+          type: array
+          items:
+            type: string
+        "security.captcha":
+          type: object
+          properties:
+            altcha:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                complexity:
+                  type: integer
+            hcaptcha:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                key:
+                  type: string
+                secret:
+                  type: string
+        "security.oidc":
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            provider_url:
+              type: string
+            provider_name:
+              type: string
+            client_id:
+              type: string
+            client_secret:
+              type: string
+            auto_create_users:
+              type: boolean
+            default_user_role_id:
+              type: integer
+              nullable: true
+            default_list_role_id:
+              type: integer
+              nullable: true
+        "security.trusted_urls":
+          type: array
+          items:
+            type: string
+        "upload.provider":
+          type: string
+        "upload.extensions":
+          type: array
+          items:
+            type: string
+        "upload.filesystem.upload_path":
+          type: string
+        "upload.filesystem.upload_uri":
+          type: string
+        "upload.s3.url":
+          type: string
+        "upload.s3.public_url":
+          type: string
+        "upload.s3.aws_access_key_id":
+          type: string
+        "upload.s3.aws_default_region":
+          type: string
+        "upload.s3.aws_secret_access_key":
+          type: string
+        "upload.s3.bucket":
+          type: string
+        "upload.s3.bucket_domain":
+          type: string
+        "upload.s3.bucket_path":
+          type: string
+        "upload.s3.bucket_type":
+          type: string
+        "upload.s3.expiry":
+          type: string
+        "smtp":
           type: array
           items:
             type: object
-        upload.provider:
-          type: string
-        upload.filesystem.upload_path:
-          type: string
-        upload.filesystem.upload_uri:
-          type: string
-        upload.s3.url:
-          type: string
-        upload.s3.public_url:
-          type: string
-        upload.s3.aws_access_key_id:
-          type: string
-        upload.s3.aws_default_region:
-          type: string
-        upload.s3.bucket:
-          type: string
-        upload.s3.bucket_domain:
-          type: string
-        upload.s3.bucket_path:
-          type: string
-        upload.s3.bucket_type:
-          type: string
-        upload.s3.expiry:
-          type: string
-        smtp:
-          type: array
-          items:
-            $ref: "#/components/schemas/SMTPSettings"
-        messengers:
+            properties:
+              name:
+                type: string
+              uuid:
+                type: string
+              enabled:
+                type: boolean
+              host:
+                type: string
+              hello_hostname:
+                type: string
+              port:
+                type: integer
+              auth_protocol:
+                type: string
+              username:
+                type: string
+              password:
+                type: string
+              email_headers:
+                type: array
+                items:
+                  type: object
+                  additionalProperties:
+                    type: string
+              max_conns:
+                type: integer
+              max_msg_retries:
+                type: integer
+              msg_retry_delay:
+                type: string
+              idle_timeout:
+                type: string
+              wait_timeout:
+                type: string
+              tls_type:
+                type: string
+              tls_skip_verify:
+                type: boolean
+              from_addresses:
+                type: array
+                items:
+                  type: string
+        "messengers":
           type: array
           items:
             type: object
-        bounce.enabled:
+            properties:
+              uuid:
+                type: string
+              enabled:
+                type: boolean
+              name:
+                type: string
+              root_url:
+                type: string
+              username:
+                type: string
+              password:
+                type: string
+              max_conns:
+                type: integer
+              timeout:
+                type: string
+              max_msg_retries:
+                type: integer
+        "bounce.enabled":
           type: boolean
-        bounce.webhooks_enabled:
+        "bounce.webhooks_enabled":
           type: boolean
-        bounce.count:
-          type: integer
-        bounce.action:
-          type: string
-        bounce.ses_enabled:
+        "bounce.actions":
+          type: object
+          description: Keyed by bounce type (soft, hard, complaint).
+          additionalProperties:
+            type: object
+            properties:
+              count:
+                type: integer
+              action:
+                type: string
+                enum: [none, unsubscribe, blocklist, delete]
+        "bounce.ses_enabled":
           type: boolean
-        bounce.azure.enabled:
+        "bounce.sendgrid_enabled":
           type: boolean
-        bounce.azure.shared_secret:
+        "bounce.sendgrid_key":
           type: string
-        bounce.azure.shared_secret_header:
-          type: string
-        bounce.sendgrid_enabled:
-          type: boolean
-        bounce.sendgrid_key:
-          type: string
-        bounce.forwardemail_enabled:
-          type: boolean
-        bounce.forwardemail_key:
-          type: string
-        bounce.postmark_enabled:
-          type: boolean
-        bounce.postmark_username:
-          type: string
-        bounce.postmark_password:
-          type: string
-        bounce.mailboxes:
+        "bounce.azure":
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            shared_secret:
+              type: string
+            shared_secret_header:
+              type: string
+        "bounce.postmark":
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            username:
+              type: string
+            password:
+              type: string
+        "bounce.forwardemail":
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            key:
+              type: string
+        "bounce.lettermint":
+          type: object
+          properties:
+            enabled:
+              type: boolean
+            key:
+              type: string
+        "bounce.mailboxes":
           type: array
           items:
-            $ref: "#/components/schemas/MailBoxBounces"
-        appearance.admin.custom_css:
+            type: object
+            properties:
+              uuid:
+                type: string
+              enabled:
+                type: boolean
+              type:
+                type: string
+              host:
+                type: string
+              port:
+                type: integer
+              auth_protocol:
+                type: string
+              return_path:
+                type: string
+              username:
+                type: string
+              password:
+                type: string
+              tls_enabled:
+                type: boolean
+              tls_skip_verify:
+                type: boolean
+              scan_interval:
+                type: string
+        "maintenance.db":
+          type: object
+          properties:
+            vacuum:
+              type: boolean
+            vacuum_cron_interval:
+              type: string
+        "appearance.admin.custom_css":
           type: string
-        appearance.admin.custom_js:
+        "appearance.admin.custom_js":
           type: string
-        appearance.public.custom_css:
+        "appearance.public.custom_css":
           type: string
-        appearance.public.custom_js:
+        "appearance.public.custom_js":
           type: string
 
     SubscriberProfile:

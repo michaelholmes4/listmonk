@@ -1,7 +1,6 @@
 {
   "web.nav.platform": "Platform",
   "web.nav.dashboard": "Dashboard",
-  "web.nav.legacyHint": "Opens in the classic admin",
   "web.nav.toggle": "Toggle sidebar",
   "web.user.account": "Account",
   "web.user.theme": "Theme",
@@ -67,5 +66,18 @@
   "web.roles.highRisk": "High risk: allows running raw SQL against subscribers",
   "web.roles.noLists": "No lists added yet.",
   "web.profile.passwordHelp": "Leave blank to keep your current password. Changing it signs out your other sessions.",
-  "web.profile.codeInvalid": "That code didn't work. Check the code and try again."
+  "web.profile.codeInvalid": "That code didn't work. Check the code and try again.",
+  "web.maintenance.data": "Data",
+  "web.settings.hasErrors": "This tab has errors",
+  "web.settings.help.general": "Identity, the sender address and the public pages. The root URL is used in every link in your emails, so subscribers must be able to reach it.",
+  "web.settings.help.performance": "How fast campaigns are sent. Start low and raise concurrency and message rate while watching your mail server's limits.",
+  "web.settings.help.privacy": "What is tracked and what subscribers can do themselves. Disabling tracking removes view and click statistics.",
+  "web.settings.help.security": "Single sign-on (OIDC), CAPTCHA on the public subscription form, and the origins allowed to call the API from a browser.",
+  "web.settings.help.media": "Where uploaded files are stored. Filesystem needs a writable folder on the server; S3 needs a bucket and credentials.",
+  "web.settings.help.smtp": "The mail servers campaigns go through. Messages are spread across all enabled servers.",
+  "web.settings.help.bounces": "How bounces are detected and what happens after repeated ones. Needs a POP mailbox, provider webhooks, or both.",
+  "web.settings.help.messengers": "Extra delivery channels. Each one is a URL that receives every message as JSON.",
+  "web.settings.help.appearance": "Custom CSS and JavaScript for the admin and for the public pages. Broken code breaks the pages it is added to.",
+  "web.settings.saveHint": "Saving reloads the app, which takes a few seconds.",
+  "web.notices.legacyUser": "Remove the admin_username and admin_password fields from the TOML configuration file or environment variables. If you use the API, create and use new API credentials first. Manage them under"
 }

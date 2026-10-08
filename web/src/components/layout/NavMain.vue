@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronRight, ExternalLink } from '@lucide/vue'
+import { ChevronRight } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -23,9 +23,7 @@ const { setOpen, state } = useSidebar()
 
 const visibleChildren = (children: NavLeaf[]) => children.filter((c) => can(...(c.perms ?? [])))
 
-// A leaf is active when it is a ported route that matches, or its legacy path is the current one.
-const isActive = (leaf: NavLeaf) =>
-  !!leaf.to && typeof leaf.to === 'object' && 'name' in leaf.to && route.name === leaf.to.name
+const isActive = (leaf: NavLeaf) => typeof leaf.to === 'object' && 'name' in leaf.to && route.name === leaf.to.name
 
 // Clicking a group in the icon rail expands the sidebar so its children are reachable.
 const onGroupClick = () => {
@@ -41,14 +39,10 @@ const onGroupClick = () => {
           <!-- Single link -->
           <SidebarMenuItem v-if="group.leaf">
             <SidebarMenuButton as-child :tooltip="t(group.label)" :is-active="isActive(group.leaf)">
-              <RouterLink v-if="group.leaf.to" :to="group.leaf.to">
+              <RouterLink :to="group.leaf.to">
                 <component :is="group.leaf.icon" />
                 <span>{{ t(group.leaf.label) }}</span>
               </RouterLink>
-              <a v-else :href="group.leaf.legacy">
-                <component :is="group.leaf.icon" />
-                <span>{{ t(group.leaf.label) }}</span>
-              </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
 
@@ -73,14 +67,9 @@ const onGroupClick = () => {
                 <SidebarMenuSub>
                   <SidebarMenuSubItem v-for="leaf in visibleChildren(group.children)" :key="leaf.key">
                     <SidebarMenuSubButton as-child :is-active="isActive(leaf)">
-                      <RouterLink v-if="leaf.to" :to="leaf.to">
+                      <RouterLink :to="leaf.to">
                         <span>{{ t(leaf.label) }}</span>
                       </RouterLink>
-                      <!-- Not ported yet: opens the classic admin (a full page load, on purpose). -->
-                      <a v-else :href="leaf.legacy" :title="t('web.nav.legacyHint')">
-                        <span>{{ t(leaf.label) }}</span>
-                        <ExternalLink class="ml-auto size-3 opacity-50" />
-                      </a>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
                 </SidebarMenuSub>

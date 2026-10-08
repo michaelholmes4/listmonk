@@ -35,10 +35,14 @@ test('dashboard breakdowns and charts load independently', async ({ page }) => {
   await expect(page.locator('[data-cy=lists]')).toContainText('Public')
 })
 
-test('unported screens link to the classic admin', async ({ page }) => {
+test('every sidebar entry is a screen of this app, none hands off to the classic admin', async ({ page }) => {
   await page.goto('/app/')
-  await page.locator('[data-sidebar=menu-button]', { hasText: 'Settings' }).click()
-  await expect(page.getByRole('link', { name: 'Maintenance' })).toHaveAttribute('href', '/admin/settings/maintenance')
+  for (const group of ['Lists', 'Subscribers', 'Campaigns', 'Users', 'Settings']) {
+    await page.locator('[data-sidebar=menu-button]', { hasText: group }).first().click()
+  }
+  const links = await page.locator('[data-sidebar=sidebar] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))
+  expect(links.length).toBeGreaterThan(10)
+  expect(links.filter((h) => !h?.startsWith('/app/'))).toEqual([])
 })
 
 test('command palette opens with ctrl+k and navigates', async ({ page }) => {

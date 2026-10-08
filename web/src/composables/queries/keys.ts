@@ -26,6 +26,8 @@ export const keys = {
     detail: (id: number) => ['campaigns', 'detail', id] as const,
     running: ['campaigns', 'running'] as const,
   },
+  logs: ['logs'] as const,
+  settings: ['settings'] as const,
   users: { all: ['users'] as const, detail: (id: number) => ['users', 'detail', id] as const },
   roles: { users: ['roles', 'users'] as const, lists: ['roles', 'lists'] as const },
   dashboard: { counts: ['dashboard', 'counts'] as const, charts: ['dashboard', 'charts'] as const },

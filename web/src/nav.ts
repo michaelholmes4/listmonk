@@ -25,10 +25,7 @@ export interface NavLeaf {
   icon: Component
   /** Hidden unless the user has ANY of these (supports `group:*`). */
   perms?: string[]
-  /** Route in the new UI. Present once the screen is ported. */
-  to?: RouteLocationRaw
-  /** Path in the classic admin, used until the screen is ported (see PARITY.md). */
-  legacy?: string
+  to: RouteLocationRaw
 }
 
 export interface NavGroup {
@@ -43,7 +40,7 @@ export interface NavGroup {
 
 /**
  * Mirrors the classic admin's menu (frontend/src/components/Navigation.vue), including its
- * permission gates. When a screen is ported, replace its `legacy` path with a `to` route.
+ * permission gates.
  */
 export const navigation: NavGroup[] = [
   {
@@ -161,16 +158,16 @@ export const navigation: NavGroup[] = [
         label: 'menu.settings',
         icon: Settings,
         perms: ['settings:get'],
-        legacy: '/admin/settings',
+        to: { name: 'settings' },
       },
       {
         key: 'maintenance',
         label: 'menu.maintenance',
         icon: Wrench,
         perms: ['settings:maintain'],
-        legacy: '/admin/settings/maintenance',
+        to: { name: 'maintenance' },
       },
-      { key: 'logs', label: 'menu.logs', icon: ScrollText, perms: ['settings:get'], legacy: '/admin/settings/logs' },
+      { key: 'logs', label: 'menu.logs', icon: ScrollText, perms: ['settings:get'], to: { name: 'logs' } },
     ],
   },
 ]
