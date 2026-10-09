@@ -187,17 +187,6 @@ function onKey(e: KeyboardEvent) {
     </template>
 
     <template v-if="automation && can('automations:manage')" #actions>
-      <!-- Lifecycle actions are occasional: they live in the "⋯" menu, so Publish is the one primary button. -->
-      <DropdownMenu v-if="canPause(status) || canResume(status) || canArchive(status)">
-        <DropdownMenuTrigger as-child>
-          <Button variant="outline" size="icon-sm" :aria-label="t('web.common.actions')" data-cy="automation-actions"><MoreHorizontal /></Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem v-if="canPause(status)" @select="acting = 'pause'"><Pause />{{ t('web.automations.pause') }}</DropdownMenuItem>
-          <DropdownMenuItem v-if="canResume(status)" @select="acting = 'resume'"><Play />{{ t('web.automations.resume') }}</DropdownMenuItem>
-          <DropdownMenuItem v-if="canArchive(status)" @select="acting = 'archive'"><Archive />{{ t('web.automations.archive') }}</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
       <template v-if="!readonly">
         <span v-if="builder?.panelDirty" class="flex items-center gap-1.5 text-xs text-muted-foreground" data-cy="unsaved">
           <span class="size-1.5 rounded-full bg-warning" aria-hidden="true" />{{ t('web.common.unsaved') }}
@@ -214,6 +203,17 @@ function onKey(e: KeyboardEvent) {
           </template>
           <template v-else>{{ t('web.automations.draftSavedAt', { time: savedAt }) }}</template>
         </div>
+        <!-- Lifecycle actions are occasional: they live in the "⋯" menu, so Publish is the one primary button. -->
+        <DropdownMenu v-if="canPause(status) || canResume(status) || canArchive(status)">
+          <DropdownMenuTrigger as-child>
+            <Button variant="outline" size="icon-sm" :aria-label="t('web.common.actions')" data-cy="automation-actions"><MoreHorizontal /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem v-if="canPause(status)" @select="acting = 'pause'"><Pause />{{ t('web.automations.pause') }}</DropdownMenuItem>
+            <DropdownMenuItem v-if="canResume(status)" @select="acting = 'resume'"><Play />{{ t('web.automations.resume') }}</DropdownMenuItem>
+            <DropdownMenuItem v-if="canArchive(status)" @select="acting = 'archive'"><Archive />{{ t('web.automations.archive') }}</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           size="sm"
           :disabled="busy || (!dirty && !unpublished && !neverPublished)"
