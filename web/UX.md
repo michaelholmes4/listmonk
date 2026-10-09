@@ -162,8 +162,8 @@ left to the pager, so nothing in the header changes from tab to tab.
 Also changed: Maintenance's delete buttons use the destructive style, and the template clone name is
 translated (it was hard-coded "Copy of").
 
-Not reviewed in depth yet: the inside of the automation flow builder, the template editor and the
-media browser. They now sit in the standard page frame, but their own layouts are unchanged.
+Not reviewed in depth yet: the template editor and the media browser. They now sit in the standard page frame, but their own layouts are unchanged. (The automation flow
+builder was reviewed later; see "Flow builder" below.)
 
 ### Detail pages and forms (October 2026, second pass)
 
@@ -192,3 +192,54 @@ Two complaints about record pages: the tabs felt cluttered, and on desktop the i
 
 Settings keeps one column with sub-headings rather than annotated sections: each settings page's
 header already names and explains the section, and the server cards need the width.
+
+### Flow builder (October 2026, third pass)
+
+Users found editing an automation step hard. Reading the code and using it showed four causes:
+
+| # | Finding | Why it hurt |
+|---|---------|-------------|
+| B1 | The email editor was squished. The step sheet asked for `sm:max-w-3xl`, but the generated sheet's `data-[side=right]:sm:max-w-sm` is more specific and won, so every sheet was 384px. | The rich-text toolbar wrapped onto six rows, and a 600px email never fit, even at 768px. |
+| B2 | One screen saved three ways. Step settings applied instantly to an unsaved in-memory draft (the sheet only had *Close*), the email had its own *Save email* button, and the flow had *Save draft* and *Publish*. | Users couldn't tell which save applied. The header also lacked the "Unsaved changes" marker rule 7 asks for. |
+| B3 | Saving an email changes what live sends contain, in every version, and nothing said so. The live banner said changes "only apply… once you publish". | A typo fix is meant to reach people already enrolled, but the user was told the opposite. |
+| B4 | The sheet was modal and blurred the flow. | You couldn't see where the step sat, and moving between steps meant click, edit, Close each time. |
+
+What the research said:
+
+- Use a drawer for quick edits that support the page, and a full, focused page for long or complex
+  editing (GitLab Pajamas, Fluent 2, Carbon, Smashing Magazine's 2026 modal-or-page decision tree).
+- Marketing tools split an email step into a light settings panel and the full email editor (Loops,
+  Klaviyo, HubSpot, ActiveCampaign, Dynamics 365).
+- One save model per screen. Show "Unsaved changes" with Save and Discard, and warn before work is lost
+  (GitLab saving and feedback, Polaris' contextual save bar, Fluent).
+
+| Before | Now |
+|--------|-----|
+| A modal sheet, 384px wide whatever the step. | The step panel docks beside the flow from `lg` up (`StepInspector`, 28rem, sticky under the page header; `Page` exposes `--page-header-h` and `--page-viewport-h` for it). It blocks nothing. Below `lg` the same `StepPanel` is a sheet (`StepSheet`). The open step is marked on the flow and in the URL (`?step=`, `?trigger=`). |
+| Settings applied as you typed; *Close* only. | The panel edits a copy. **Save** (⌘S) writes it into the flow, **Cancel** throws it away. Leaving with edits (another step, ✕, Esc, another tab) asks: Save, Discard or keep editing. |
+| *Save draft* in the header. | The flow is always saved: adding, removing, moving a step and adding or removing a trigger save the draft at once (`useDraftSaver`: one request at a time, later changes coalesced). The header shows *Saving…*, *Draft saved 14:02*, the server's problems, or an error with *Retry*. Only the open panel can hold unsaved edits. |
+| Deleting a step was one click. | Deleting a step or trigger that has settings asks first, because the delete saves at once. |
+| The email form (subject, from, body, *Save email*) inside the sheet. | The panel keeps the step's own settings (type, topic, content source) and shows the email as a card (subject, from, format, preview, *Edit email*). The content is written on `/automations/:id/emails/:step`, laid out like a campaign's Content tab. |
+| A live email saved silently. | The page says it is live, the button reads *Save to live email*, and saving asks first, with how many people are in the automation now. |
+| *Write email* created a campaign even if the panel was then cancelled. | It saves the panel, creates the campaign, stores its id in the step, saves the draft, and only then opens the page. |
+
+Rules for builders and step editors:
+
+1. **Docked panel, not a modal**, wherever the thing being edited should stay visible.
+2. **Buffered panel, Save and Cancel.** The panel's copy is the only thing that can be unsaved.
+3. **Structural edits save immediately**; the screen shows a save status, never a *Save draft* button.
+4. **A long editor gets a page.** The panel holds a summary card and a link.
+5. **Saving something that changes live behaviour says so** and asks before doing it.
+
+Sources: GitLab Pajamas [Drawer](https://design.gitlab.com/components/drawer) and
+[Saving and feedback](https://design.gitlab.com/patterns/saving-and-feedback);
+[Fluent 2 Drawer](https://fluent2.microsoft.design/components/web/react/core/drawer/usage);
+[Carbon dialog pattern](https://carbondesignsystem.com/patterns/dialog-pattern/);
+[Polaris contextual save bar](https://polaris.shopify.com/components/contextual-save-bar);
+[Smashing Magazine, modal vs. separate page (2026)](https://www.smashingmagazine.com/2026/03/modal-separate-page-ux-decision-tree/);
+[Loops workflows](https://loops.so/docs/workflows);
+[Klaviyo: edit a flow](https://help.klaviyo.com/hc/en-us/articles/115002779151);
+[HubSpot: automated emails in workflows](https://knowledge.hubspot.com/marketing-email/create-automated-emails-to-use-in-workflows);
+[ActiveCampaign: Send an email action](https://help.activecampaign.com/hc/en-us/articles/16196494893084);
+[Dynamics 365: edit email in a live journey](https://learn.microsoft.com/en-gb/dynamics365/customer-insights/journeys/edit-email-in-live-journey);
+[Zapier: step setup](https://help.zapier.com/hc/en-us/articles/29508922694797-Setting-up-triggers-and-actions-just-got-better).
