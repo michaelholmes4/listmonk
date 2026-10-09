@@ -37,30 +37,28 @@ body:has(section.login) {
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  body:has(section.login) {
-    --background: hsl(120 2.6% 7.6%);
-    --foreground: hsl(150 6% 93%);
-    --card: hsl(120 2% 10%);
-    --primary: hsl(152 58% 54%);
-    --primary-foreground: hsl(120 2.6% 7.6%);
-    --secondary: hsl(120 3% 4%);
-    --muted-foreground: hsl(120 1% 74%);
-    --accent: hsl(150 3% 15%);
-    --destructive: hsl(4 92% 74%);
-    --border: hsl(150 2% 16%);
-    --input: hsl(150 2% 19%);
-    --ring: hsl(152 45% 33%);
-    color-scheme: dark;
-  }
+/* Dark mode follows the admin UI's saved choice, or the system's: librelist-auth.js sets the
+   attribute. */
+:root[data-librelist-theme="dark"] body:has(section.login) {
+  --background: hsl(120 2.6% 7.6%);
+  --foreground: hsl(150 6% 93%);
+  --card: hsl(120 2% 10%);
+  --primary: hsl(152 58% 54%);
+  --primary-foreground: hsl(120 2.6% 7.6%);
+  --secondary: hsl(120 3% 4%);
+  --muted-foreground: hsl(120 1% 74%);
+  --accent: hsl(150 3% 15%);
+  --destructive: hsl(4 92% 74%);
+  --border: hsl(150 2% 16%);
+  --input: hsl(150 2% 19%);
+  --ring: hsl(152 45% 33%);
+  color-scheme: dark;
 }
 
 /* The bundled wordmark is black-on-transparent; flip it in dark mode. A custom logo (Settings →
    Appearance) is left as the admin uploaded it. */
-@media (prefers-color-scheme: dark) {
-  body:has(section.login) .header .logo img[src^="/public/static/logo.svg"] {
-    filter: invert(1) hue-rotate(180deg);
-  }
+:root[data-librelist-theme="dark"] body:has(section.login) .header .logo img[src^="/public/static/logo.svg"] {
+  filter: invert(1) hue-rotate(180deg);
 }
 
 /* The card. */

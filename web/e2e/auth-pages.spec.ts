@@ -27,6 +27,24 @@ test('forgot password page is themed too', async ({ page }) => {
   expect(await font(page, 'body')).toContain('Geist')
 })
 
+test('login page follows the light/dark choice saved by the admin UI', async ({ page }) => {
+  const bg = () => page.locator('body').evaluate((el) => getComputedStyle(el).backgroundColor)
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.goto('/admin/login')
+  const systemDark = await bg()
+
+  await page.evaluate(() => localStorage.setItem('librelist-theme', 'light'))
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-librelist-theme', 'light')
+  expect(await bg()).not.toBe(systemDark)
+
+  await page.emulateMedia({ colorScheme: 'light' })
+  await page.evaluate(() => localStorage.setItem('librelist-theme', 'dark'))
+  await page.reload()
+  await expect(page.locator('html')).toHaveAttribute('data-librelist-theme', 'dark')
+  expect(await bg()).toBe(systemDark)
+})
+
 test('public subscriber pages are left alone', async ({ page }) => {
   await page.goto('/subscription/form')
   expect(await font(page, 'body')).not.toContain('Geist')

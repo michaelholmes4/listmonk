@@ -17,7 +17,7 @@ Known conflict hotspots (the only upstream files we edit):
 - `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `eng.Stop` in the shutdown closure; `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
-- `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`)
+- `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`, one `<script>` for `librelist-auth.js`)
 - `.devcontainer/*`, `.gitignore`
 
 The hooks are one-liners that call into `cmd/web.go` (`/app` routes, `webFSFiles()`), so a
@@ -30,11 +30,11 @@ TS types in `web/src/api/schema.d.ts`; after a merge run `pnpm -C web gen:api` a
 
 Admin login, 2FA, forgot/reset and OIDC stay server-rendered (the security boundary); the new UI only
 themes them via `static/public/static/librelist-auth.css`, scoped to `section.login` so the public
-subscriber pages are untouched. Post-login `next` still defaults to `/admin` until Phase 7.
+subscriber pages are untouched; `librelist-auth.js` applies the light/dark choice the admin saved (same origin). Post-login `next` still defaults to `/admin` until Phase 7.
 
 Everything else we add lives in new files: `web/`, `internal/automation/`,
 `internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/automation_sender.go`,
-`cmd/track.go`, `cmd/web.go`, `cmd/message_log.go`, `internal/msglog/`, `static/public/static/librelist-auth.css`.
+`cmd/track.go`, `cmd/web.go`, `cmd/message_log.go`, `internal/msglog/`, `static/public/static/librelist-auth.css`, `librelist-auth.js`.
 
 ## Automation: things to know
 - **Engine.** River (poll-only, one job kind) drives `internal/automation`; one DB transaction per node. Email steps are
