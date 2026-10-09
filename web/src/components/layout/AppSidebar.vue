@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ArrowLeft } from '@lucide/vue'
+import { ArrowLeft, Search } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { Kbd } from '@/components/ui/kbd'
 import {
   Sidebar,
   SidebarContent,
@@ -13,12 +14,15 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { navigation, spaceEntry } from '@/nav'
+import { useUiStore } from '@/stores/ui'
 import AppLogo from './AppLogo.vue'
 import NavMain from './NavMain.vue'
 import NavUser from './NavUser.vue'
 
 const { t } = useI18n()
 const route = useRoute()
+const ui = useUiStore()
+const modKey = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl+'
 
 // Inside a space (Settings) the sidebar lists the space, with a way back to where you were.
 const space = computed(() => spaceEntry(route))
@@ -43,6 +47,19 @@ watch(
                 <AppLogo mark class="size-5!" />
               </div>
             </RouterLink>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem v-if="!space">
+          <SidebarMenuButton
+            variant="outline"
+            :tooltip="t('web.commands.search')"
+            class="text-muted-foreground"
+            data-cy="nav-search"
+            @click="ui.commandPaletteOpen = true"
+          >
+            <Search />
+            <span>{{ t('web.commands.search') }}</span>
+            <Kbd class="ml-auto group-data-[collapsible=icon]:hidden">{{ modKey }}K</Kbd>
           </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem v-if="space">

@@ -13,6 +13,7 @@
   "web.commands.navigation": "Navigation",
   "web.commands.preferences": "Preferences",
   "web.commands.open": "Open command palette",
+  "web.commands.search": "Search…",
   "web.dashboard.title": "Dashboard",
   "web.errors.notFoundTitle": "Page not found",
   "web.errors.notFoundBody": "This page doesn't exist in the new admin yet.",
