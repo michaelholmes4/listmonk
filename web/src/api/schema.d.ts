@@ -2758,7 +2758,7 @@ export interface components {
         AutomationNode: {
             id?: string;
             /** @enum {string} */
-            type?: "send_email" | "delay" | "wait_until" | "wait_for_event" | "condition" | "update_attribute" | "add_to_list" | "remove_from_list" | "exit";
+            type?: "send_email" | "delay" | "wait_until" | "wait_for_event" | "condition" | "go_to" | "update_attribute" | "add_to_list" | "remove_from_list" | "exit";
             config?: {
                 [key: string]: unknown;
             };
@@ -2811,7 +2811,10 @@ export interface components {
             entered_at?: string;
             /** Format: date-time */
             exited_at?: string | null;
+            /** @description Why the run ended, for example completed, goal_reached, exit_step or loop_limit (a go_to step passed its max_runs). */
             exit_reason?: string | null;
+            /** @description How many times the run has arrived at its current step. */
+            current_visit?: number;
         };
         SubscriberAutomation: components["schemas"]["AutomationEnrollment"] & {
             automation_name?: string;
@@ -2830,6 +2833,8 @@ export interface components {
                 [key: string]: unknown;
             };
             error?: string | null;
+            /** @description Which arrival at the step this row belongs to */
+            visit?: number;
         };
         AutomationNodeStat: {
             node_id?: string;

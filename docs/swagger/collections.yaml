@@ -5663,7 +5663,7 @@ components:
       type: object
       properties:
         id: { type: string }
-        type: { type: string, enum: [send_email, delay, wait_until, wait_for_event, condition, update_attribute, add_to_list, remove_from_list, exit] }
+        type: { type: string, enum: [send_email, delay, wait_until, wait_for_event, condition, go_to, update_attribute, add_to_list, remove_from_list, exit] }
         config: { type: object, additionalProperties: true }
     AutomationEdge:
       type: object
@@ -5714,7 +5714,8 @@ components:
         next_run_at: { type: string, format: date-time, nullable: true }
         entered_at: { type: string, format: date-time }
         exited_at: { type: string, format: date-time, nullable: true }
-        exit_reason: { type: string, nullable: true }
+        exit_reason: { type: string, nullable: true , description: "Why the run ended, for example completed, goal_reached, exit_step or loop_limit (a go_to step passed its max_runs)." }
+        current_visit: { type: integer, description: How many times the run has arrived at its current step. }
     SubscriberAutomation:
       allOf:
         - $ref: "#/components/schemas/AutomationEnrollment"
@@ -5732,6 +5733,7 @@ components:
         finished_at: { type: string, format: date-time, nullable: true }
         result: { type: object, additionalProperties: true }
         error: { type: string, nullable: true }
+        visit: { type: integer, description: Which arrival at the step this row belongs to, from 1. }
     AutomationNodeStat:
       type: object
       properties:
