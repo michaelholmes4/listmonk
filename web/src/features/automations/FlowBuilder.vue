@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAllLists } from '@/composables/queries/useLists'
 import { provideBuilder } from './context'
 import { triggerMeta } from './labels'
-import { insertStep, moveStep, newId, newStep, removeStep, triggerTypes, type Config, type Flow, type Step, type StepType, type Trigger, type TriggerType } from './model'
+import { insertStep, locate, moveStep, newId, newStep, removeStep, triggerTypes, type Config, type Flow, type StepType, type Trigger, type TriggerType } from './model'
 import StepList from './StepList.vue'
 import StepSheet from './StepSheet.vue'
 import TriggerCard from './TriggerCard.vue'
@@ -37,19 +37,6 @@ const serverProblems = computed(() => props.problems ?? new Map<string, string[]
 
 const target = ref<{ kind: 'step' | 'trigger'; id: string } | null>(null)
 
-function findStep(id: string): Step | undefined {
-  const walk = (l: Step[]): Step | undefined => {
-    for (const s of l) {
-      if (s.id === id) return s
-      if (s.type === 'condition') {
-        const h = walk(s.yes ?? []) ?? walk(s.no ?? [])
-        if (h) return h
-      }
-    }
-  }
-  return walk(props.flow.steps)
-}
-
 provideBuilder({
   readonly: computed(() => props.readonly),
   stats,
@@ -74,7 +61,8 @@ provideBuilder({
 })
 
 function apply(id: string, config: Config) {
-  const step = findStep(id)
+  const loc = locate(props.flow, id)
+  const step = loc?.list[loc.index]
   const trigger = props.flow.triggers.find((x) => x.id === id)
   if (step) step.config = config
   else if (trigger) trigger.config = config

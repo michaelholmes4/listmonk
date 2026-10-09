@@ -30,8 +30,10 @@ function sample(): Flow {
         id: 'check',
         type: 'condition',
         config: { rule: { type: 'step', node_id: 'welcome', operator: 'opened' } },
-        yes: [mail('followup'), { id: 'done', type: 'exit', config: {} }],
-        no: [mail('reminder'), delay('wait2')],
+        branches: {
+          yes: [mail('followup'), { id: 'done', type: 'exit', config: {} }],
+          no: [mail('reminder'), delay('wait2')],
+        },
       },
     ],
   }
@@ -56,7 +58,7 @@ describe('flow <-> graph', () => {
   })
 
   it('keeps a condition with only one branch filled', () => {
-    const f: Flow = { triggers: [], steps: [{ id: 'c', type: 'condition', config: {}, yes: [delay('d')], no: [] }] }
+    const f: Flow = { triggers: [], steps: [{ id: 'c', type: 'condition', config: {}, branches: { yes: [delay('d')], no: [] } }] }
     const g = flowToGraph(f)
     expect(g.edges).toEqual([{ from: 'c', to: 'd', handle: 'yes' }])
     expect(graphToFlow(g)).toEqual(f)
@@ -91,7 +93,7 @@ describe('editing', () => {
 
   it('refuses to put anything after a condition or an exit, or an ending step in the middle', () => {
     const f = sample()
-    const yes = f.steps[2]!.yes!
+    const yes = f.steps[2]!.branches!.yes!
     expect(insertStep(f.steps, 3, delay('x'))).toBe(false) // after the condition
     expect(insertStep(yes, 2, delay('x'))).toBe(false) // after the exit
     expect(insertStep(yes, 1, newStep(f, 'exit'))).toBe(false) // an exit before another step's position
@@ -127,7 +129,7 @@ describe('editing', () => {
 
   it('builds new steps with usable defaults', () => {
     const f = emptyFlow()
-    expect(newStep(f, 'condition')).toMatchObject({ type: 'condition', yes: [], no: [] })
+    expect(newStep(f, 'condition')).toMatchObject({ type: 'condition', branches: { yes: [], no: [] } })
     expect(newStep(f, 'delay').config).toEqual({ duration: '1d' })
     expect(newStep(f, 'send_email').config).toEqual({ message_type: 'marketing' })
   })

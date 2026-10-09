@@ -1,12 +1,12 @@
 import type { AutomationGraph } from '@/api/types'
 
 /**
- * The builder edits a tree (a list of steps, where a condition owns a "yes" and a "no" list); the
+ * The builder edits a tree (a list of steps, where a condition owns a "yes" and a "no" list, a wait for an event one list per path); the
  * server stores nodes and edges. These two views of the same thing are converted here, and nothing
  * else in the UI deals with edges.
  *
- * Shape rules (the server enforces the same): a condition and an exit end their list, because a
- * condition's continuation is its two branches and nothing follows an exit.
+ * Shape rules (the server enforces the same): a branching step and an exit end their list, because a
+ * branching step's continuation is its paths and nothing follows an exit.
  */
 
 export const stepTypes = [
@@ -30,9 +30,8 @@ export interface Step {
   id: string
   type: StepType
   config: Config
-  /** Only on a condition. */
-  yes?: Step[]
-  no?: Step[]
+  /** Only on a branching step: the steps down each path, by handle (a condition has yes and no). */
+  branches?: Record<string, Step[]>
 }
 
 export interface Trigger {
@@ -50,8 +49,21 @@ export type Branch = 'yes' | 'no'
 
 export const emptyFlow = (): Flow => ({ triggers: [], steps: [] })
 
-/** True when nothing can be added after this step in its list. */
-export const endsList = (s: Step | undefined) => !!s && (s.type === 'condition' || s.type === 'exit')
+/** Steps whose continuation is several paths instead of one next step. */
+export const isBranching = (type: StepType) => type === 'condition'
+
+/** The paths out of a branching step, in display order. */
+export function branchHandles(s: Step): string[] {
+  switch (s.type) {
+    case 'condition':
+      return ['yes', 'no']
+    default:
+      return []
+  }
+}
+
+/** True when nothing can be added after this step in its list: a branching step continues in its paths, nothing follows an exit. */
+export const endsList = (s: Step | undefined) => !!s && (isBranching(s.type) || s.type === 'exit')
 
 export const defaultConfig = (type: StepType): Config => {
   switch (type) {
@@ -89,9 +101,9 @@ export function graphToFlow(g: AutomationGraph | undefined): Flow {
       const n = nodes.get(id)!
       const step: Step = { id, type: n.type as StepType, config: { ...((n.config as Config | undefined) ?? {}) } }
       out.push(step)
-      if (step.type === 'condition') {
-        step.yes = walk(next.get(`${id}|yes`))
-        step.no = walk(next.get(`${id}|no`))
+      if (isBranching(step.type)) {
+        step.branches = {}
+        for (const h of branchHandles(step)) step.branches[h] = walk(next.get(`${id}|${h}`))
         break
       }
       id = next.get(`${id}|`)
@@ -116,9 +128,9 @@ export function flowToGraph(f: Flow): AutomationGraph {
     for (const s of list) {
       nodes.push({ id: s.id, type: s.type, config: s.config })
       if (prev) edges.push({ from: prev.id, to: s.id })
-      if (s.type === 'condition') {
-        for (const h of ['yes', 'no'] as const) {
-          const first = emit(s[h] ?? [])
+      if (isBranching(s.type)) {
+        for (const h of branchHandles(s)) {
+          const first = emit(s.branches?.[h] ?? [])
           if (first) edges.push({ from: s.id, to: first, handle: h })
         }
         break // nothing follows a condition in its own list
@@ -142,10 +154,7 @@ export function flowToGraph(f: Flow): AutomationGraph {
 export function* allSteps(list: Step[]): Generator<Step> {
   for (const s of list) {
     yield s
-    if (s.type === 'condition') {
-      yield* allSteps(s.yes ?? [])
-      yield* allSteps(s.no ?? [])
-    }
+    for (const h of branchHandles(s)) yield* allSteps(s.branches?.[h] ?? [])
   }
 }
 
@@ -159,10 +168,7 @@ export function newId(f: Flow, prefix = 's'): string {
 
 export function newStep(f: Flow, type: StepType): Step {
   const s: Step = { id: newId(f), type, config: defaultConfig(type) }
-  if (type === 'condition') {
-    s.yes = []
-    s.no = []
-  }
+  if (isBranching(type)) s.branches = Object.fromEntries(branchHandles(s).map((h) => [h, [] as Step[]]))
   return s
 }
 
@@ -177,8 +183,8 @@ export function locate(f: Flow, id: string): Location | undefined {
     for (let i = 0; i < list.length; i++) {
       if (list[i]!.id === id) return { list, index: i }
       const s = list[i]!
-      if (s.type === 'condition') {
-        const hit = find(s.yes ?? []) ?? find(s.no ?? [])
+      for (const h of branchHandles(s)) {
+        const hit = find(s.branches?.[h] ?? [])
         if (hit) return hit
       }
     }
@@ -196,7 +202,7 @@ export function insertStep(list: Step[], index: number, step: Step): boolean {
   return true
 }
 
-/** Removes a step (a condition takes both its branches with it). */
+/** Removes a step (a branching step takes its paths with it). */
 export function removeStep(f: Flow, id: string): boolean {
   const loc = locate(f, id)
   if (!loc) return false
@@ -223,9 +229,13 @@ function pathTo(list: Step[], id: string, passed: Step[]): Step[] | undefined {
   const here = [...passed]
   for (const s of list) {
     if (s.id === id) return here
-    if (s.type === 'condition') {
-      // A condition ends its list: the way on is one of its branches.
-      return pathTo(s.yes ?? [], id, [...here, s]) ?? pathTo(s.no ?? [], id, [...here, s])
+    if (isBranching(s.type)) {
+      // A branching step ends its list: the way on is one of its paths.
+      for (const h of branchHandles(s)) {
+        const hit = pathTo(s.branches?.[h] ?? [], id, [...here, s])
+        if (hit) return hit
+      }
+      return undefined
     }
     here.push(s)
   }

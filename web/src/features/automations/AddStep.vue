@@ -1,4 +1,4 @@
-<script setup lang="ts">
+!(isBranching(s) || s === 'exit') || props.index >= props.list.length<script setup lang="ts">
 import { Plus } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useBuilder } from './context'
 import { stepMeta } from './labels'
-import { stepTypes, type Step, type StepType } from './model'
+import { isBranching, stepTypes, type Step, type StepType } from './model'
 
 /** The "+" between steps: a menu of what can go at this spot. */
 const props = defineProps<{ list: Step[]; index: number }>()
@@ -14,8 +14,8 @@ const { t } = useI18n()
 const b = useBuilder()
 const open = ref(false)
 
-// A condition or an exit ends its list, so it can only go last.
-const types = computed(() => stepTypes.filter((s) => (s !== 'condition' && s !== 'exit') || props.index >= props.list.length))
+// A branching step or an exit ends its list, so it can only go last.
+const types = computed(() => stepTypes.filter((s) => !(isBranching(s) || s === 'exit') || props.index >= props.list.length))
 
 function choose(type: StepType) {
   open.value = false

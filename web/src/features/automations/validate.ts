@@ -1,4 +1,4 @@
-import { emailStepsBefore, type Flow, type Step, type Trigger } from './model'
+import { branchHandles, emailStepsBefore, type Flow, type Step, type Trigger } from './model'
 import { isDuration, ruleIssues, type Rule } from './rule'
 
 /** A message about a step's settings; `key` is an i18n key, `field` names the input it is about. */
@@ -76,10 +76,7 @@ export function flowIssues(f: Flow, allowSQL: boolean): Map<string, Issue[]> {
     for (const s of list) {
       const i = stepIssues(s, { flow: f, allowSQL })
       if (i.length) out.set(s.id, i)
-      if (s.type === 'condition') {
-        walk(s.yes ?? [])
-        walk(s.no ?? [])
-      }
+      for (const h of branchHandles(s)) walk(s.branches?.[h] ?? [])
     }
   }
   walk(f.steps)

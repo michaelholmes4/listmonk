@@ -2,16 +2,17 @@
 import { useI18n } from 'vue-i18n'
 import AddStep from './AddStep.vue'
 
-import { endsList, type Step } from './model'
+import { branchHandles, endsList, isBranching, type Step } from './model'
 import StepCard from './StepCard.vue'
 
 /**
- * A vertical run of steps with a "+" before each and at the end. A condition shows its two
- * branches side by side, each another StepList.
+ * A vertical run of steps with a "+" before each and at the end. A branching step shows its
+ * paths side by side, each another StepList.
  */
 defineProps<{ steps: Step[] }>()
 const { t } = useI18n()
 
+const branchTitle = (_s: Step, h: string) => t(`web.automations.branch.${h}`)
 </script>
 
 <template>
@@ -24,14 +25,14 @@ const { t } = useI18n()
       </div>
       <StepCard :step="s" :first="i === 0" :last="i === steps.length - 1 || endsList(steps[i + 1])" />
 
-      <div v-if="s.type === 'condition'" class="w-full">
+      <div v-if="isBranching(s.type)" class="w-full">
         <div class="mx-auto h-3 w-px bg-border" />
         <div class="grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
-          <section v-for="h in ['yes', 'no'] as const" :key="h" class="rounded-lg border border-dashed p-3" :data-cy="`branch-${s.id}-${h}`">
+          <section v-for="h in branchHandles(s)" :key="h" class="rounded-lg border border-dashed p-3" :data-cy="`branch-${s.id}-${h}`">
             <h3 class="text-center text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              {{ t(`web.automations.branch.${h}`) }}
+              {{ branchTitle(s, h) }}
             </h3>
-            <StepList :steps="s[h] ?? []" />
+            <StepList :steps="s.branches?.[h] ?? []" />
           </section>
         </div>
       </div>

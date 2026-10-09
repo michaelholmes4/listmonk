@@ -46,8 +46,7 @@ describe('step issues', () => {
       id: 'c',
       type: 'condition',
       config: { rule: { type: 'step', node_id: 'm', operator: 'opened' } },
-      yes: [],
-      no: [],
+      branches: { yes: [], no: [] },
     }
     const f = flow([mail, cond])
     expect(stepIssues(cond, ctx(f))).toEqual([])

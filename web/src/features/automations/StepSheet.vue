@@ -12,7 +12,7 @@ import UpdateAttributeForm from './forms/UpdateAttributeForm.vue'
 import WaitUntilForm from './forms/WaitUntilForm.vue'
 import { stepMeta, triggerMeta } from './labels'
 import type { Config, Flow, Step, Trigger } from './model'
-import { emailStepsBefore } from './model'
+import { emailStepsBefore, locate } from './model'
 import { stepIssues, triggerIssues } from './validate'
 import { usePermission } from '@/composables/usePermission'
 
@@ -28,16 +28,8 @@ const { can } = usePermission()
 
 const step = computed<Step | undefined>(() => {
   if (props.target?.kind !== 'step') return undefined
-  const find = (l: Step[]): Step | undefined => {
-    for (const s of l) {
-      if (s.id === props.target!.id) return s
-      if (s.type === 'condition') {
-        const h = find(s.yes ?? []) ?? find(s.no ?? [])
-        if (h) return h
-      }
-    }
-  }
-  return find(props.flow.steps)
+  const loc = locate(props.flow, props.target.id)
+  return loc?.list[loc.index]
 })
 const trigger = computed<Trigger | undefined>(() => (props.target?.kind === 'trigger' ? props.flow.triggers.find((x) => x.id === props.target!.id) : undefined))
 const subject = computed(() => step.value ?? trigger.value)
