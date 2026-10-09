@@ -26,7 +26,7 @@ test('build, save, publish and watch an automation', async ({ page, request }) =
   try {
     // --- Create from the list. -------------------------------------------------------------------------
     await page.goto('/admin/automations')
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(name)
     await dialog.getByRole('button', { name: 'New' }).click()
@@ -229,7 +229,7 @@ test('a wait for an event: two events, one that restarts, and its two paths', as
   let id = 0
   try {
     await page.goto('/admin/automations')
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(name)
     await dialog.getByRole('button', { name: 'New' }).click()
@@ -265,7 +265,7 @@ test('a go to step: pick its target, see the hints, and be told about an instant
   let id = 0
   try {
     await page.goto('/admin/automations')
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('textbox').fill(name)
     await dialog.getByRole('button', { name: 'New' }).click()

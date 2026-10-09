@@ -18,7 +18,7 @@ test('lists: create, edit, archive, delete', async ({ page }) => {
   await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
   // Create a public double opt-in list with a tag
-  await page.getByRole('button', { name: 'New' }).click()
+  await page.locator('[data-cy=btn-new]').click()
   await expect(page).toHaveURL(/\/lists\/new$/)
   await expect(page.getByRole('heading', { name: 'New list' })).toBeVisible()
   await page.getByLabel('Name', { exact: true }).fill(name)

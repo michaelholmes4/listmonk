@@ -37,7 +37,7 @@ test('campaigns: create, write HTML, save, preview, convert, delete', async ({ p
     await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
     // Create: settings first, content after "Continue"
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     await expect(page).toHaveURL(/\/campaigns\/new$/)
     await expect(page.getByRole('heading', { name: 'New campaign' })).toBeVisible()
     await page.getByLabel('Name', { exact: true }).fill(name)

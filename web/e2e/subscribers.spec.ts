@@ -19,7 +19,7 @@ test('subscribers: create, search, edit, delete', async ({ page }) => {
   await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
   // Create
-  await page.getByRole('button', { name: 'New' }).click()
+  await page.locator('[data-cy=btn-new]').click()
   await expect(page).toHaveURL(/\/subscribers\/new$/)
   await expect(page.getByRole('heading', { name: 'New subscriber' })).toBeVisible()
   await page.getByLabel('E-mail', { exact: true }).fill(email)
@@ -60,7 +60,7 @@ test('subscribers: sorting and invalid attribute JSON', async ({ page }) => {
   await page.getByRole('button', { name: 'E-mail' }).click()
   await sorted
 
-  await page.getByRole('button', { name: 'New' }).click()
+  await page.locator('[data-cy=btn-new]').click()
   await page.getByLabel('E-mail', { exact: true }).fill('bad-json@example.com')
   await page.getByLabel('Attributes').fill('[1,2]')
   await page.getByRole('button', { name: 'Save' }).click()

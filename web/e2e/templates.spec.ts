@@ -26,7 +26,7 @@ test('templates: create, validate, preview, clone, delete', async ({ page }) => 
     await expect(page.getByRole('heading', { name: /^Templates/ })).toBeVisible()
     await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     await expect(page).toHaveURL(/\/templates\/new$/)
     await page.getByLabel('Name', { exact: true }).fill(name)
 

@@ -25,7 +25,7 @@ test('users: create, edit, delete a person', async ({ page }) => {
   try {
     await page.goto('/admin/users')
     await expect(page.getByRole('heading', { name: /^Users/ })).toBeVisible()
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     await expect(page).toHaveURL(/\/users\/new$/)
 
     // A person needs a role, then an email.
@@ -119,7 +119,7 @@ test('user roles: create, clone, edit permissions, delete; Super Admin is read-o
     await expect(page.getByRole('button', { name: 'Save' })).toHaveCount(0)
     await page.goBack()
 
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     await expect(page).toHaveURL(/\/users\/roles\/users\/new$/)
     await page.getByLabel('Name', { exact: true }).fill(name)
     // New roles start with the everyday permissions, never raw SQL.
@@ -169,7 +169,7 @@ test('list roles: pick lists, set view/manage, save', async ({ page }) => {
   try {
     await page.goto('/admin/users/roles/lists')
     await expect(page.getByRole('heading', { name: /^List roles/ })).toBeVisible()
-    await page.getByRole('button', { name: 'New' }).click()
+    await page.locator('[data-cy=btn-new]').click()
     await expect(page).toHaveURL(/\/users\/roles\/lists\/new$/)
     await page.getByLabel('Name', { exact: true }).fill(name)
 
