@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CircleHelp } from '@lucide/vue'
-import { useIntersectionObserver } from '@vueuse/core'
+import { useIntersectionObserver, useResizeObserver } from '@vueuse/core'
 import { computed, ref, useSlots } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -20,6 +20,9 @@ import PageTabs from './PageTabs.vue'
  *   button there, see FormActions).
  * - `help` slot: a rail beside the content on wide screens, a "?" popover in the header otherwise.
  * - `width`: `full` for tables and builders, `form` caps the content at a readable width.
+ * - `--page-header-h` (the sticky header's height) and `--page-viewport-h` (the visible height of the
+ *   scrolling area) are set on the page, so content can stick below the header and fill the rest of the
+ *   screen (the automation builder's docked step panel).
  * - Record tabs: a view's `RecordTabs` render along the bottom of the header (`#page-tabs`).
  * - Tabs: on the pages of a sidebar entry with secondary pages (nav.ts `pages`), the header is the
  *   entry's (its name, then tabs) and identical on every tab, so the tabs never move. The page's
@@ -44,6 +47,17 @@ const sentinel = ref<HTMLElement>()
 const stuck = ref(false)
 useIntersectionObserver(sentinel, ([e]) => (stuck.value = !e?.isIntersecting))
 
+// Sizes for content that sticks below the header (see the doc comment).
+const root = ref<HTMLElement>()
+const header = ref<HTMLElement>()
+const headerH = ref(0)
+const viewportH = ref(0)
+useResizeObserver(header, ([e]) => (headerH.value = e?.target.getBoundingClientRect().height ?? 0))
+useResizeObserver(
+  () => root.value?.closest('main') ?? undefined,
+  ([e]) => (viewportH.value = (e?.target as HTMLElement | undefined)?.clientHeight ?? 0),
+)
+
 const hasHelp = computed(() => !!slots.help)
 
 // The entry's pages this user may open; a lone tab is no navigation, so it isn't shown.
@@ -57,9 +71,14 @@ const hasIntro = computed(() => !!(props.description || slots.meta || slots.badg
 </script>
 
 <template>
-  <div class="group/page flex min-h-full flex-col">
+  <div
+    ref="root"
+    class="group/page flex min-h-full flex-col"
+    :style="{ '--page-header-h': `${headerH}px`, '--page-viewport-h': `${viewportH}px` }"
+  >
     <div ref="sentinel" class="h-px" aria-hidden="true" />
     <header
+      ref="header"
       :class="
         cn(
           'sticky top-0 z-20 -mt-px bg-background px-4 pt-5 transition-shadow sm:px-6',

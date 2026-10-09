@@ -19,6 +19,8 @@ export interface BuilderContext {
   jumps: Ref<Map<string, string[]>>
   /** The step to highlight (what a hovered go to points at). */
   highlight: Ref<string | null>
+  /** The step or trigger open in the panel. */
+  selected: Ref<string | null>
   add: (list: Step[], index: number, type: StepType) => void
   open: (id: string) => void
   remove: (id: string) => void

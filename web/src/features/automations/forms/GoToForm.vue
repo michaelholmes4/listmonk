@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { stepMeta, stepPaths } from '../labels'
-import { goToTargets, type Config, type Flow } from '../model'
+import { flowToGraph, goToTargets, locate, type Config, type Flow } from '../model'
 import { stepSummary } from '../summary'
 import { useBuilder } from '../context'
+import { instantLoops } from '../validate'
 
 const props = defineProps<{ flow: Flow; stepId: string; errors: Record<string, string>; disabled?: boolean }>()
 const config = defineModel<Config>({ required: true })
@@ -24,8 +25,13 @@ const options = computed(() => {
   })
 })
 
-// A loop with no pause is found on the whole flow, which the builder keeps up to date as this form edits it.
-const loopIssue = computed(() => (b.issues.value.get(props.stepId) ?? []).find((i) => i.key === 'web.automations.goTo.instantLoop'))
+// A loop with no pause is found on the whole flow, as it would be with the settings being edited here saved.
+const loops = computed(() => {
+  const copy: Flow = JSON.parse(JSON.stringify(props.flow))
+  const loc = locate(copy, props.stepId)
+  if (loc) loc.list[loc.index]!.config = config.value
+  return instantLoops(flowToGraph(copy)).includes(props.stepId)
+})
 const target = computed(() => (typeof config.value.target === 'string' ? config.value.target : ''))
 const maxRuns = computed(() => (typeof config.value.max_runs === 'number' ? String(config.value.max_runs) : ''))
 const setTarget = (v: unknown) => (config.value = { ...config.value, target: String(v ?? '') })
@@ -50,7 +56,7 @@ const setRuns = (v: string | number) => {
         </SelectContent>
       </Select>
       <p v-if="errors.target" class="text-sm text-destructive">{{ errors.target }}</p>
-      <p v-if="loopIssue" class="text-sm text-destructive" data-cy="goto-loop">{{ t(loopIssue.key) }}</p>
+      <p v-if="loops" class="text-sm text-destructive" data-cy="goto-loop">{{ t('web.automations.goTo.instantLoop') }}</p>
       <p class="text-xs text-muted-foreground">{{ t('web.automations.goTo.help') }}</p>
     </div>
 

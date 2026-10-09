@@ -287,3 +287,6 @@ export function jumpsInto(f: Flow): Map<string, string[]> {
 
 /** Number of steps, conditions' branches included. */
 export const countSteps = (f: Flow) => [...allSteps(f.steps)].length
+
+/** Whether a step has been set up beyond what a new one starts with (deleting it would lose that). */
+export const hasSettings = (s: Step) => s.type !== 'exit' && JSON.stringify(s.config) !== JSON.stringify(defaultConfig(s.type))

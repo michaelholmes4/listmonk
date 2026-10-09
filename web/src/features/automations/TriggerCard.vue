@@ -20,7 +20,7 @@ const warn = computed(() => (b.issues.value.get(props.trigger.id)?.length ?? 0) 
 
 <template>
   <div
-    :class="cn('group relative flex w-full max-w-md items-center gap-3 rounded-lg border border-primary/40 bg-card p-3 shadow-xs hover:border-ring/60', warn && 'border-destructive/60')"
+    :class="cn('group relative flex w-full max-w-md items-center gap-3 rounded-lg border border-primary/40 bg-card p-3 shadow-xs hover:border-ring/60', warn && 'border-destructive/60', b.selected.value === trigger.id && 'ring-2 ring-ring')"
     :data-cy="`trigger-${trigger.id}`"
   >
     <button type="button" class="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-ring" :aria-label="t(meta.title)" @click="b.open(trigger.id)" />

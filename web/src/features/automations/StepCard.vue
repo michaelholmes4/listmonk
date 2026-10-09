@@ -29,7 +29,7 @@ const stat = computed(() => b.stats.value.get(props.step.id))
       cn(
         'group relative flex w-full max-w-md items-center gap-3 rounded-lg border bg-card p-3 text-card-foreground shadow-xs transition-colors hover:border-ring/60',
         warn && 'border-destructive/60',
-        b.highlight.value === step.id && 'ring-2 ring-ring',
+        (b.highlight.value === step.id || b.selected.value === step.id) && 'ring-2 ring-ring',
       )
     "
     :data-cy="`step-${step.id}`"

@@ -1,10 +1,18 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
-// The sheet slides away; clicking before it has gone can hit a half-closed page.
+// The step panel buffers its edits: save them if there are any, then close it. (In a sheet, clicking
+// before it has slid away can hit a half-closed page, hence the wait.)
 async function closeSheet(page: Page) {
+  const save = page.locator('[data-cy=step-save]')
+  if (await save.isEnabled()) await save.click()
   await page.locator('[data-cy=step-close]').click()
   await expect(page.locator('[data-cy=step-sheet]')).toBeHidden()
 }
+
+// The flow saves itself; this is the header's word for it.
+const draftSaved = (page: Page) => expect(page.locator('[data-cy=save-status]')).toContainText('Draft saved')
+
+test.use({ viewport: { width: 1440, height: 900 } })
 
 test.beforeEach(({ page }) => {
   page.on('pageerror', (e) => {
@@ -69,8 +77,7 @@ test('build, save, publish and watch an automation', async ({ page, request }) =
     await expect(page.locator('[data-cy=step-s2]')).toBeVisible()
 
     // --- Save the draft; it survives a reload. -----------------------------------------------------------
-    await page.locator('[data-cy=save-draft]').click()
-    await expect(page.getByText('Draft saved').first()).toBeVisible()
+    await draftSaved(page)
     await page.reload()
     await expect(page.locator('[data-cy=step-s2]')).toBeVisible()
     await expect(page.locator('[data-cy=branch-s2-yes] [data-cy=step-s3]')).toBeVisible()
@@ -144,7 +151,6 @@ test('a transactional email step has no topic and saves its email without one', 
     await sheet.locator('[data-cy=create-email]').click()
     const editor = sheet.locator('[data-cy=email-editor]')
     await expect(editor).toBeVisible()
-    expect((await sheet.boundingBox())!.width).toBeGreaterThan(600)
     await editor.locator('#email-subject').fill(`Receipt ${stamp}`)
     await sheet.locator('[data-cy=save-email]').click()
     await expect(page.getByText('Email saved').first()).toBeVisible()
@@ -309,4 +315,158 @@ test('a go to step: pick its target, see the hints, and be told about an instant
       await request.delete(`/api/automations/${id}`)
     }
   }
+})
+
+// --- The step panel: one save model --------------------------------------------------------------------------------
+
+async function newAutomation(request: APIRequestContext, graph?: object) {
+  const a = (await (await request.post('/api/automations', { data: { name: `E2E panel ${Date.now()}`, settings: {} } })).json()).data
+  if (graph) await request.put(`/api/automations/${a.id}/draft`, { data: graph })
+  return a.id as number
+}
+const waitFlow = {
+  triggers: [{ id: 't1', type: 'manual', config: {} }],
+  nodes: [
+    { id: 's1', type: 'delay', config: { duration: '2d' } },
+    { id: 's2', type: 'delay', config: { duration: '3d' } },
+  ],
+  edges: [{ from: 's1', to: 's2' }],
+  root: 's1',
+}
+const durationInput = (page: Page) => page.locator('[data-cy=step-sheet] #delay-duration')
+
+test('a step panel buffers its edits: Cancel leaves the card unchanged, Save changes it', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const id = await newAutomation(request, waitFlow)
+  try {
+    await page.goto(`/admin/automations/${id}`)
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('2 days')
+    await page.locator('[data-cy=step-s1]').click()
+    await expect(page.locator('[data-cy=step-sheet]')).toBeVisible()
+    await expect(page.locator('[data-cy=step-s1]')).toHaveClass(/ring-2/)
+    await expect(page.locator('[data-cy=step-save]')).toBeDisabled()
+
+    await durationInput(page).fill('5')
+    await expect(page.locator('[data-cy=unsaved]')).toBeVisible()
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('2 days') // the card has not moved
+    await page.locator('[data-cy=step-cancel]').click()
+    await expect(page.locator('[data-cy=step-sheet]')).toBeHidden()
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('2 days')
+
+    await page.locator('[data-cy=step-s1]').click()
+    await durationInput(page).fill('5')
+    await page.locator('[data-cy=step-save]').click()
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('5 days')
+    await draftSaved(page)
+    await expect(page.locator('[data-cy=step-save]')).toBeDisabled()
+    await expect(page.locator('[data-cy=unsaved]')).toHaveCount(0)
+  } finally {
+    await request.delete(`/api/automations/${id}`)
+  }
+})
+
+test('clicking another step with edits asks: Discard keeps the old value, Save keeps the new one', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const id = await newAutomation(request, waitFlow)
+  try {
+    await page.goto(`/admin/automations/${id}`)
+    await page.locator('[data-cy=step-s1]').click()
+    await durationInput(page).fill('7')
+
+    // Keep editing: nothing moves.
+    await page.locator('[data-cy=step-s2]').click()
+    await expect(page.locator('[data-cy=step-leave]')).toContainText('Unsaved changes to Wait')
+    await page.locator('[data-cy=step-leave-keep]').click()
+    await expect(durationInput(page)).toHaveValue('7')
+
+    await page.locator('[data-cy=step-s2]').click()
+    await page.locator('[data-cy=step-leave-discard]').click()
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('2 days')
+    await expect(durationInput(page)).toHaveValue('3')
+
+    await durationInput(page).fill('9')
+    await page.locator('[data-cy=step-s1]').click()
+    await page.locator('[data-cy=step-leave-save]').click()
+    await expect(page.locator('[data-cy=step-s2]')).toContainText('9 days')
+    await expect(durationInput(page)).toHaveValue('2')
+    await draftSaved(page)
+  } finally {
+    await request.delete(`/api/automations/${id}`)
+  }
+})
+
+test('the open step is in the URL, and structural edits are saved without pressing anything', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const id = await newAutomation(request, waitFlow)
+  try {
+    await page.goto(`/admin/automations/${id}?step=s2`)
+    await expect(page.locator('[data-cy=step-sheet]')).toBeVisible()
+    await expect(durationInput(page)).toHaveValue('3')
+    await page.locator('[data-cy=step-close]').click()
+    await expect(page).not.toHaveURL(/step=/)
+
+    // An unknown step is ignored and dropped from the URL.
+    await page.goto(`/admin/automations/${id}?step=nope`)
+    await expect(page.locator('[data-cy=step-s1]')).toBeVisible()
+    await expect(page.locator('[data-cy=step-sheet]')).toHaveCount(0)
+    await expect(page).not.toHaveURL(/step=/)
+
+    // Adding a step saves the draft by itself.
+    await page.locator('[data-cy=add-step]').last().click()
+    await page.locator('[data-cy=add-exit]').click()
+    await draftSaved(page)
+    await page.reload()
+    await expect(page.locator('[data-cy=step-s3]')).toBeVisible()
+  } finally {
+    await request.delete(`/api/automations/${id}`)
+  }
+})
+
+test('deleting a step with settings asks first; an exit does not', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const id = await newAutomation(request, { ...waitFlow, nodes: [...waitFlow.nodes, { id: 's3', type: 'exit', config: {} }], edges: [...waitFlow.edges, { from: 's2', to: 's3' }] })
+  try {
+    await page.goto(`/admin/automations/${id}`)
+    await page.locator('[data-cy=step-s3]').hover()
+    await page.locator('[data-cy=step-s3] [data-cy=remove-step]').click()
+    await expect(page.locator('[data-cy=step-s3]')).toHaveCount(0)
+    await draftSaved(page)
+
+    await page.locator('[data-cy=step-s1]').hover()
+    await page.locator('[data-cy=step-s1] [data-cy=remove-step]').click()
+    await expect(page.getByRole('alertdialog')).toContainText('Delete Wait?')
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.locator('[data-cy=step-s1]')).toBeVisible()
+
+    await page.locator('[data-cy=step-s1]').click()
+    await page.locator('[data-cy=step-actions]').click()
+    await page.locator('[data-cy=step-delete]').click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
+    await expect(page.locator('[data-cy=step-s1]')).toHaveCount(0)
+    await expect(page.locator('[data-cy=step-sheet]')).toHaveCount(0)
+  } finally {
+    await request.delete(`/api/automations/${id}`)
+  }
+})
+
+test.describe('on a narrow screen the panel is a sheet', () => {
+  test.use({ viewport: { width: 800, height: 900 } })
+
+  test('same panel, same save model', async ({ page, request }) => {
+    test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+    const id = await newAutomation(request, waitFlow)
+    try {
+      await page.goto(`/admin/automations/${id}`)
+      await page.locator('[data-cy=step-s1]').click()
+      await expect(page.getByRole('dialog')).toBeVisible()
+      await durationInput(page).fill('4')
+      await page.locator('[data-cy=step-save]').click()
+      await expect(page.locator('[data-cy=step-s1]')).toContainText('4 days')
+      await draftSaved(page)
+      await page.locator('[data-cy=step-close]').click()
+      await expect(page.locator('[data-cy=step-sheet]')).toBeHidden()
+    } finally {
+      await request.delete(`/api/automations/${id}`)
+    }
+  })
 })

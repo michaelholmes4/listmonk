@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Archive, Loader2, MoreHorizontal, Pause, Play, Rocket } from '@lucide/vue'
+import { Archive, Loader2, MoreHorizontal, Pause, Play, Rocket, TriangleAlert } from '@lucide/vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -38,6 +38,7 @@ import SettingsPanel from '@/features/automations/SettingsPanel.vue'
 import { automationVariant, canArchive, canPause, canResume, isLive } from '@/features/automations/status'
 import { flowIssues } from '@/features/automations/validate'
 import VersionsPanel from '@/features/automations/VersionsPanel.vue'
+import { useDraftSaver } from '@/features/automations/useDraftSaver'
 import { usePageTitle } from '@/lib/page-title'
 
 const { t } = useI18n()
@@ -56,9 +57,8 @@ const readonly = computed(() => !can('automations:manage') || status.value === '
 const live = computed(() => isLive(status.value))
 const { data: stats } = useNodeStats(id, live)
 
-// --- The working copy of the flow. Edited in place; saved explicitly. ----------------------------------
+// --- The working copy of the flow. Edited in place; every change to it is saved to the draft. -------------
 const flow = reactive<Flow>(emptyFlow())
-const savedJson = ref('')
 const loaded = ref(false)
 watch(
   draft,
@@ -67,13 +67,11 @@ watch(
     const f = graphToFlow(d.graph)
     flow.triggers = f.triggers
     flow.steps = f.steps
-    savedJson.value = JSON.stringify(flowToGraph(f))
     loaded.value = true
   },
   { immediate: true },
 )
 const currentJson = computed(() => JSON.stringify(flowToGraph(flow)))
-const dirty = computed(() => loaded.value && currentJson.value !== savedJson.value)
 
 // Whether the live version differs from what is being edited.
 const publishedJson = computed(() => {
@@ -105,23 +103,20 @@ const resume = useResumeAutomation()
 const archive = useArchiveAutomation()
 const busy = computed(() => save.isPending.value || publish.isPending.value)
 
-async function saveDraft(): Promise<boolean> {
-  try {
-    const r = await save.mutateAsync({ id: id.value, graph: flowToGraph(flow) })
-    savedJson.value = currentJson.value
-    problemList.value = r.problems
-    if (!r.problems.length) toast.success(t('web.automations.draftSaved'))
-    else toast.warning(t('web.automations.draftSavedProblems', { n: r.problems.length }))
-    return true
-  } catch {
-    return false
-  }
-}
+// Saves are serialised and coalesced; the flow is read when a save starts, so it is always the latest.
+const saver = useDraftSaver(async () => {
+  const r = await save.mutateAsync({ id: id.value, graph: flowToGraph(flow) })
+  problemList.value = r.problems
+  return r
+})
+/** A draft save is under way or failed: what the unload guard protects. */
+const dirty = computed(() => saver.pending.value)
+const savedAt = computed(() => saver.savedAt.value?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) ?? '')
 
 const publishOpen = ref(false)
 const hasListTrigger = computed(() => flow.triggers.some((x) => x.type === 'list_joined'))
 async function doPublish(enrollExisting: boolean) {
-  if (dirty.value && !(await saveDraft())) return
+  if (!(await saver.flush())) return
   publish.mutate(
     { id: id.value, enrollExisting },
     {
@@ -156,24 +151,30 @@ function confirmAct() {
 // --- Tabs in the URL. -------------------------------------------------------------------------------------------
 const tabs = ['flow', 'activity', 'settings', 'versions'] as const
 type Tab = (typeof tabs)[number]
+const builder = ref<InstanceType<typeof FlowBuilder>>()
 const tab = computed<Tab>({
   get: () => {
     const q = route.query.tab as Tab
     // Activity and Versions aren't there until the first publish.
     return tabs.includes(q) && !(neverPublished.value && (q === 'activity' || q === 'versions')) ? q : 'flow'
   },
-  set: (v) => router.replace({ query: { ...route.query, tab: v === 'flow' ? undefined : v } }),
+  set: (v) => {
+    // The open step belongs to the Flow tab; leaving it asks first if the panel has edits.
+    const go = () => router.replace({ query: { ...route.query, tab: v === 'flow' ? undefined : v, step: undefined, trigger: undefined } })
+    if (v !== 'flow' && builder.value) builder.value.leavePanel(go)
+    else void go()
+  },
 })
 
 const settingsPanel = ref<InstanceType<typeof SettingsPanel>>()
-const guardDirty = computed(() => dirty.value || !!settingsPanel.value?.dirty)
+const guardDirty = computed(() => dirty.value || !!settingsPanel.value?.dirty || !!builder.value?.panelDirty)
 const { leaveOpen, decide } = useUnsavedGuard(guardDirty, busy)
 
-// Ctrl+S saves the draft on the flow tab.
+// Ctrl+S saves the open step's edits on the flow tab. The flow itself is saved as it changes.
 function onKey(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 's' && tab.value === 'flow' && !readonly.value) {
     e.preventDefault()
-    if (dirty.value) void saveDraft()
+    builder.value?.savePanel()
   }
 }
 </script>
@@ -198,12 +199,21 @@ function onKey(e: KeyboardEvent) {
         </DropdownMenuContent>
       </DropdownMenu>
       <template v-if="!readonly">
-        <span v-if="dirty" class="flex items-center gap-1.5 text-xs text-muted-foreground" data-cy="unsaved">
+        <span v-if="builder?.panelDirty" class="flex items-center gap-1.5 text-xs text-muted-foreground" data-cy="unsaved">
           <span class="size-1.5 rounded-full bg-warning" aria-hidden="true" />{{ t('web.common.unsaved') }}
         </span>
-        <Button variant="outline" size="sm" :disabled="!dirty || busy" data-cy="save-draft" @click="saveDraft">
-          <Loader2 v-if="save.isPending.value" class="animate-spin" />{{ t('web.automations.saveDraft') }}
-        </Button>
+        <!-- The flow saves itself; this says how that is going. -->
+        <div v-if="saver.status.value !== 'idle'" class="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" data-cy="save-status">
+          <template v-if="saver.status.value === 'saving'"><Loader2 class="size-3.5 animate-spin" />{{ t('web.automations.saving') }}</template>
+          <template v-else-if="saver.status.value === 'error'">
+            <span class="text-destructive">{{ t('web.automations.saveFailed') }}</span>
+            <Button variant="outline" size="xs" data-cy="save-retry" @click="saver.retry()">{{ t('web.automations.retry') }}</Button>
+          </template>
+          <template v-else-if="saver.result.value?.problems.length">
+            <TriangleAlert class="size-3.5 text-warning" />{{ t('web.automations.draftSavedProblems', { n: saver.result.value.problems.length }) }}
+          </template>
+          <template v-else>{{ t('web.automations.draftSavedAt', { time: savedAt }) }}</template>
+        </div>
         <Button
           size="sm"
           :disabled="busy || (!dirty && !unpublished && !neverPublished)"
@@ -234,13 +244,24 @@ function onKey(e: KeyboardEvent) {
       </RecordTabs>
 
       <TabsContent value="flow">
-        <Alert v-if="live && status !== 'archived'" class="mb-4">
-          <AlertDescription>{{ t('web.automations.liveNote') }}</AlertDescription>
-        </Alert>
-        <p v-if="localIssues.size && tab === 'flow'" class="mb-2 text-center text-sm text-muted-foreground">
-          {{ t('web.automations.incomplete', { n: localIssues.size }) }}
-        </p>
-        <FlowBuilder :flow="flow" :readonly="readonly" :stats="stats" :problems="problems" />
+        <FlowBuilder
+          ref="builder"
+          :flow="flow"
+          :readonly="readonly"
+          :stats="stats"
+          :problems="problems"
+          :saving="saver.status.value === 'saving'"
+          @change="saver.request()"
+        >
+          <template #notices>
+            <Alert v-if="live && status !== 'archived'" class="mb-4">
+              <AlertDescription>{{ t('web.automations.liveNote') }}</AlertDescription>
+            </Alert>
+            <p v-if="localIssues.size && tab === 'flow'" class="mb-2 text-center text-sm text-muted-foreground">
+              {{ t('web.automations.incomplete', { n: localIssues.size }) }}
+            </p>
+          </template>
+        </FlowBuilder>
       </TabsContent>
       <TabsContent value="activity"><EnrollmentsPanel :automation-id="id" /></TabsContent>
       <TabsContent value="settings">
