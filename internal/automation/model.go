@@ -261,6 +261,8 @@ type Enrollment struct {
 	EnteredAt    time.Time        `db:"entered_at" json:"entered_at"`
 	ExitedAt     *time.Time       `db:"exited_at" json:"exited_at"`
 	ExitReason   *string          `db:"exit_reason" json:"exit_reason"`
+	// CurrentVisit counts how many times the run has arrived at CurrentNode, from 1.
+	CurrentVisit int `db:"current_visit" json:"current_visit"`
 }
 
 // StepStatus of a node run for an enrollment.
@@ -282,6 +284,8 @@ type Step struct {
 	FinishedAt   *time.Time      `db:"finished_at" json:"finished_at"`
 	Result       json.RawMessage `db:"result" json:"result"`
 	Error        *string         `db:"error" json:"error"`
+	// Visit is which arrival at the node this row belongs to, from 1.
+	Visit int `db:"visit" json:"visit"`
 }
 
 // Event is something that happened to a subscriber.

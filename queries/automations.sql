@@ -90,7 +90,17 @@ SELECT e.* FROM enrollments e JOIN automations a ON a.id = e.automation_id
 WHERE e.subscriber_id = $1 AND e.status = 'waiting' AND a.status IN ('active', 'paused');
 
 -- name: automation-update-enrollment
+-- A run arriving at a different node starts a new visit of it. current_visit is then the number of
+-- earlier visits plus one. That works because: in an UPDATE, current_node_id on the right-hand side
+-- is the old value; every visit that ran leaves exactly one step row, so the rows already there
+-- count the earlier visits; a go_to never targets itself and edges never point back to their own
+-- node, so moving on always changes the node; and waiting, exiting and completing keep (or clear)
+-- the node, so the visit stays as it was. A NULL node is the root on its first visit: its step row
+-- may already be written, so it is not counted again.
 UPDATE enrollments SET status = $2::enrollment_status, current_node_id = $3, next_run_at = $4, context = $5,
+    current_visit = (CASE WHEN $3::TEXT IS NOT NULL AND current_node_id IS NOT NULL AND current_node_id <> $3::TEXT
+        THEN (SELECT COUNT(*) + 1 FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $3::TEXT)
+        ELSE current_visit END),
     exited_at = (CASE WHEN $2::enrollment_status IN ('completed', 'exited', 'failed') THEN NOW() ELSE NULL END),
     exit_reason = $6
 WHERE id = $1;
@@ -119,31 +129,35 @@ FROM enrollments e JOIN automations a ON a.id = e.automation_id
 WHERE e.subscriber_id = $1 ORDER BY e.entered_at DESC;
 
 -- name: automation-insert-step
--- The unique (enrollment, node) row is what stops a retried job from running a step twice.
--- no row back means it had already started.
-INSERT INTO enrollment_steps (enrollment_id, node_id, status) VALUES ($1, $2, $3)
-ON CONFLICT (enrollment_id, node_id) DO NOTHING RETURNING *;
+-- The unique (enrollment, node, visit) row is what stops a retried job from running a step twice
+-- within one visit. No row back means it had already started. The visit is the run's current one.
+INSERT INTO enrollment_steps (enrollment_id, node_id, status, visit)
+VALUES ($1, $2, $3, (SELECT current_visit FROM enrollments WHERE id = $1))
+ON CONFLICT (enrollment_id, node_id, visit) DO NOTHING RETURNING *;
 
 -- name: automation-get-step
-SELECT * FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2;
+SELECT * FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2
+AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
 
 -- name: automation-update-step
 UPDATE enrollment_steps SET status = $3::TEXT,
     finished_at = (CASE WHEN $3::TEXT IN ('done', 'skipped', 'failed') THEN NOW() ELSE NULL END),
     result = $4, error = $5
-WHERE enrollment_id = $1 AND node_id = $2;
+WHERE enrollment_id = $1 AND node_id = $2
+AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
 
 -- name: automation-list-steps
 SELECT * FROM enrollment_steps WHERE enrollment_id = $1 ORDER BY started_at, id;
 
 -- name: automation-node-stats
--- Per step of an automation, how many enrollments reached it, finished it, or are waiting on it.
+-- Per step of an automation, how many people reached it, finished it, or are waiting on it.
+-- People, not visits: someone who went round a loop three times counts once.
 SELECT st.node_id,
-    COUNT(*) AS entered,
-    COUNT(*) FILTER (WHERE st.status = 'done') AS done,
-    COUNT(*) FILTER (WHERE st.status = 'skipped') AS skipped,
-    COUNT(*) FILTER (WHERE st.status = 'failed') AS failed,
-    COUNT(*) FILTER (WHERE st.status IN ('waiting', 'sending')) AS waiting
+    COUNT(DISTINCT st.enrollment_id) AS entered,
+    COUNT(DISTINCT st.enrollment_id) FILTER (WHERE st.status = 'done') AS done,
+    COUNT(DISTINCT st.enrollment_id) FILTER (WHERE st.status = 'skipped') AS skipped,
+    COUNT(DISTINCT st.enrollment_id) FILTER (WHERE st.status = 'failed') AS failed,
+    COUNT(DISTINCT st.enrollment_id) FILTER (WHERE st.status IN ('waiting', 'sending')) AS waiting
 FROM enrollment_steps st JOIN enrollments e ON e.id = st.enrollment_id
 WHERE e.automation_id = $1 GROUP BY st.node_id;
 

@@ -96,7 +96,8 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 	})
 	if err != nil {
 		// Not queued: forget that we tried so the retry sends it.
-		if _, derr := e.db.ExecContext(ctx, `DELETE FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2 AND status = $3`, enr.ID, n.ID, StepSending); derr != nil {
+		if _, derr := e.db.ExecContext(ctx, `DELETE FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2 AND status = $3
+			AND visit = (SELECT current_visit FROM enrollments WHERE id = $1)`, enr.ID, n.ID, StepSending); derr != nil {
 			e.log.Printf("automation: clearing step %s of enrollment %d: %v", n.ID, enr.ID, derr)
 		}
 		return false, err

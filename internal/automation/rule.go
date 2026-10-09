@@ -178,9 +178,9 @@ func (b *builder) rule(r Rule, depth int) (string, error) {
 			neg = "NOT "
 		}
 		c, e, n := b.add(camp), b.add(b.env.EnrollmentID), b.add(r.NodeID)
-		// Only activity after this enrollment sent the step counts.
+		// Only activity after this enrollment last sent the step counts (its latest visit).
 		return fmt.Sprintf(`%sEXISTS (SELECT 1 FROM %s t WHERE t.campaign_id = %s AND t.subscriber_id = s.id
-			AND t.created_at >= COALESCE((SELECT started_at FROM enrollment_steps WHERE enrollment_id = %s AND node_id = %s), 'infinity'))`,
+			AND t.created_at >= COALESCE((SELECT started_at FROM enrollment_steps WHERE enrollment_id = %s AND node_id = %s ORDER BY visit DESC LIMIT 1), 'infinity'))`,
 			neg, table, c, e, n), nil
 
 	case RuleEvent:
