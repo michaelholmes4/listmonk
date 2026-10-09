@@ -82,8 +82,9 @@ onScopeDispose(
 </script>
 
 <template>
-  <!-- bg-canvas is the gutter behind the floating content panel. -->
-  <SidebarProvider class="has-data-[variant=inset]:bg-canvas">
+  <!-- bg-canvas is the gutter behind the floating content panel. The shell is viewport-high so
+       <main> scrolls inside the panel (and Page's header can stick), not the whole document. -->
+  <SidebarProvider class="h-svh has-data-[variant=inset]:bg-canvas">
     <AppSidebar />
     <SidebarInset class="overflow-hidden">
       <PageHeader />

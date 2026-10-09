@@ -142,8 +142,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* The root background is what overscroll (trackpad bounce) reveals; match the gutter behind the
+     floating content panel (AppShell) rather than flashing the body colour. */
   html {
     color-scheme: light;
+    @apply md:bg-canvas;
   }
   html.dark {
     color-scheme: dark;
