@@ -49,17 +49,16 @@ watch(
             </RouterLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
-        <SidebarMenuItem v-if="!space">
+        <SidebarMenuItem v-if="!space" class="group-data-[collapsible=icon]:hidden">
           <SidebarMenuButton
             variant="outline"
-            :tooltip="t('web.commands.search')"
             class="text-muted-foreground"
             data-cy="nav-search"
             @click="ui.commandPaletteOpen = true"
           >
             <Search />
             <span>{{ t('web.commands.search') }}</span>
-            <Kbd class="ml-auto group-data-[collapsible=icon]:hidden">{{ modKey }}K</Kbd>
+            <Kbd class="ml-auto">{{ modKey }}K</Kbd>
           </SidebarMenuButton>
         </SidebarMenuItem>
         <SidebarMenuItem v-if="space">
