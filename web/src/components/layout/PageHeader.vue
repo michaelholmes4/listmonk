@@ -51,9 +51,8 @@ const refresh = () => qc.invalidateQueries({ type: 'active' })
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
-    <!-- Views can put page-level actions here via <Teleport to="#page-actions">. -->
-    <div id="page-actions" class="ml-auto flex items-center gap-2" />
-    <Button variant="ghost" size="icon-sm" :title="t('globals.buttons.refresh')" :aria-label="t('globals.buttons.refresh')" data-cy="btn-refresh" @click="refresh">
+    <!-- Page actions live in each page's own header (Page.vue), next to its title. -->
+    <Button class="ml-auto" variant="ghost" size="icon-sm" :title="t('globals.buttons.refresh')" :aria-label="t('globals.buttons.refresh')" data-cy="btn-refresh" @click="refresh">
       <RefreshCw :class="fetching > 0 && 'animate-spin'" />
     </Button>
   </header>

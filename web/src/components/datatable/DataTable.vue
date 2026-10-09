@@ -33,6 +33,8 @@ import DataTablePagination from './DataTablePagination.vue'
  * Optional, both controlled by the parent and server-side:
  *   v-model:sorting   a column with `enableSorting` gets a clickable header
  *   v-model:selection ticked rows keyed by `rowId` (use a "select" column with a Checkbox)
+ *
+ * The `empty` slot replaces the "nothing to show" text, usually with an <EmptyState>.
  */
 const props = withDefaults(
   defineProps<{
@@ -130,7 +132,7 @@ const colCount = computed(() => props.columns.length)
           </template>
           <TableRow v-else>
             <TableCell :colspan="colCount" class="h-24 text-center text-muted-foreground">
-              {{ emptyText ?? t('web.table.empty') }}
+              <slot name="empty">{{ emptyText ?? t('web.table.empty') }}</slot>
             </TableCell>
           </TableRow>
         </TableBody>

@@ -46,7 +46,7 @@ test('campaigns: create, write HTML, save, preview, convert, delete', async ({ p
     await page.getByRole('option', { name: list.name }).click()
     await page.keyboard.press('Escape')
     await pick(page, page.locator('[data-cy=format]'), 'Raw HTML')
-    await page.locator('[data-cy=btn-continue]').click()
+    await page.getByRole('button', { name: 'Continue' }).click()
 
     // Edit page, content tab: the body is empty until we write one
     await expect(page).toHaveURL(/\/campaigns\/\d+\?tab=content/)

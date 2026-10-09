@@ -43,7 +43,7 @@ export function createColumns(c: Handlers): ColumnDef<any, List>[] {
       cell: ({ row }) => {
         const l = row.original
         return h('div', { class: 'space-y-1' }, [
-          h('button', { type: 'button', class: 'font-medium hover:underline', onClick: () => c.onEdit(l) }, l.name),
+          h(RouterLink, { to: { name: 'list', params: { id: l.id } }, class: 'font-medium hover:underline' }, () => l.name),
           (l.tags ?? []).length
             ? h('div', { class: 'flex flex-wrap gap-1' }, (l.tags ?? []).map((tag) => h(Badge, { key: tag, variant: 'outline' }, () => tag)))
             : null,

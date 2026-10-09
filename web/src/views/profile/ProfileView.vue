@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useProfile } from '@/composables/queries/useProfile'
@@ -10,7 +10,7 @@ const { data: user } = useProfile()
 </script>
 
 <template>
-  <FormPage :title="user ? `@${user.username}` : '…'">
+  <Page width="form" :title="user ? `@${user.username}` : '…'">
     <template v-if="user?.user_role" #badges>
       <Badge variant="secondary">{{ user.user_role.name }}</Badge>
     </template>
@@ -23,5 +23,5 @@ const { data: user } = useProfile()
       <ProfileForm :user="user" />
       <TwoFactor v-if="user.password_login" :user="user" />
     </div>
-  </FormPage>
+  </Page>
 </template>

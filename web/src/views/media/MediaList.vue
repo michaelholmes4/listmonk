@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import Page from '@/components/layout/Page.vue'
 import { useConfig } from '@/composables/queries/useConfig'
 import { useUrlState } from '@/composables/useUrlState'
 import MediaBrowser from '@/features/media/MediaBrowser.vue'
 
-const { t, n } = useI18n()
+const { t } = useI18n()
 const { data: config } = useConfig()
 
 // Search and page live in the URL so they survive reloads and back-navigation.
@@ -16,12 +17,10 @@ const total = ref(0)
 </script>
 
 <template>
-  <div class="space-y-6 p-6">
-    <h1 class="text-xl font-semibold">
-      {{ t('media.title') }}
-      <span v-if="total" class="text-muted-foreground tabular-nums">({{ n(total) }})</span>
-      <span v-if="config?.media_provider" class="font-normal text-muted-foreground"> / {{ config.media_provider }}</span>
-    </h1>
+  <Page :title="t('media.title')" :count="total || undefined">
+    <template v-if="config?.media_provider" #meta>
+      <span>{{ t('settings.media.provider') }}: {{ config.media_provider }}</span>
+    </template>
     <MediaBrowser v-model:search="search" v-model:page="page" @total="total = $event" />
-  </div>
+  </Page>
 </template>

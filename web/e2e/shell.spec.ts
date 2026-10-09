@@ -37,12 +37,23 @@ test('dashboard breakdowns and charts load independently', async ({ page }) => {
 
 test('every sidebar entry is a screen of this app, none hands off to the classic admin', async ({ page }) => {
   await page.goto('/admin/')
-  for (const group of ['Lists', 'Subscribers', 'Campaigns', 'Users', 'Settings']) {
-    await page.locator('[data-sidebar=menu-button]', { hasText: group }).first().click()
+  await ready(page)
+  // Every destination is visible at once: no collapsed groups to open first.
+  for (const section of ['Audience', 'Messaging', 'Administration']) {
+    await expect(page.locator('[data-sidebar=group-label]', { hasText: section })).toBeVisible()
   }
   const links = await page.locator('[data-sidebar=sidebar] a').evaluateAll((as) => as.map((a) => a.getAttribute('href')))
   expect(links.length).toBeGreaterThan(10)
   expect(links.filter((h) => !h?.startsWith('/admin/'))).toEqual([])
+})
+
+test('the sidebar entry stays highlighted on detail and create pages', async ({ page }) => {
+  await page.goto('/admin/campaigns/new')
+  await ready(page)
+  await expect(page.locator('[data-cy=nav-campaigns]')).toHaveAttribute('data-active', 'true')
+  await page.goto('/admin/lists/new')
+  await expect(page.locator('[data-cy=nav-lists]')).toHaveAttribute('data-active', 'true')
+  await expect(page.locator('[data-cy=nav-campaigns]')).not.toHaveAttribute('data-active', 'true')
 })
 
 test('command palette opens with ctrl+k and navigates', async ({ page }) => {

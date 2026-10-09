@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import CopyText from '@/components/CopyText.vue'
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useList } from '@/composables/queries/useLists'
@@ -20,7 +20,7 @@ usePageTitle(() => list.value?.name)
 </script>
 
 <template>
-  <FormPage :title="list?.name ?? '…'">
+  <Page width="form" :title="list?.name ?? '…'">
     <template v-if="list" #badges>
       <Badge variant="secondary">{{ t(`lists.types.${list.type}`) }}</Badge>
     </template>
@@ -37,5 +37,5 @@ usePageTitle(() => list.value?.name)
     <!-- Keyed by id so moving between lists never reuses another list's form state. -->
     <Form v-else :key="list.id" :list="list" />
     <template #help><ListHelp /></template>
-  </FormPage>
+  </Page>
 </template>

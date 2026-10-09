@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 import type { User } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import DataTable from '@/components/datatable/DataTable.vue'
+import Page from '@/components/layout/Page.vue'
 import { Button } from '@/components/ui/button'
 import { useDeleteUser, useUsers } from '@/composables/queries/useUsers'
 import { usePermission } from '@/composables/usePermission'
@@ -52,17 +53,12 @@ const columns = createColumns({
 </script>
 
 <template>
-  <Teleport defer to="#page-actions">
-    <Button v-if="can('users:manage')" size="sm" data-cy="btn-new" @click="router.push({ name: 'user-new' })">
-      <Plus />{{ t('globals.buttons.new') }}
-    </Button>
-  </Teleport>
-
-  <div class="space-y-4 p-6">
-    <h1 class="text-xl font-semibold">
-      {{ t('globals.terms.users') }}
-      <span v-if="data?.length" class="text-muted-foreground tabular-nums">({{ data.length }})</span>
-    </h1>
+  <Page :title="t('globals.terms.users')" :count="data?.length">
+    <template #actions>
+      <Button v-if="can('users:manage')" size="sm" data-cy="btn-new" @click="router.push({ name: 'user-new' })">
+        <Plus />{{ t('users.newUser') }}
+      </Button>
+    </template>
 
     <DataTable
       v-model:sorting="sorting"
@@ -72,7 +68,7 @@ const columns = createColumns({
       :paginated="false"
       :row-id="(r: User) => String(r.id)"
     />
-  </div>
+  </Page>
 
   <ConfirmDialog
     v-model:open="deleteOpen"

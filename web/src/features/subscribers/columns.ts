@@ -18,9 +18,10 @@ interface Handlers {
 
 const date = (iso?: string) => (iso ? format(new Date(iso), 'PP') : '')
 
-/** Lists the subscriber is still on (an unsubscribed list doesn't count). */
-export const activeListCount = (s: Subscriber) =>
-  (s.lists ?? []).filter((l) => l.subscription_status !== 'unsubscribed').length
+export const subscriberStatusVariant = (s?: string) => (s === 'blocklisted' ? 'destructive' : s === 'unsubscribed' ? 'warning' : 'success')
+
+/** How many list badges a row shows before "+N". */
+const LISTS = 3
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches DataTable's `columns` prop
 export function createColumns({ t, onEdit, onDelete }: Handlers): ColumnDef<any, Subscriber>[] {
@@ -32,63 +33,71 @@ export function createColumns({ t, onEdit, onDelete }: Handlers): ColumnDef<any,
       header: () => t('subscribers.email'),
       cell: ({ row }) => {
         const s = row.original
-        const blocked = s.status === 'blocklisted'
-        return h('div', { class: 'space-y-1' }, [
-          h('div', { class: 'flex items-center gap-2' }, [
+        // The copy button only shows on hover/focus of the row, so it doesn't add noise to every line.
+        return h(
+          CopyText,
+          { text: s.email ?? '', class: '[&>button]:opacity-0 group-hover/row:[&>button]:opacity-100 [&>button]:focus-visible:opacity-100' },
+          () =>
             h(
-              'button',
+              RouterLink,
               {
-                type: 'button',
-                class: ['font-medium hover:underline', blocked && 'text-destructive line-through'],
-                onClick: () => onEdit(s),
+                to: { name: 'subscriber', params: { id: s.id } },
+                class: ['font-medium hover:underline', s.status === 'blocklisted' && 'text-muted-foreground line-through'],
               },
-              s.email,
+              () => s.email,
             ),
-            h(CopyText, { text: s.email ?? '' }, { default: () => [] }),
-            s.status !== 'enabled'
-              ? h(Badge, { variant: blocked ? 'destructive' : 'warning' }, () => t(`subscribers.status.${s.status}`))
-              : null,
-          ]),
-          (s.lists ?? []).length
-            ? h(
-                'div',
-                { class: 'flex flex-wrap gap-1' },
-                (s.lists ?? []).map((l) => {
-                  const flagged = l.optin === 'double' || l.subscription_status === 'unsubscribed'
-                  return h(
-                    RouterLink,
-                    { key: l.id, to: { name: 'subscribers-list', params: { listID: l.id } } },
-                    () =>
-                      h(
-                        Badge,
-                        { variant: l.subscription_status === 'unsubscribed' ? 'warning' : 'secondary' },
-                        () => [l.name, flagged ? h('sup', t(`subscribers.status.${l.subscription_status}`)) : null],
-                      ),
-                  )
-                }),
-              )
-            : null,
-        ])
+        )
       },
     },
     { id: 'name', accessorKey: 'name', header: () => t('globals.fields.name') },
     {
+      id: 'status',
+      accessorKey: 'status',
+      header: () => t('globals.fields.status'),
+      cell: ({ row }) => h(Badge, { variant: subscriberStatusVariant(row.original.status) }, () => t(`subscribers.status.${row.original.status}`)),
+    },
+    {
       id: 'lists',
       enableSorting: false,
       header: () => t('globals.terms.lists'),
-      cell: ({ row }) => h('span', { class: 'tabular-nums' }, activeListCount(row.original)),
+      cell: ({ row }) => {
+        const lists = row.original.lists ?? []
+        const more = lists.length - LISTS
+        return h('div', { class: 'flex max-w-72 flex-wrap gap-1' }, [
+          ...lists.slice(0, LISTS).map((l) => {
+            const unsubscribed = l.subscription_status === 'unsubscribed'
+            const unconfirmed = l.optin === 'double' && l.subscription_status === 'unconfirmed'
+            return h(
+              RouterLink,
+              {
+                key: l.id,
+                to: { name: 'subscribers-list', params: { listID: l.id } },
+                title: unsubscribed || unconfirmed ? t(`subscribers.status.${l.subscription_status}`) : undefined,
+              },
+              () =>
+                h(Badge, { variant: unsubscribed ? 'outline' : 'secondary', class: ['font-normal', unsubscribed && 'line-through'] }, () => [
+                  l.name,
+                  unconfirmed ? h('span', { 'class': 'size-1.5 rounded-full bg-warning', 'aria-label': t('subscribers.status.unconfirmed') }) : null,
+                ]),
+            )
+          }),
+          more > 0
+            ? h('span', { class: 'self-center text-xs text-muted-foreground', title: lists.slice(LISTS).map((l) => l.name).join(', ') }, `+${more}`)
+            : null,
+        ])
+      },
     },
     {
       id: 'created_at',
       accessorKey: 'created_at',
       header: () => t('globals.fields.createdAt'),
-      cell: ({ row }) => date(row.original.created_at),
+      cell: ({ row }) => h('span', { class: 'whitespace-nowrap' }, date(row.original.created_at)),
     },
     {
       id: 'updated_at',
       accessorKey: 'updated_at',
       header: () => t('globals.fields.updatedAt'),
-      cell: ({ row }) => date(row.original.updated_at),
+      cell: ({ row }) => h('span', { class: 'whitespace-nowrap' }, date(row.original.updated_at)),
     },
     {
       id: 'actions',

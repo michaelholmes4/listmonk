@@ -3,7 +3,7 @@ import { Loader2 } from '@lucide/vue'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import AdminSplitLayout from '@/components/layout/AdminSplitLayout.vue'
+import Page from '@/components/layout/Page.vue'
 import LogView from '@/components/LogView.vue'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -45,9 +45,7 @@ const tone = computed(() =>
 </script>
 
 <template>
-  <AdminSplitLayout>
-    <h1 class="mb-6 text-xl font-semibold">{{ t('import.title') }}</h1>
-
+  <Page :title="t('import.title')" width="form">
     <div v-if="isPending" class="space-y-4">
       <Skeleton class="h-20 w-full" />
       <Skeleton class="h-10 w-full" />
@@ -72,5 +70,5 @@ const tone = computed(() =>
     </section>
 
     <template #help><ImportHelp /></template>
-  </AdminSplitLayout>
+  </Page>
 </template>

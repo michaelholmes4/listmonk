@@ -35,7 +35,7 @@ test('subscribers: create, search, edit, delete', async ({ page }) => {
   await expect(page.getByRole('row')).toHaveCount(2) // header + 1
 
   // Edit page: breadcrumb names the subscriber, and going back keeps the search
-  await row.getByRole('button', { name: email }).click()
+  await row.getByRole('link', { name: email }).click()
   await expect(page).toHaveURL(/\/subscribers\/\d+$/)
   await expect(page.getByLabel('E-mail', { exact: true })).toHaveValue(email)
   await expect(page.getByRole('navigation', { name: 'breadcrumb' }).getByText(email)).toBeVisible()
@@ -85,7 +85,7 @@ test('subscribers: bulk blocklist then delete the selection', async ({ page }) =
   await expect(page.getByText('2 selected')).toBeVisible()
 
   // Blocklist
-  await page.getByRole('button', { name: 'Blocklisted' }).click()
+  await page.getByRole('button', { name: 'Blocklist', exact: true }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
   await expect(page.getByRole('alertdialog')).toBeHidden()
   await expect(page.getByText('Blocklisted', { exact: true })).toHaveCount(2)
@@ -95,7 +95,7 @@ test('subscribers: bulk blocklist then delete the selection', async ({ page }) =
   await page.getByRole('button', { name: 'Delete' }).first().click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
   await expect(page.getByRole('row')).toHaveCount(2) // header + empty-state row
-  await expect(page.getByText('Nothing to show.')).toBeVisible()
+  await expect(page.getByText('No results', { exact: true })).toBeVisible()
 })
 
 test('subscribers: sort order really flips (server accepts lowercase asc/desc only)', async ({ page }) => {
@@ -109,7 +109,7 @@ test('subscribers: sort order really flips (server accepts lowercase asc/desc on
 
   try {
     await page.goto(`/admin/subscribers?q=${tag}`)
-    const emails = page.getByRole('row').getByRole('button', { name: /@example\.com$/ })
+    const emails = page.getByRole('row').getByRole('link', { name: /@example\.com$/ })
     await expect(emails).toHaveCount(2)
 
     await page.getByRole('button', { name: 'E-mail' }).click() // first click: ascending
@@ -142,7 +142,7 @@ test('subscribers: "select all N" acts on every match, not just the visible page
   await page.getByRole('button', { name: /select all 3/i }).click()
   await expect(page.getByText('3 selected')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Blocklisted' }).click()
+  await page.getByRole('button', { name: 'Blocklist', exact: true }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
   await expect(page.getByRole('alertdialog')).toBeHidden()
   await expect.poll(async () => (await matching()).map((s) => s.status)).toEqual(['blocklisted', 'blocklisted', 'blocklisted'])

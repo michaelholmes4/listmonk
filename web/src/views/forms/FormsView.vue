@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CodeEditor from '@/components/CodeEditor.vue'
+import Page from '@/components/layout/Page.vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -42,9 +43,7 @@ const toggle = (id: number, on: boolean) =>
 </script>
 
 <template>
-  <div class="space-y-4 p-6">
-    <h1 class="text-xl font-semibold">{{ t('forms.title') }}</h1>
-
+  <Page :title="t('forms.title')" :description="t('web.forms.description')">
     <div v-if="isPending" class="grid gap-6 md:grid-cols-[18rem_1fr]">
       <div class="space-y-2"><Skeleton class="h-5 w-32" /><Skeleton class="h-5 w-48" /><Skeleton class="h-5 w-40" /></div>
       <Skeleton class="h-64 w-full" />
@@ -97,5 +96,5 @@ const toggle = (id: number, on: boolean) =>
         <CodeEditor v-if="html" :model-value="html" lang="html" readonly />
       </section>
     </div>
-  </div>
+  </Page>
 </template>

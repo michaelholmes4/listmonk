@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import SlowQueriesNote from '@/components/SlowQueriesNote.vue'
-import { Plus, Search, Trash2 } from '@lucide/vue'
-import type { PaginationState, RowSelectionState, SortingState } from '@tanstack/vue-table'
-import { computed, ref, watch } from 'vue'
+import { Archive, List as ListIcon, Plus, Trash2 } from '@lucide/vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -10,8 +8,13 @@ import type { ListQuery } from '@/api/lists'
 import type { List } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import DataTable from '@/components/datatable/DataTable.vue'
+import DataTableToolbar from '@/components/datatable/DataTableToolbar.vue'
+import SearchInput from '@/components/datatable/SearchInput.vue'
+import EmptyState from '@/components/EmptyState.vue'
+import Page from '@/components/layout/Page.vue'
+import SlowQueriesNote from '@/components/SlowQueriesNote.vue'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   useBulkDeleteLists,
   useCreateOptinCampaign,
@@ -19,6 +22,7 @@ import {
   useLists,
 } from '@/composables/queries/useLists'
 import { usePermission } from '@/composables/usePermission'
+import { useRowSelection, useUrlTable } from '@/composables/useTableState'
 import { useUrlState } from '@/composables/useUrlState'
 import { createColumns } from '@/features/lists/columns'
 
@@ -28,62 +32,35 @@ const { can, canList } = usePermission()
 
 // --- URL state: archived toggle, search, page and sort (`status`, `q`, `page`, `size`, `sort`). ---
 const url = useUrlState(['lists'])
-const status = computed<'active' | 'archived'>(() => (url.query.value.status === 'archived' ? 'archived' : 'active'))
-const urlSearch = url.str('q')
-const searchInput = ref(urlSearch.value)
-
-const pagination = computed<PaginationState>({
-  get: () => ({ pageIndex: url.int('page', 1) - 1, pageSize: url.int('size', 20) }),
-  set: (v) => url.set({ page: v.pageIndex === 0 ? undefined : v.pageIndex + 1, size: v.pageSize === 20 ? undefined : v.pageSize }),
+const status = computed<'active' | 'archived'>({
+  get: () => (url.query.value.status === 'archived' ? 'archived' : 'active'),
+  set: (v) => url.set({ status: v === 'archived' ? v : undefined }),
 })
-const sorting = computed<SortingState>({
-  get: () => {
-    const [id, dir] = ((url.query.value.sort as string) ?? '').split(':')
-    return id ? [{ id, desc: dir === 'desc' }] : []
-  },
-  set: (v) => url.set({ sort: v[0] ? `${v[0].id}:${v[0].desc ? 'desc' : 'asc'}` : undefined, page: undefined }),
-})
-const selection = ref<RowSelectionState>({})
-const selectAll = ref(false)
+const search = url.str('q')
+const { pagination, sorting, apiPage } = useUrlTable(url)
 
-const filter = computed(() => ({ query: urlSearch.value, status: status.value }))
-const query = computed<ListQuery>(() => ({
-  ...filter.value,
-  page: pagination.value.pageIndex + 1,
-  perPage: pagination.value.pageSize,
-  orderBy: sorting.value[0]?.id as ListQuery['orderBy'],
-  order: sorting.value[0] ? (sorting.value[0].desc ? 'desc' : 'asc') : undefined,
-}))
+const filter = computed(() => ({ query: search.value, status: status.value }))
+const query = computed<ListQuery>(() => ({ ...filter.value, ...apiPage<NonNullable<ListQuery['orderBy']>>() }))
 
 const { data, isPending } = useLists(query)
 const total = computed(() => data.value?.total ?? 0)
 
-watch(filter, () => {
-  url.set({ page: undefined })
-  selection.value = {}
-  selectAll.value = false
+const sel = useRowSelection({
+  total,
+  pageRows: computed(() => data.value?.results.length ?? 0),
+  filter,
+  onFilterChange: () => url.set({ page: undefined }),
 })
-watch(selection, () => {
-  if (selectAll.value && Object.keys(selection.value).length < (data.value?.results.length ?? 0)) selectAll.value = false
-})
-
-const selectedIds = computed(() => Object.keys(selection.value).map(Number))
-const selectedCount = computed(() => (selectAll.value ? total.value : selectedIds.value.length))
-const canSelectAll = computed(() => !selectAll.value && selectedIds.value.length > 0 && total.value > selectedIds.value.length)
-const clearSelection = () => {
-  selection.value = {}
-  selectAll.value = false
-}
 
 // --- Actions. -----------------------------------------------------------------------------------
 const bulkConfirm = ref(false)
 const bulkDelete = useBulkDeleteLists()
 function runBulkDelete() {
-  bulkDelete.mutate(selectAll.value ? { filter: filter.value } : { ids: selectedIds.value }, {
+  bulkDelete.mutate(sel.selectAll ? { filter: filter.value } : { ids: sel.ids }, {
     onSuccess: (num) => {
       toast.success(t('globals.messages.deletedCount', { name: t('globals.terms.list', num), num }))
       bulkConfirm.value = false
-      clearSelection()
+      sel.clear()
     },
   })
 }
@@ -125,69 +102,54 @@ const columns = createColumns({
 </script>
 
 <template>
-  <Teleport defer to="#page-actions">
-    <Button v-if="can('lists:manage_all')" size="sm" @click="router.push({ name: 'list-new' })">
-      <Plus />{{ t('globals.buttons.new') }}
-    </Button>
-  </Teleport>
+  <Page :title="t('globals.terms.lists')" :count="data ? total : undefined">
+    <template #actions>
+      <Button v-if="can('lists:manage_all')" size="sm" data-cy="btn-new" @click="router.push({ name: 'list-new' })">
+        <Plus />{{ t('lists.newList') }}
+      </Button>
+    </template>
 
-  <div class="space-y-4 p-6">
-    <div class="space-y-1">
-      <h1 class="text-xl font-semibold">
-        {{ t('globals.terms.lists') }}
-        <span v-if="status === 'archived'" class="font-normal text-muted-foreground">/ {{ t('lists.archived').toLowerCase() }}</span>
-        <span v-if="data" class="text-muted-foreground tabular-nums">({{ n(total) }})</span>
-      </h1>
-      <RouterLink
-        class="text-xs text-primary hover:underline"
-        :to="{ name: 'lists', query: status === 'archived' ? {} : { status: 'archived' } }"
-      >
-        {{ t('globals.buttons.view') }}
-        {{ (status === 'archived' ? t('menu.allLists') : t('lists.archived')).toLowerCase() }} &rarr;
-      </RouterLink>
-    </div>
-
-    <div class="flex flex-wrap items-center gap-2">
-      <form class="relative min-w-64 max-w-sm flex-1" @submit.prevent="urlSearch = searchInput.trim()">
-        <Search class="pointer-events-none absolute top-2 left-2.5 size-4 text-muted-foreground" />
-        <Input v-model="searchInput" class="pl-8" :placeholder="t('globals.fields.name')" :aria-label="t('globals.fields.name')" />
-      </form>
-      <template v-if="selectedCount > 0">
-        <Button v-if="can('lists:manage_all')" variant="ghost" size="sm" class="text-destructive" @click="bulkConfirm = true">
-          <Trash2 />{{ t('globals.buttons.delete') }}
-        </Button>
-        <span class="text-sm text-muted-foreground">
-          {{ t('globals.messages.numSelected', { num: n(selectedCount) }) }}
-          <template v-if="canSelectAll">
-            &mdash;
-            <button type="button" class="underline" @click="selectAll = true">
-              {{ t('globals.messages.selectAll', { num: n(total) }) }}
-            </button>
-          </template>
-          &middot;
-          <button type="button" class="underline" @click="clearSelection">{{ t('globals.buttons.clear') }}</button>
-        </span>
+    <DataTableToolbar :selected="sel.count" :total="total" :can-select-all="sel.canSelectAll" @select-all="sel.selectAll = true" @clear="sel.clear">
+      <SearchInput v-model="search" :placeholder="t('globals.fields.name')" />
+      <ToggleGroup v-model="status" type="single" variant="outline" size="sm" :aria-label="t('globals.fields.status')" data-cy="list-status">
+        <ToggleGroupItem value="active" data-cy="view-active">{{ t('web.lists.active') }}</ToggleGroupItem>
+        <ToggleGroupItem value="archived" data-cy="view-archived">{{ t('lists.archived') }}</ToggleGroupItem>
+      </ToggleGroup>
+      <template v-if="can('lists:manage_all')" #bulk>
+        <Button variant="ghost" size="sm" class="text-destructive" @click="bulkConfirm = true"><Trash2 />{{ t('globals.buttons.delete') }}</Button>
       </template>
-    </div>
+    </DataTableToolbar>
 
     <DataTable
       v-model:pagination="pagination"
       v-model:sorting="sorting"
-      v-model:selection="selection"
+      v-model:selection="sel.selection"
       :columns="columns"
       :data="data?.results ?? []"
       :row-count="total"
       :loading="isPending"
       :row-id="(l: List) => String(l.id)"
-    />
+    >
+      <template #empty>
+        <EmptyState v-if="search" :title="t('web.common.noResults')" :description="t('web.common.noResultsHelp')">
+          <template #action><Button variant="outline" size="sm" @click="search = ''">{{ t('web.common.clearFilters') }}</Button></template>
+        </EmptyState>
+        <EmptyState v-else-if="status === 'archived'" :icon="Archive" :title="t('web.lists.emptyArchived')" :description="t('lists.archivedHelp')" />
+        <EmptyState v-else :icon="ListIcon" :title="t('web.lists.emptyTitle')" :description="t('web.lists.emptyHelp')">
+          <template v-if="can('lists:manage_all')" #action>
+            <Button size="sm" @click="router.push({ name: 'list-new' })"><Plus />{{ t('lists.newList') }}</Button>
+          </template>
+        </EmptyState>
+      </template>
+    </DataTable>
 
     <SlowQueriesNote />
-  </div>
+  </Page>
 
   <ConfirmDialog
     v-model:open="bulkConfirm"
     destructive
-    :title="t('globals.messages.confirmDelete', { num: n(selectedCount), name: t('globals.terms.list', selectedCount).toLowerCase() })"
+    :title="t('globals.messages.confirmDelete', { num: n(sel.count), name: t('globals.terms.list', sel.count).toLowerCase() })"
     :description="t('lists.confirmDelete')"
     :confirm-label="t('globals.buttons.delete')"
     :pending="bulkDelete.isPending.value"

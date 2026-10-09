@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import CopyText from '@/components/CopyText.vue'
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSubscriber } from '@/composables/queries/useSubscribers'
@@ -21,7 +21,7 @@ const statusVariant = (s?: string) => (s === 'blocklisted' ? 'destructive' : s =
 </script>
 
 <template>
-  <FormPage :title="subscriber?.name || subscriber?.email || '…'">
+  <Page width="form" :title="subscriber?.name || subscriber?.email || '…'">
     <template v-if="subscriber" #badges>
       <Badge :variant="statusVariant(subscriber.status)">{{ t(`subscribers.status.${subscriber.status}`) }}</Badge>
     </template>
@@ -39,5 +39,5 @@ const statusVariant = (s?: string) => (s === 'blocklisted' ? 'destructive' : s =
     <!-- Keyed by id so moving between subscribers never reuses another one's form state. -->
     <Form v-else :key="subscriber.id" :subscriber="subscriber" />
     <template #help><SubscriberHelp /></template>
-  </FormPage>
+  </Page>
 </template>

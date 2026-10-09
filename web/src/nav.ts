@@ -4,9 +4,9 @@ import {
   Image,
   LayoutDashboard,
   List,
+  ListChecks,
   MailX,
   Newspaper,
-  Plus,
   Rocket,
   ScrollText,
   Settings,
@@ -14,6 +14,7 @@ import {
   Upload,
   Workflow,
   Users,
+  UserCog,
   Wrench,
 } from '@lucide/vue'
 import type { Component } from 'vue'
@@ -26,96 +27,74 @@ export interface NavLeaf {
   icon: Component
   /** Hidden unless the user has ANY of these (supports `group:*`). */
   perms?: string[]
-  to: RouteLocationRaw
+  to: { name: string } & RouteLocationRaw
+  /** Other route names under this entry (detail and create pages): the entry stays highlighted there. */
+  match?: string[]
 }
 
-export interface NavGroup {
+export interface NavSection {
   key: string
-  label: string
-  icon: Component
-  perms?: string[]
-  /** A group with a single leaf and no children renders as a plain link. */
-  leaf?: NavLeaf
-  children?: NavLeaf[]
+  /** i18n key of the section heading; none for the top section. */
+  label?: string
+  items: NavLeaf[]
 }
 
 /**
- * Mirrors the classic admin's menu (frontend/src/components/Navigation.vue), including its
- * permission gates.
+ * The sidebar: destinations only (no actions), grouped by job and all visible (see web/UX.md).
+ * Permission gates mirror the classic admin's menu.
  */
-export const navigation: NavGroup[] = [
+export const navigation: NavSection[] = [
   {
-    key: 'dashboard',
-    label: 'menu.dashboard',
-    icon: LayoutDashboard,
-    leaf: { key: 'dashboard', label: 'menu.dashboard', icon: LayoutDashboard, to: { name: 'dashboard' } },
+    key: 'home',
+    items: [{ key: 'dashboard', label: 'menu.dashboard', icon: LayoutDashboard, to: { name: 'dashboard' } }],
   },
   {
-    key: 'lists',
-    label: 'globals.terms.lists',
-    icon: List,
-    children: [
-      { key: 'lists', label: 'menu.allLists', icon: List, to: { name: 'lists' } },
+    key: 'audience',
+    label: 'web.nav.audience',
+    items: [
+      {
+        key: 'subscribers',
+        label: 'globals.terms.subscribers',
+        icon: Users,
+        perms: ['subscribers:get_all', 'subscribers:get'],
+        to: { name: 'subscribers' },
+        match: ['subscribers-list', 'subscriber', 'subscriber-new'],
+      },
+      { key: 'lists', label: 'globals.terms.lists', icon: List, to: { name: 'lists' }, match: ['list', 'list-new'] },
+      { key: 'import', label: 'menu.import', icon: Upload, perms: ['subscribers:import'], to: { name: 'import' } },
+      { key: 'bounces', label: 'globals.terms.bounces', icon: MailX, perms: ['bounces:get'], to: { name: 'bounces' } },
       { key: 'forms', label: 'menu.forms', icon: Newspaper, to: { name: 'forms' } },
     ],
   },
   {
-    key: 'subscribers',
-    label: 'globals.terms.subscribers',
-    icon: Users,
-    perms: ['subscribers:*'],
-    children: [
+    key: 'messaging',
+    label: 'web.nav.messaging',
+    items: [
       {
-        key: 'all-subscribers',
-        label: 'menu.allSubscribers',
-        icon: Users,
-        perms: ['subscribers:get_all', 'subscribers:get'],
-        to: { name: 'subscribers' },
-      },
-      {
-        key: 'import',
-        label: 'menu.import',
-        icon: Upload,
-        perms: ['subscribers:import'],
-        to: { name: 'import' },
-      },
-      {
-        key: 'bounces',
-        label: 'globals.terms.bounces',
-        icon: MailX,
-        perms: ['bounces:get'],
-        to: { name: 'bounces' },
-      },
-    ],
-  },
-  {
-    key: 'campaigns',
-    label: 'globals.terms.campaigns',
-    icon: Rocket,
-    perms: ['campaigns:*'],
-    children: [
-      {
-        key: 'all-campaigns',
-        label: 'menu.allCampaigns',
+        key: 'campaigns',
+        label: 'globals.terms.campaigns',
         icon: Rocket,
-        perms: ['campaigns:get'],
+        perms: ['campaigns:get_all', 'campaigns:get'],
         to: { name: 'campaigns' },
+        match: ['campaign', 'campaign-new'],
       },
       {
-        key: 'new-campaign',
-        label: 'menu.newCampaign',
-        icon: Plus,
-        perms: ['campaigns:manage'],
-        to: { name: 'campaign-new' },
+        key: 'automations',
+        label: 'web.automations.title',
+        icon: Workflow,
+        perms: ['automations:get'],
+        to: { name: 'automations' },
+        match: ['automation'],
       },
-      { key: 'media', label: 'menu.media', icon: Image, perms: ['media:*'], to: { name: 'media' } },
       {
         key: 'templates',
         label: 'globals.terms.templates',
         icon: FileText,
         perms: ['templates:get'],
         to: { name: 'templates' },
+        match: ['template', 'template-new'],
       },
+      { key: 'media', label: 'menu.media', icon: Image, perms: ['media:*'], to: { name: 'media' } },
       {
         key: 'analytics',
         label: 'globals.terms.analytics',
@@ -126,62 +105,33 @@ export const navigation: NavGroup[] = [
     ],
   },
   {
-    key: 'automations',
-    label: 'web.automations.title',
-    icon: Workflow,
-    perms: ['automations:get'],
-    leaf: {
-      key: 'automations',
-      label: 'web.automations.title',
-      icon: Workflow,
-      perms: ['automations:get'],
-      to: { name: 'automations' },
-    },
-  },
-  {
-    key: 'users',
-    label: 'globals.terms.users',
-    icon: ShieldUser,
-    perms: ['users:*', 'roles:*'],
-    children: [
-      { key: 'all-users', label: 'globals.terms.users', icon: Users, perms: ['users:get'], to: { name: 'users' } },
+    key: 'admin',
+    label: 'web.nav.admin',
+    items: [
+      { key: 'users', label: 'globals.terms.users', icon: UserCog, perms: ['users:get'], to: { name: 'users' }, match: ['user', 'user-new'] },
       {
         key: 'user-roles',
         label: 'users.userRoles',
         icon: ShieldUser,
         perms: ['roles:get'],
         to: { name: 'user-roles' },
+        match: ['user-role', 'user-role-new'],
       },
       {
         key: 'list-roles',
         label: 'users.listRoles',
-        icon: List,
+        icon: ListChecks,
         perms: ['roles:get'],
         to: { name: 'list-roles' },
+        match: ['list-role', 'list-role-new'],
       },
-    ],
-  },
-  {
-    key: 'settings',
-    label: 'menu.settings',
-    icon: Settings,
-    perms: ['settings:*'],
-    children: [
-      {
-        key: 'all-settings',
-        label: 'menu.settings',
-        icon: Settings,
-        perms: ['settings:get'],
-        to: { name: 'settings' },
-      },
-      {
-        key: 'maintenance',
-        label: 'menu.maintenance',
-        icon: Wrench,
-        perms: ['settings:maintain'],
-        to: { name: 'maintenance' },
-      },
+      { key: 'settings', label: 'menu.settings', icon: Settings, perms: ['settings:get'], to: { name: 'settings' } },
+      { key: 'maintenance', label: 'menu.maintenance', icon: Wrench, perms: ['settings:maintain'], to: { name: 'maintenance' } },
       { key: 'logs', label: 'menu.logs', icon: ScrollText, perms: ['settings:get'], to: { name: 'logs' } },
     ],
   },
 ]
+
+/** Whether `leaf` is the nav entry for the route named `routeName`. */
+export const isNavActive = (leaf: NavLeaf, routeName: unknown) =>
+  leaf.to.name === routeName || (leaf.match ?? []).includes(routeName as string)

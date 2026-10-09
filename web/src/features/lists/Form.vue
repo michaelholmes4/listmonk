@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
-import { Loader2 } from '@lucide/vue'
 import { useForm } from 'vee-validate'
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { List } from '@/api/types'
-import { Button } from '@/components/ui/button'
+import FormActions from '@/components/layout/FormActions.vue'
+import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCreateList, useUpdateList } from '@/composables/queries/useLists'
 import { useGoBack } from '@/composables/useGoBack'
 import { usePermission } from '@/composables/usePermission'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { emptyList, listSchema, toForm } from './schema'
 
 /** Create (no `list`) or edit. Leaves the page on success or cancel. */
@@ -31,7 +32,7 @@ const create = useCreateList()
 const update = useUpdateList()
 const saving = computed(() => create.isPending.value || update.isPending.value)
 
-const { handleSubmit, resetForm, values, setFieldValue } = useForm({
+const { handleSubmit, resetForm, values, setFieldValue, meta } = useForm({
   validationSchema: toTypedSchema(listSchema(t)),
   initialValues: props.list ? toForm(props.list) : emptyList(),
 })
@@ -42,12 +43,20 @@ watch(
   (l) => l && resetForm({ values: toForm(l) }),
 )
 
+const dirty = computed(() => canManage.value && meta.value.dirty)
+const { leaveOpen, decide } = useUnsavedGuard(dirty, saving)
+/** After a successful save: the form is clean again, then leave. */
+const savedAndBack = () => {
+  resetForm({ values: { ...values } })
+  goBack()
+}
+
 const onSubmit = handleSubmit((v) => {
   const { archived, ...rest } = v
   const body = { ...rest, status: archived ? ('archived' as const) : ('active' as const) }
   const done = (name: string | undefined, key: 'created' | 'updated') => {
     toast.success(t(`globals.messages.${key}`, { name: name ?? v.name }))
-    goBack()
+    savedAndBack()
   }
   if (!props.list) create.mutate(body, { onSuccess: (l) => done(l.name, 'created') })
   else update.mutate({ id: props.list.id!, body }, { onSuccess: (l) => done(l.name, 'updated') })
@@ -55,6 +64,7 @@ const onSubmit = handleSubmit((v) => {
 </script>
 
 <template>
+  <FormActions :pending="saving" :dirty="list ? dirty : undefined" :can-save="canManage" :on-cancel="goBack" @save="onSubmit" />
   <form class="space-y-6" @submit.prevent="onSubmit">
     <div class="space-y-6">
       <FormField v-slot="{ componentField }" name="name">
@@ -135,13 +145,8 @@ const onSubmit = handleSubmit((v) => {
       </div>
     </div>
 
-    <div class="flex gap-2">
-      <Button v-if="canManage" type="submit" :disabled="saving">
-        <Loader2 v-if="saving" class="animate-spin" />
-        {{ t('globals.buttons.save') }}
-      </Button>
-
-      <Button type="button" variant="outline" @click="goBack">{{ canManage ? t('globals.buttons.cancel') : t('globals.buttons.close') }}</Button>
-    </div>
+    <!-- Enter in a field submits; the visible Save button is in the page header. -->
+    <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
   </form>
+  <LeaveConfirm :open="leaveOpen" @decide="decide" />
 </template>

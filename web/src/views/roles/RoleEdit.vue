@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import CopyText from '@/components/CopyText.vue'
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useListRoles, useUserRoles } from '@/composables/queries/useRoles'
@@ -30,7 +30,7 @@ usePageTitle(() => role.value?.name ?? undefined)
 </script>
 
 <template>
-  <FormPage :title="role?.name ?? '…'">
+  <Page width="form" :title="role?.name ?? '…'">
     <template v-if="role" #badges>
       <Badge v-if="role.id === SUPER_ADMIN_ROLE_ID" variant="default">{{ t('users.type.super') }}</Badge>
     </template>
@@ -48,5 +48,5 @@ usePageTitle(() => role.value?.name ?? undefined)
       <ListRoleForm v-else :key="role.id" :role="listRole" />
     </template>
     <template #help><RoleHelp :kind="kind" /></template>
-  </FormPage>
+  </Page>
 </template>

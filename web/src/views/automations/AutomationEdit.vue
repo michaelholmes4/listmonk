@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 import { PublishError } from '@/api/automations'
 import type { AutomationProblem } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import Page from '@/components/layout/Page.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -76,7 +77,9 @@ const publishedJson = computed(() => {
   const cur = versions.value?.find((v) => v.id === automation.value?.current_version_id)
   return cur ? JSON.stringify(flowToGraph(graphToFlow(cur.graph))) : undefined
 })
-const unpublished = computed(() => loaded.value && publishedJson.value !== undefined && publishedJson.value !== currentJson.value)
+const unpublished = computed(
+  () => loaded.value && publishedJson.value !== undefined && publishedJson.value !== currentJson.value,
+)
 const neverPublished = computed(() => automation.value?.current_version_id == null)
 
 // --- Problems the server found (on save and publish), shown on the steps. -----------------------------
@@ -169,33 +172,36 @@ function onKey(e: KeyboardEvent) {
 </script>
 
 <template>
-  <div class="space-y-4 p-6" @keydown="onKey">
-    <header class="flex flex-wrap items-center justify-between gap-3">
-      <div class="space-y-1">
-        <h1 class="flex flex-wrap items-center gap-2 text-xl font-semibold">
-          <Skeleton v-if="!automation" class="h-7 w-48" />
-          <template v-else>
-            {{ automation.name }}
-            <Badge :variant="automationVariant(status)" data-cy="status">{{ t(`web.automations.status.${status}`) }}</Badge>
-            <Badge v-if="unpublished" variant="warning">{{ t('web.automations.unpublished') }}</Badge>
-          </template>
-        </h1>
-      </div>
+  <Page :title="automation?.name ?? '…'" @keydown="onKey">
+    <template v-if="automation" #badges>
+      <Badge :variant="automationVariant(status)" data-cy="status">{{ t(`web.automations.status.${status}`) }}</Badge>
+      <Badge v-if="unpublished" variant="warning">{{ t('web.automations.unpublished') }}</Badge>
+    </template>
 
-      <div v-if="automation && can('automations:manage')" class="flex flex-wrap items-center gap-2">
-        <Button v-if="canPause(status)" variant="outline" size="sm" @click="acting = 'pause'"><Pause />{{ t('web.automations.pause') }}</Button>
-        <Button v-if="canResume(status)" variant="outline" size="sm" @click="acting = 'resume'"><Play />{{ t('web.automations.resume') }}</Button>
-        <Button v-if="canArchive(status)" variant="outline" size="sm" @click="acting = 'archive'"><Archive />{{ t('web.automations.archive') }}</Button>
-        <template v-if="!readonly">
-          <Button variant="outline" size="sm" :disabled="!dirty || busy" data-cy="save-draft" @click="saveDraft">
-            <Loader2 v-if="save.isPending.value" class="animate-spin" />{{ t('web.automations.saveDraft') }}
-          </Button>
-          <Button size="sm" :disabled="busy || (!dirty && !unpublished && !neverPublished)" data-cy="publish" @click="publishOpen = true">
-            <Rocket />{{ t(neverPublished ? 'web.automations.publish.action' : 'web.automations.publishChanges') }}
-          </Button>
-        </template>
-      </div>
-    </header>
+    <template v-if="automation && can('automations:manage')" #actions>
+      <Button v-if="canPause(status)" variant="outline" size="sm" @click="acting = 'pause'">
+        <Pause />{{ t('web.automations.pause') }}
+      </Button>
+      <Button v-if="canResume(status)" variant="outline" size="sm" @click="acting = 'resume'">
+        <Play />{{ t('web.automations.resume') }}
+      </Button>
+      <Button v-if="canArchive(status)" variant="outline" size="sm" @click="acting = 'archive'">
+        <Archive />{{ t('web.automations.archive') }}
+      </Button>
+      <template v-if="!readonly">
+        <Button variant="outline" size="sm" :disabled="!dirty || busy" data-cy="save-draft" @click="saveDraft">
+          <Loader2 v-if="save.isPending.value" class="animate-spin" />{{ t('web.automations.saveDraft') }}
+        </Button>
+        <Button
+          size="sm"
+          :disabled="busy || (!dirty && !unpublished && !neverPublished)"
+          data-cy="publish"
+          @click="publishOpen = true"
+        >
+          <Rocket />{{ t(neverPublished ? 'web.automations.publish.action' : 'web.automations.publishChanges') }}
+        </Button>
+      </template>
+    </template>
 
     <Alert v-if="general.length" variant="destructive" data-cy="problems">
       <AlertDescription>
@@ -203,7 +209,9 @@ function onKey(e: KeyboardEvent) {
       </AlertDescription>
     </Alert>
 
-    <div v-if="!automation || !loaded" class="space-y-3"><Skeleton class="mx-auto h-16 w-md max-w-full" /><Skeleton class="mx-auto h-16 w-md max-w-full" /></div>
+    <div v-if="!automation || !loaded" class="space-y-3">
+      <Skeleton class="mx-auto h-16 w-md max-w-full" /><Skeleton class="mx-auto h-16 w-md max-w-full" />
+    </div>
     <Tabs v-else v-model="tab">
       <TabsList>
         <TabsTrigger value="flow">{{ t('web.automations.tabs.flow') }}</TabsTrigger>
@@ -229,9 +237,15 @@ function onKey(e: KeyboardEvent) {
         <VersionsPanel :automation-id="id" :current-version-id="automation.current_version_id" />
       </TabsContent>
     </Tabs>
-  </div>
+  </Page>
 
-  <PublishDialog v-model:open="publishOpen" :pending="busy" :first="neverPublished" :has-list-trigger="hasListTrigger" @confirm="doPublish" />
+  <PublishDialog
+    v-model:open="publishOpen"
+    :pending="busy"
+    :first="neverPublished"
+    :has-list-trigger="hasListTrigger"
+    @confirm="doPublish"
+  />
 
   <ConfirmDialog
     v-model:open="actOpen"

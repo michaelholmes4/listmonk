@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import CopyText from '@/components/CopyText.vue'
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTemplate } from '@/composables/queries/useTemplates'
@@ -21,7 +21,7 @@ usePageTitle(() => template.value?.name)
 </script>
 
 <template>
-  <FormPage :title="template?.name ?? '…'">
+  <Page :title="template?.name ?? '…'">
     <template v-if="template" #badges>
       <Badge variant="outline">{{ t(typeLabelKey(template.type)) }}</Badge>
       <Badge v-if="template.is_default" variant="secondary">{{ t('templates.default') }}</Badge>
@@ -36,5 +36,5 @@ usePageTitle(() => template.value?.name)
     </div>
     <Form v-else :key="template.id" :template="template" />
     <template #help><TemplateHelp /></template>
-  </FormPage>
+  </Page>
 </template>

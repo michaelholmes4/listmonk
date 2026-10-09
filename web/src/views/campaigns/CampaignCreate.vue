@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import Form from '@/features/campaigns/Form.vue'
 import CampaignHelp from '@/features/campaigns/CampaignHelp.vue'
 
@@ -16,8 +16,8 @@ const initialLists = computed(() =>
 </script>
 
 <template>
-  <FormPage :title="t('campaigns.newCampaign')">
+  <Page :title="t('campaigns.newCampaign')">
     <Form :initial-lists="initialLists" />
     <template #help><CampaignHelp /></template>
-  </FormPage>
+  </Page>
 </template>

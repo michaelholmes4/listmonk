@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Moon, Sun } from '@lucide/vue'
+import { FilePlus, ListPlus, Moon, Rocket, Sun, UserPlus } from '@lucide/vue'
 import { onScopeDispose } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -19,18 +19,40 @@ const router = useRouter()
 const { can } = usePermission()
 const theme = useTheme()
 
-// Navigation commands: one per visible nav leaf (the palette respects the same permissions).
+// Navigation commands: one per visible nav entry (the palette respects the same permissions).
 onScopeDispose(
   registerCommandProvider('navigation', () =>
     navigation
-      .filter((g) => can(...(g.perms ?? [])))
-      .flatMap((g) => (g.leaf ? [g.leaf] : (g.children ?? []).filter((c) => can(...(c.perms ?? [])))))
+      .flatMap((s) => s.items)
+      .filter((leaf) => can(...(leaf.perms ?? [])))
       .map((leaf) => ({
         id: `nav:${leaf.key}`,
         group: t('web.commands.navigation'),
         label: t(leaf.label),
         icon: leaf.icon,
         run: () => router.push(leaf.to),
+      })),
+  ),
+)
+
+// "Create" commands: actions live here and in page headers, not in the sidebar.
+const creates = [
+  { id: 'campaign', label: 'campaigns.newCampaign', icon: Rocket, perm: 'campaigns:manage', route: 'campaign-new' },
+  { id: 'subscriber', label: 'subscribers.newSubscriber', icon: UserPlus, perm: 'subscribers:manage', route: 'subscriber-new' },
+  { id: 'list', label: 'lists.newList', icon: ListPlus, perm: 'lists:manage_all', route: 'list-new' },
+  { id: 'template', label: 'templates.newTemplate', icon: FilePlus, perm: 'templates:manage', route: 'template-new' },
+]
+onScopeDispose(
+  registerCommandProvider('create', () =>
+    creates
+      .filter((c) => can(c.perm))
+      .map((c) => ({
+        id: `new:${c.id}`,
+        group: t('web.commands.create'),
+        label: t(c.label),
+        icon: c.icon,
+        keywords: ['new', 'create', 'add'],
+        run: () => router.push({ name: c.route }),
       })),
   ),
 )

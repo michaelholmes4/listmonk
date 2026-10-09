@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { useQueries } from '@tanstack/vue-query'
-import { Search } from '@lucide/vue'
+import { Info, Search } from '@lucide/vue'
 import { addDays, endOfDay, startOfDay } from 'date-fns'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { getCampaign } from '@/api/campaigns'
 import type { AnalyticsRange } from '@/api/campaigns'
+import Page from '@/components/layout/Page.vue'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -93,10 +95,8 @@ const noteKey = computed(() =>
 </script>
 
 <template>
-  <div class="space-y-6 p-6">
-    <h1 class="text-xl font-semibold">{{ t('analytics.title') }}</h1>
-
-    <p v-if="noteKey" class="rounded-lg border bg-muted/40 p-3 text-sm">{{ t(noteKey) }}</p>
+  <Page :title="t('analytics.title')">
+    <Alert v-if="noteKey"><Info /><AlertDescription>{{ t(noteKey) }}</AlertDescription></Alert>
 
     <form class="grid items-end gap-4 md:grid-cols-[1fr_auto_auto_auto]" @submit.prevent="apply">
       <div class="space-y-2">
@@ -121,5 +121,5 @@ const noteKey = computed(() =>
       <MetricCard :title="t('globals.terms.bounces')" :campaigns="picked" :data="bounces.data.value" :loading="bounces.isPending.value" />
       <LinksCard :links="links.data.value" :loading="links.isPending.value" />
     </template>
-  </div>
+  </Page>
 </template>

@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
-import { Loader2, Save } from '@lucide/vue'
 import { useEventListener } from '@vueuse/core'
 import { useForm } from 'vee-validate'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import type { Settings } from '@/api/types'
+import FormActions from '@/components/layout/FormActions.vue'
+import SectionNav from '@/components/layout/SectionNav.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { useSaveSettings } from '@/composables/queries/useSettings'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { usePermission } from '@/composables/usePermission'
@@ -27,7 +27,6 @@ import { halfEditedSecret, settingsSchema, toForm, toRequest } from './schema'
 import { tabOfPath, tabs, type SettingsTab } from './tabIds'
 
 const props = defineProps<{ settings: Settings }>()
-const emit = defineEmits<{ tab: [tab: SettingsTab] }>()
 
 const { t } = useI18n()
 const route = useRoute()
@@ -37,7 +36,7 @@ const canManage = computed(() => can('settings:manage'))
 
 const save = useSaveSettings()
 
-const { handleSubmit, resetForm, values, errors } = useForm({
+const { handleSubmit, resetForm, values, errors, validate } = useForm({
   validationSchema: toTypedSchema(settingsSchema(t)),
   initialValues: toForm(props.settings),
   // Tabs and conditional blocks unmount their fields; their values still belong to the form.
@@ -65,7 +64,6 @@ const tab = computed<SettingsTab>({
   get: () => (tabs.includes(route.query.tab as SettingsTab) ? (route.query.tab as SettingsTab) : 'general'),
   set: (v) => void router.replace({ query: { ...route.query, tab: v } }),
 })
-watch(tab, (v) => emit('tab', v), { immediate: true })
 
 // Tabs holding an error get a dot, so a problem on another tab isn't invisible.
 const tabsWithErrors = computed(() => new Set(Object.keys(errors.value).map(tabOfPath)))
@@ -83,7 +81,12 @@ const submit = handleSubmit(
   ({ errors: errs }) => {
     const first = Object.keys(errs)[0]
     if (first) {
-      tab.value = tabOfPath(first)
+      // Jump to the section with the problem, then validate again once its fields have mounted:
+      // a field that was not on screen at submit time would otherwise show no message.
+      void router
+        .replace({ query: { ...route.query, tab: tabOfPath(first) } })
+        .then(() => nextTick())
+        .then(() => validate())
       toast.error(t('globals.messages.invalidFields', { name: first }))
     }
   },
@@ -95,6 +98,21 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
     void submit()
   }
 })
+
+const sections: Record<SettingsTab, Component> = {
+  general: GeneralTab,
+  performance: PerformanceTab,
+  privacy: PrivacyTab,
+  security: SecurityTab,
+  media: MediaTab,
+  smtp: SmtpTab,
+  bounces: BouncesTab,
+  messengers: MessengersTab,
+  appearance: AppearanceTab,
+}
+const navItems = computed(() =>
+  tabs.map((id) => ({ id, label: t(tabLabels[id]), alert: tabsWithErrors.value.has(id), alertLabel: t('web.settings.hasErrors') })),
+)
 
 const tabLabels: Record<SettingsTab, string> = {
   general: 'settings.general.name',
@@ -110,34 +128,29 @@ const tabLabels: Record<SettingsTab, string> = {
 </script>
 
 <template>
-  <Teleport defer to="#page-actions">
-    <Button v-if="canManage" size="sm" :disabled="!dirty || save.isPending.value" data-cy="btn-save" @click="submit">
-      <Loader2 v-if="save.isPending.value" class="animate-spin" /><Save v-else />{{ t('globals.buttons.save') }}
-    </Button>
-  </Teleport>
+  <FormActions :pending="save.isPending.value" :dirty="dirty" :can-save="canManage" @save="submit" />
 
-  <form novalidate @submit.prevent="submit">
-    <Tabs v-model="tab">
-      <TabsList class="h-auto w-full flex-wrap justify-start" data-cy="settings-tabs">
-        <TabsTrigger v-for="id in tabs" :key="id" :value="id" :data-cy="`tab-${id}`">
-          {{ t(tabLabels[id]) }}
-          <span v-if="tabsWithErrors.has(id)" class="size-1.5 rounded-full bg-destructive" :aria-label="t('web.settings.hasErrors')" />
-        </TabsTrigger>
-      </TabsList>
+  <!-- Sections: a vertical nav on the left (a scrolling row on small screens), the section on the right. -->
+  <div class="grid grid-cols-1 gap-6 md:grid-cols-[11rem_minmax(0,1fr)] md:gap-10">
+    <div>
+      <SectionNav v-model="tab" :items="navItems" :label="t('settings.title')" data-cy="settings-tabs" />
+    </div>
 
-      <fieldset :disabled="!canManage" class="min-w-0 border-0 p-0">
-        <TabsContent value="general" class="pt-6"><GeneralTab /></TabsContent>
-        <TabsContent value="performance" class="pt-6"><PerformanceTab /></TabsContent>
-        <TabsContent value="privacy" class="pt-6"><PrivacyTab /></TabsContent>
-        <TabsContent value="security" class="pt-6"><SecurityTab /></TabsContent>
-        <TabsContent value="media" class="pt-6"><MediaTab /></TabsContent>
-        <TabsContent value="smtp" class="pt-6"><SmtpTab /></TabsContent>
-        <TabsContent value="bounces" class="pt-6"><BouncesTab /></TabsContent>
-        <TabsContent value="messengers" class="pt-6"><MessengersTab /></TabsContent>
-        <TabsContent value="appearance" class="pt-6"><AppearanceTab /></TabsContent>
-      </fieldset>
-    </Tabs>
-  </form>
+    <form novalidate class="max-w-3xl min-w-0 space-y-6" @submit.prevent="submit">
+      <header class="space-y-1 border-b pb-4">
+        <h2 class="text-lg font-semibold">{{ t(tabLabels[tab]) }}</h2>
+        <p class="text-sm text-muted-foreground">{{ t(`web.settings.help.${tab}`) }}</p>
+      </header>
+      <!-- Tabs without a TabsList: SectionNav is the switcher, TabsContent mounts the active section. -->
+      <Tabs v-model="tab" orientation="vertical">
+        <fieldset :disabled="!canManage" class="min-w-0 border-0 p-0">
+          <TabsContent v-for="id in tabs" :key="id" :value="id"><component :is="sections[id]" /></TabsContent>
+        </fieldset>
+      </Tabs>
+      <p class="text-xs text-muted-foreground">{{ t('web.settings.saveHint') }}</p>
+      <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
+    </form>
+  </div>
 
   <LeaveConfirm :open="leaveOpen" @decide="decide" />
 </template>

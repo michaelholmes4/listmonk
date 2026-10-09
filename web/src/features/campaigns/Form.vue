@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
 import { useEventListener } from '@vueuse/core'
-import { Clock, Eye, FileUp, Loader2, Mail, Plus, Rocket, Save, X } from '@lucide/vue'
+import { Clock, Eye, FileUp, Loader2, Mail, Plus, Rocket, X } from '@lucide/vue'
 import { useForm } from 'vee-validate'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -10,6 +10,8 @@ import { toast } from 'vue-sonner'
 import { z } from 'zod'
 import type { Campaign } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import FormActions from '@/components/layout/FormActions.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import { Badge } from '@/components/ui/badge'
@@ -222,19 +224,22 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
 </script>
 
 <template>
-  <Teleport v-if="!isNew" defer to="#page-actions">
-    <template v-if="canEdit">
-      <Button size="sm" variant="outline" :disabled="saving || !dirty" data-cy="btn-save" @click="submit">
-        <Loader2 v-if="update.isPending.value" class="animate-spin" /><Save v-else />
-        {{ t('globals.buttons.saveChanges') }}
-      </Button>
-      <Button v-if="canStartNow" size="sm" :disabled="saving" data-cy="btn-start" @click="startOpen = true"><Rocket />{{ t('campaigns.start') }}</Button>
-      <Button v-if="canScheduleNow" size="sm" :disabled="saving" data-cy="btn-schedule" @click="startOpen = true"><Clock />{{ t('campaigns.schedule') }}</Button>
-    </template>
+  <!-- New: one step ("Continue" creates the draft and opens the editor). Existing: save, then start or schedule. -->
+  <FormActions
+    v-if="isNew"
+    :pending="create.isPending.value"
+    :can-save="canManage"
+    :save-label="t('campaigns.continue')"
+    :on-cancel="() => router.push({ name: 'campaigns' })"
+    @save="submit"
+  />
+  <FormActions v-else :pending="update.isPending.value" :dirty="dirty" :can-save="canEdit" :save-label="t('globals.buttons.saveChanges')" @save="submit">
+    <Button v-if="canEdit && canStartNow" size="sm" :disabled="saving" data-cy="btn-start" @click="startOpen = true"><Rocket />{{ t('campaigns.start') }}</Button>
+    <Button v-if="canEdit && canScheduleNow" size="sm" :disabled="saving" data-cy="btn-schedule" @click="startOpen = true"><Clock />{{ t('campaigns.schedule') }}</Button>
     <Button v-if="canUnschedule" size="sm" variant="outline" :disabled="saving" data-cy="btn-unschedule" @click="unscheduleOpen = true">
       <Clock />{{ t('campaigns.unSchedule') }}
     </Button>
-  </Teleport>
+  </FormActions>
 
   <form class="space-y-6" @submit.prevent="submit">
     <Tabs v-model="tab">
@@ -246,117 +251,122 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
       </TabsList>
 
       <!-- Settings -->
-      <TabsContent value="campaign" class="space-y-6 pt-4">
-        <FormField v-slot="{ componentField }" name="name">
-          <FormItem>
-            <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
-            <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canEdit" autofocus /></FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="subject">
-          <FormItem>
-            <FormLabel>{{ t('campaigns.subject') }}</FormLabel>
-            <FormControl><Input v-bind="componentField" maxlength="5000" :disabled="!canEdit" /></FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="fromEmail">
-          <FormItem>
-            <FormLabel>{{ t('campaigns.fromAddress') }}</FormLabel>
-            <FormControl><Input v-bind="componentField" maxlength="200" :placeholder="t('campaigns.fromAddressPlaceholder')" :disabled="!canEdit" /></FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <FormField name="lists">
-          <FormItem>
-            <FormLabel>{{ t('globals.terms.lists') }}</FormLabel>
-            <ListPicker :model-value="values.lists ?? []" :placeholder="t('campaigns.sendToLists')" :disabled="!canEdit" @update:model-value="setFieldValue('lists', $event)" />
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
-        <div class="grid items-start gap-6 md:grid-cols-2">
-          <FormField v-slot="{ componentField }" name="messenger">
+      <TabsContent value="campaign" class="max-w-3xl space-y-8 pt-4">
+        <FormSection :title="t('web.common.details')">
+          <FormField v-slot="{ componentField }" name="name">
             <FormItem>
-              <FormLabel>{{ t('globals.terms.messenger', 1) }}</FormLabel>
-              <Select v-bind="componentField" :disabled="!canEdit">
-                <FormControl><SelectTrigger class="w-full"><SelectValue /></SelectTrigger></FormControl>
-                <SelectContent>
-                  <SelectItem v-for="m in emailMessengers" :key="m" :value="m">{{ m }}</SelectItem>
-                  <SelectItem v-for="m in otherMessengers" :key="m" :value="m">{{ m }}</SelectItem>
-                </SelectContent>
-              </Select>
+              <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
+              <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canEdit" autofocus /></FormControl>
+              <FormMessage />
             </FormItem>
           </FormField>
 
-          <FormField v-if="isNew" v-slot="{ componentField }" name="contentType">
+          <FormField v-slot="{ componentField }" name="subject">
             <FormItem>
-              <FormLabel>{{ t('campaigns.format') }}</FormLabel>
-              <Select v-bind="componentField">
-                <FormControl><SelectTrigger class="w-full" data-cy="format"><SelectValue /></SelectTrigger></FormControl>
-                <SelectContent>
-                  <SelectItem value="richtext">{{ t('campaigns.richText') }}</SelectItem>
-                  <SelectItem value="html">{{ t('campaigns.rawHTML') }}</SelectItem>
-                  <SelectItem value="markdown">{{ t('campaigns.markdown') }}</SelectItem>
-                  <SelectItem value="plain">{{ t('campaigns.plainText') }}</SelectItem>
-                  <SelectItem value="visual">{{ t('campaigns.visual') }}</SelectItem>
-                </SelectContent>
-              </Select>
+              <FormLabel>{{ t('campaigns.subject') }}</FormLabel>
+              <FormControl><Input v-bind="componentField" maxlength="5000" :disabled="!canEdit" /></FormControl>
+              <FormMessage />
             </FormItem>
           </FormField>
-        </div>
 
-        <FormField name="tags">
-          <FormItem>
-            <FormLabel>{{ t('globals.terms.tags') }}</FormLabel>
-            <TagsInput :model-value="values.tags ?? []" :disabled="!canEdit" add-on-blur @update:model-value="setFieldValue('tags', $event as string[])">
-              <TagsInputItem v-for="tag in values.tags" :key="tag" :value="tag">
-                <TagsInputItemText />
-                <TagsInputItemDelete />
-              </TagsInputItem>
-              <TagsInputInput :placeholder="t('globals.terms.tags')" />
-            </TagsInput>
-          </FormItem>
-        </FormField>
+          <FormField v-slot="{ componentField }" name="fromEmail">
+            <FormItem>
+              <FormLabel>{{ t('campaigns.fromAddress') }}</FormLabel>
+              <FormControl><Input v-bind="componentField" maxlength="200" :placeholder="t('campaigns.fromAddressPlaceholder')" :disabled="!canEdit" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
-        <div class="grid items-start gap-6 md:grid-cols-2">
-          <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
-            <label for="send-later" class="text-sm font-medium">{{ t('campaigns.sendLater') }}</label>
-            <Switch id="send-later" :model-value="values.sendLater" :disabled="!canEdit" data-cy="btn-send-later" @update:model-value="setFieldValue('sendLater', $event)" />
+          <FormField name="tags">
+            <FormItem>
+              <FormLabel>{{ t('globals.terms.tags') }}</FormLabel>
+              <TagsInput :model-value="values.tags ?? []" :disabled="!canEdit" add-on-blur @update:model-value="setFieldValue('tags', $event as string[])">
+                <TagsInputItem v-for="tag in values.tags" :key="tag" :value="tag">
+                  <TagsInputItemText />
+                  <TagsInputItemDelete />
+                </TagsInputItem>
+                <TagsInputInput :placeholder="t('globals.terms.tags')" />
+              </TagsInput>
+            </FormItem>
+          </FormField>
+        </FormSection>
+
+        <FormSection :title="t('web.campaigns.audience')" :description="t('web.campaigns.audienceHelp')">
+          <FormField name="lists">
+            <FormItem>
+              <FormLabel>{{ t('globals.terms.lists') }}</FormLabel>
+              <ListPicker :model-value="values.lists ?? []" :placeholder="t('campaigns.sendToLists')" :disabled="!canEdit" @update:model-value="setFieldValue('lists', $event)" />
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </FormSection>
+
+        <FormSection :title="t('web.campaigns.delivery')">
+          <div class="grid items-start gap-6 md:grid-cols-2">
+            <FormField v-slot="{ componentField }" name="messenger">
+              <FormItem>
+                <FormLabel>{{ t('globals.terms.messenger', 1) }}</FormLabel>
+                <Select v-bind="componentField" :disabled="!canEdit">
+                  <FormControl><SelectTrigger class="w-full"><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    <SelectItem v-for="m in emailMessengers" :key="m" :value="m">{{ m }}</SelectItem>
+                    <SelectItem v-for="m in otherMessengers" :key="m" :value="m">{{ m }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            </FormField>
+
+            <FormField v-if="isNew" v-slot="{ componentField }" name="contentType">
+              <FormItem>
+                <FormLabel>{{ t('campaigns.format') }}</FormLabel>
+                <Select v-bind="componentField">
+                  <FormControl><SelectTrigger class="w-full" data-cy="format"><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    <SelectItem value="richtext">{{ t('campaigns.richText') }}</SelectItem>
+                    <SelectItem value="html">{{ t('campaigns.rawHTML') }}</SelectItem>
+                    <SelectItem value="markdown">{{ t('campaigns.markdown') }}</SelectItem>
+                    <SelectItem value="plain">{{ t('campaigns.plainText') }}</SelectItem>
+                    <SelectItem value="visual">{{ t('campaigns.visual') }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            </FormField>
           </div>
-          <FormField v-if="values.sendLater" v-slot="{ componentField }" name="sendAt">
-            <FormItem>
-              <FormControl>
-                <Input v-bind="componentField" type="datetime-local" :disabled="!canEdit" :aria-label="t('campaigns.dateAndTime')" data-cy="send_at" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
 
-        <div class="space-y-2">
-          <button v-if="!headersVisible" type="button" class="flex items-center gap-1 text-sm text-primary hover:underline" data-cy="btn-headers" @click="showHeaders = true">
-            <Plus class="size-4" />{{ t('settings.smtp.setCustomHeaders') }}
-          </button>
-          <FormField v-if="headersVisible" v-slot="{ componentField }" name="headers">
-            <FormItem>
-              <FormLabel>{{ t('settings.smtp.setCustomHeaders') }}</FormLabel>
-              <FormControl>
-                <Textarea v-bind="componentField" class="font-mono text-xs" rows="4" :disabled="!canEdit" placeholder="[{&quot;X-Custom&quot;: &quot;value&quot;}]" />
-              </FormControl>
-              <FormDescription>{{ t('campaigns.customHeadersHelp') }}</FormDescription>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
+          <div class="grid items-start gap-6 md:grid-cols-2">
+            <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
+              <label for="send-later" class="text-sm font-medium">{{ t('campaigns.sendLater') }}</label>
+              <Switch id="send-later" :model-value="values.sendLater" :disabled="!canEdit" data-cy="btn-send-later" @update:model-value="setFieldValue('sendLater', $event)" />
+            </div>
+            <FormField v-if="values.sendLater" v-slot="{ componentField }" name="sendAt">
+              <FormItem>
+                <FormControl>
+                  <Input v-bind="componentField" type="datetime-local" :disabled="!canEdit" :aria-label="t('campaigns.dateAndTime')" data-cy="send_at" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+          </div>
+
+          <div class="space-y-2">
+            <button v-if="!headersVisible" type="button" class="flex items-center gap-1 text-sm text-primary hover:underline" data-cy="btn-headers" @click="showHeaders = true">
+              <Plus class="size-4" />{{ t('settings.smtp.setCustomHeaders') }}
+            </button>
+            <FormField v-if="headersVisible" v-slot="{ componentField }" name="headers">
+              <FormItem>
+                <FormLabel>{{ t('settings.smtp.setCustomHeaders') }}</FormLabel>
+                <FormControl>
+                  <Textarea v-bind="componentField" class="font-mono text-xs" rows="4" :disabled="!canEdit" placeholder="[{&quot;X-Custom&quot;: &quot;value&quot;}]" />
+                </FormControl>
+                <FormDescription>{{ t('campaigns.customHeadersHelp') }}</FormDescription>
+                <FormMessage />
+              </FormItem>
+            </FormField>
+          </div>
+        </FormSection>
 
         <!-- Test send -->
-        <section v-if="!isNew && canManage" class="space-y-3 rounded-lg border p-4">
-          <h3 class="text-sm font-medium">{{ t('campaigns.sendTest') }}</h3>
+        <FormSection v-if="!isNew && canManage" :title="t('campaigns.sendTest')" :description="t('campaigns.sendTestHelp')">
           <TagsInput :model-value="testEmails" add-on-blur @update:model-value="onTestEmails">
             <TagsInputItem v-for="e in testEmails" :key="e" :value="e">
               <TagsInputItemText />
@@ -364,11 +374,12 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
             </TagsInputItem>
             <TagsInputInput :aria-label="t('campaigns.testEmails')" :placeholder="t('campaigns.testEmails')" />
           </TagsInput>
-          <p class="text-xs text-muted-foreground">{{ t('campaigns.sendTestHelp') }}</p>
-          <Button type="button" variant="outline" size="sm" :disabled="!testEmails.length || sendTest.isPending.value" data-cy="btn-test" @click="runTest">
-            <Loader2 v-if="sendTest.isPending.value" class="animate-spin" /><Mail v-else />{{ t('campaigns.send') }}
-          </Button>
-        </section>
+          <div>
+            <Button type="button" variant="outline" size="sm" :disabled="!testEmails.length || sendTest.isPending.value" data-cy="btn-test" @click="runTest">
+              <Loader2 v-if="sendTest.isPending.value" class="animate-spin" /><Mail v-else />{{ t('campaigns.send') }}
+            </Button>
+          </div>
+        </FormSection>
       </TabsContent>
 
       <!-- Content -->
@@ -412,7 +423,7 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
       </TabsContent>
 
       <!-- Attributes -->
-      <TabsContent v-if="!isNew" value="attribs" class="pt-4">
+      <TabsContent v-if="!isNew" value="attribs" class="max-w-3xl pt-4">
         <FormField v-slot="{ componentField }" name="attribs">
           <FormItem>
             <FormLabel>{{ t('globals.terms.attribs') }}</FormLabel>
@@ -424,7 +435,7 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
       </TabsContent>
 
       <!-- Archive -->
-      <TabsContent v-if="!isNew" value="archive" class="space-y-6 pt-4">
+      <TabsContent v-if="!isNew" value="archive" class="max-w-3xl space-y-6 pt-4">
         <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
           <div class="space-y-0.5">
             <label for="archive" class="text-sm font-medium">{{ t('campaigns.archiveEnable') }}</label>
@@ -478,12 +489,8 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
       </TabsContent>
     </Tabs>
 
-    <div v-if="isNew" class="flex gap-2">
-      <Button v-if="canManage" type="submit" :disabled="saving" data-cy="btn-continue">
-        <Loader2 v-if="create.isPending.value" class="animate-spin" />{{ t('campaigns.continue') }}
-      </Button>
-      <Button type="button" variant="outline" @click="router.push({ name: 'campaigns' })">{{ t('globals.buttons.cancel') }}</Button>
-    </div>
+    <!-- Enter in a field submits; the visible buttons are in the page header. -->
+    <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
 
     <p v-if="Object.keys(errors).length && !isNew" class="sr-only" aria-live="polite">{{ Object.values(errors)[0] }}</p>
   </form>

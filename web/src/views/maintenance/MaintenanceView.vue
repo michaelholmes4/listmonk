@@ -7,6 +7,7 @@ import { toast } from 'vue-sonner'
 import { deleteOldEvents } from '@/api/automations'
 import { analyticsExportURL, type AnalyticsType, type OrphanType } from '@/api/maintenance'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import Page from '@/components/layout/Page.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -79,12 +80,7 @@ function run() {
 </script>
 
 <template>
-  <div class="max-w-4xl space-y-6 p-6">
-    <header class="space-y-1">
-      <h1 class="text-xl font-semibold">{{ t('maintenance.title') }}</h1>
-      <p class="text-sm text-muted-foreground">{{ t('maintenance.help') }}</p>
-    </header>
-
+  <Page :title="t('maintenance.title')" :description="t('maintenance.help')" width="form">
     <section class="space-y-4 rounded-lg border p-4" data-cy="gc-subscribers">
       <h2 class="font-medium">{{ t('globals.terms.subscribers') }}</h2>
       <div class="flex flex-wrap items-end gap-4">
@@ -98,7 +94,7 @@ function run() {
             </SelectContent>
           </Select>
         </div>
-        <Button :disabled="busy" @click="pending = 'subscribers'">{{ t('globals.buttons.delete') }}</Button>
+        <Button variant="destructive" :disabled="busy" @click="pending = 'subscribers'">{{ t('globals.buttons.delete') }}</Button>
       </div>
       <p class="text-xs text-muted-foreground">{{ t('maintenance.orphanHelp') }}</p>
     </section>
@@ -119,7 +115,7 @@ function run() {
           <Label for="gc-subscriptions-date">{{ t('maintenance.olderThan') }}</Label>
           <Input id="gc-subscriptions-date" v-model="subscriptionDate" type="date" class="w-44" />
         </div>
-        <Button :disabled="busy || !subscriptionDate" @click="pending = 'subscriptions'">{{ t('globals.buttons.delete') }}</Button>
+        <Button variant="destructive" :disabled="busy || !subscriptionDate" @click="pending = 'subscriptions'">{{ t('globals.buttons.delete') }}</Button>
       </div>
     </section>
 
@@ -142,7 +138,7 @@ function run() {
             <Label for="gc-analytics-date">{{ t('maintenance.olderThan') }}</Label>
             <Input id="gc-analytics-date" v-model="analyticsDate" type="date" class="w-44" />
           </div>
-          <Button :disabled="busy || !analyticsDate" @click="pending = 'analytics'">{{ t('globals.buttons.delete') }}</Button>
+          <Button variant="destructive" :disabled="busy || !analyticsDate" @click="pending = 'analytics'">{{ t('globals.buttons.delete') }}</Button>
         </div>
       </div>
 
@@ -177,7 +173,7 @@ function run() {
           <Label for="gc-events-date">{{ t('maintenance.olderThan') }}</Label>
           <Input id="gc-events-date" v-model="eventsDate" type="date" class="w-44" />
         </div>
-        <Button :disabled="busy || !eventsDate" @click="pending = 'events'">{{ t('globals.buttons.delete') }}</Button>
+        <Button variant="destructive" :disabled="busy || !eventsDate" @click="pending = 'events'">{{ t('globals.buttons.delete') }}</Button>
       </div>
       <p class="text-xs text-muted-foreground">{{ t('web.maintenance.eventsHelp') }}</p>
     </section>
@@ -192,5 +188,5 @@ function run() {
       :pending="busy"
       @confirm="run"
     />
-  </div>
+  </Page>
 </template>

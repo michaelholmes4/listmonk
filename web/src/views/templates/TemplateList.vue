@@ -9,6 +9,7 @@ import { getTemplate } from '@/api/templates'
 import type { Template } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import DataTable from '@/components/datatable/DataTable.vue'
+import Page from '@/components/layout/Page.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import PromptDialog from '@/components/PromptDialog.vue'
 import { Button } from '@/components/ui/button'
@@ -102,17 +103,12 @@ const columns = createColumns({
 </script>
 
 <template>
-  <Teleport defer to="#page-actions">
-    <Button v-if="can('templates:manage')" size="sm" @click="router.push({ name: 'template-new' })">
-      <Plus />{{ t('globals.buttons.new') }}
-    </Button>
-  </Teleport>
-
-  <div class="space-y-4 p-6">
-    <h1 class="text-xl font-semibold">
-      {{ t('globals.terms.templates') }}
-      <span v-if="data?.length" class="text-muted-foreground tabular-nums">({{ data.length }})</span>
-    </h1>
+  <Page :title="t('globals.terms.templates')" :count="data?.length">
+    <template #actions>
+      <Button v-if="can('templates:manage')" size="sm" data-cy="btn-new" @click="router.push({ name: 'template-new' })">
+        <Plus />{{ t('templates.newTemplate') }}
+      </Button>
+    </template>
 
     <DataTable
       v-model:sorting="sorting"
@@ -121,8 +117,9 @@ const columns = createColumns({
       :loading="isPending"
       :paginated="false"
       :row-id="(r: Template) => String(r.id)"
+      :empty-text="t('web.templates.emptyTitle')"
     />
-  </div>
+  </Page>
 
   <PreviewDialog v-model:open="previewOpen" :title="previewing?.name ?? ''" :html="preview.data.value" :pending="preview.isPending.value" />
 
@@ -130,7 +127,7 @@ const columns = createColumns({
     v-model:open="cloneOpen"
     :title="t('globals.buttons.clone')"
     :label="t('globals.fields.name')"
-    :initial="cloning ? `Copy of ${cloning.name}` : ''"
+    :initial="cloning ? t('campaigns.copyOf', { name: cloning.name }) : ''"
     :confirm-label="t('globals.buttons.clone')"
     :pending="create.isPending.value"
     @submit="clone"

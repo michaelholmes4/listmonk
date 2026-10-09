@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import CopyText from '@/components/CopyText.vue'
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCampaign } from '@/composables/queries/useCampaigns'
@@ -21,7 +21,7 @@ usePageTitle(() => campaign.value?.name)
 </script>
 
 <template>
-  <FormPage :title="campaign?.name ?? '…'">
+  <Page :title="campaign?.name ?? '…'">
     <template v-if="campaign" #badges>
       <Badge :variant="statusVariant(campaign.status)">{{ t(`campaigns.status.${campaign.status}`) }}</Badge>
       <Badge v-if="campaign.type === 'optin'" variant="outline">{{ t('lists.optin') }}</Badge>
@@ -39,5 +39,5 @@ usePageTitle(() => campaign.value?.name)
     <!-- Keyed by id so moving between campaigns never reuses another one's form state. -->
     <Form v-else :key="campaign.id" :campaign="campaign" />
     <template #help><CampaignHelp /></template>
-  </FormPage>
+  </Page>
 </template>

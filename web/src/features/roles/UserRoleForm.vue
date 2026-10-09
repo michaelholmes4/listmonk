@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
-import { Loader2, TriangleAlert } from '@lucide/vue'
+import { TriangleAlert } from '@lucide/vue'
 import { useForm } from 'vee-validate'
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { Role } from '@/api/types'
+import FormActions from '@/components/layout/FormActions.vue'
+import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -14,6 +16,7 @@ import { useConfig } from '@/composables/queries/useConfig'
 import { useCreateUserRole, useUpdateUserRole } from '@/composables/queries/useRoles'
 import { useGoBack } from '@/composables/useGoBack'
 import { usePermission } from '@/composables/usePermission'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import {
   SUPER_ADMIN_ROLE_ID,
   emptyUserRole,
@@ -38,7 +41,7 @@ const create = useCreateUserRole()
 const update = useUpdateUserRole()
 const saving = computed(() => create.isPending.value || update.isPending.value)
 
-const { handleSubmit, resetForm, values, setFieldValue } = useForm({
+const { handleSubmit, resetForm, values, setFieldValue, meta } = useForm({
   validationSchema: toTypedSchema(userRoleSchema(t)),
   initialValues: props.role ? toUserRoleForm(props.role) : emptyUserRole(groups.value),
 })
@@ -60,11 +63,19 @@ function toggle(p: string, on: boolean) {
   setFieldValue('permissions', on ? [...cur, p] : cur.filter((x) => x !== p))
 }
 
+const dirty = computed(() => !readonly.value && meta.value.dirty)
+const { leaveOpen, decide } = useUnsavedGuard(dirty, saving)
+/** After a successful save: the form is clean again, then leave. */
+const savedAndBack = () => {
+  resetForm({ values: { ...values } })
+  goBack()
+}
+
 const onSubmit = handleSubmit((v) => {
   const body = toUserRoleRequest(v)
   const done = (name: string | null | undefined, key: 'created' | 'updated') => {
     toast.success(t(`globals.messages.${key}`, { name: name ?? v.name }))
-    goBack()
+    savedAndBack()
   }
   if (!props.role) create.mutate(body, { onSuccess: (r) => done(r.name, 'created') })
   else update.mutate({ id: props.role.id!, body }, { onSuccess: (r) => done(r.name, 'updated') })
@@ -72,6 +83,7 @@ const onSubmit = handleSubmit((v) => {
 </script>
 
 <template>
+  <FormActions :pending="saving" :dirty="role ? dirty : undefined" :can-save="!readonly" :on-cancel="goBack" @save="onSubmit" />
   <form class="space-y-6" @submit.prevent="onSubmit">
     <FormField v-slot="{ componentField }" name="name">
       <FormItem>
@@ -117,12 +129,8 @@ const onSubmit = handleSubmit((v) => {
       </div>
     </section>
 
-    <div class="flex gap-2">
-      <Button v-if="!readonly" type="submit" :disabled="saving">
-        <Loader2 v-if="saving" class="animate-spin" />
-        {{ t('globals.buttons.save') }}
-      </Button>
-      <Button type="button" variant="outline" @click="goBack">{{ readonly ? t('globals.buttons.close') : t('globals.buttons.cancel') }}</Button>
-    </div>
+    <!-- Enter in a field submits; the visible Save button is in the page header. -->
+    <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
   </form>
+  <LeaveConfirm :open="leaveOpen" @decide="decide" />
 </template>

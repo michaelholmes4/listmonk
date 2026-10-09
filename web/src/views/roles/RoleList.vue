@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import DataTable from '@/components/datatable/DataTable.vue'
+import Page from '@/components/layout/Page.vue'
 import PromptDialog from '@/components/PromptDialog.vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -89,17 +90,12 @@ const columns = computed(() =>
 </script>
 
 <template>
-  <Teleport defer to="#page-actions">
-    <Button v-if="can('roles:manage')" size="sm" data-cy="btn-new" @click="router.push({ name: newRoute })">
-      <Plus />{{ t('globals.buttons.new') }}
-    </Button>
-  </Teleport>
-
-  <div class="space-y-4 p-6">
-    <h1 class="text-xl font-semibold">
-      {{ kind === 'user' ? t('users.userRoles') : t('users.listRoles') }}
-      <span v-if="data.length" class="text-muted-foreground tabular-nums">({{ data.length }})</span>
-    </h1>
+  <Page :title="kind === 'user' ? t('users.userRoles') : t('users.listRoles')" :count="isPending ? undefined : data.length">
+    <template #actions>
+      <Button v-if="can('roles:manage')" size="sm" data-cy="btn-new" @click="router.push({ name: newRoute })">
+        <Plus />{{ kind === 'user' ? t('users.newUserRole') : t('users.newListRole') }}
+      </Button>
+    </template>
 
     <DataTable
       v-model:sorting="sorting"
@@ -109,7 +105,7 @@ const columns = computed(() =>
       :paginated="false"
       :row-id="(r: RoleRow) => String(r.id)"
     />
-  </div>
+  </Page>
 
   <PromptDialog
     v-model:open="cloneOpen"

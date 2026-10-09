@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
-import { Code, Loader2, UserRound } from '@lucide/vue'
+import { Code, UserRound } from '@lucide/vue'
 import { useForm } from 'vee-validate'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { User } from '@/api/types'
 import CopyText from '@/components/CopyText.vue'
-import { Button } from '@/components/ui/button'
+import FormActions from '@/components/layout/FormActions.vue'
+import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ import { useListRoles, useUserRoles } from '@/composables/queries/useRoles'
 import { useCreateUser, useUpdateUser } from '@/composables/queries/useUsers'
 import { useGoBack } from '@/composables/useGoBack'
 import { usePermission } from '@/composables/usePermission'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { emptyUser, toForm, toRequest, userSchema } from './schema'
 
 /** Create (no `user`) or edit. Leaves the page on success or cancel; a new API user stays to show its token. */
@@ -35,7 +37,7 @@ const create = useCreateUser()
 const update = useUpdateUser()
 const saving = computed(() => create.isPending.value || update.isPending.value)
 
-const { handleSubmit, resetForm, values, setFieldValue } = useForm({
+const { handleSubmit, resetForm, values, setFieldValue, meta } = useForm({
   validationSchema: toTypedSchema(userSchema(t, !!props.user)),
   initialValues: props.user ? toForm(props.user) : emptyUser(),
   // Email and password fields disappear for API users; their values (and the schema) must not.
@@ -52,6 +54,14 @@ const apiToken = ref<string | null>(null)
 
 const NONE = 'none'
 
+const dirty = computed(() => canManage.value && !apiToken.value && meta.value.dirty)
+const { leaveOpen, decide } = useUnsavedGuard(dirty, saving)
+/** After a successful save: the form is clean again, then leave. */
+const savedAndBack = () => {
+  resetForm({ values: { ...values } })
+  goBack()
+}
+
 const onSubmit = handleSubmit((v) => {
   const body = toRequest(v)
   if (!props.user) {
@@ -59,7 +69,7 @@ const onSubmit = handleSubmit((v) => {
       onSuccess: (u) => {
         toast.success(t('globals.messages.created', { name: u.name }))
         if (u.type === 'api') apiToken.value = u.password ?? null
-        else goBack()
+        else savedAndBack()
       },
     })
   } else {
@@ -68,7 +78,7 @@ const onSubmit = handleSubmit((v) => {
       {
         onSuccess: (u) => {
           toast.success(t('globals.messages.updated', { name: u.name }))
-          goBack()
+          savedAndBack()
         },
       },
     )
@@ -77,6 +87,7 @@ const onSubmit = handleSubmit((v) => {
 </script>
 
 <template>
+  <FormActions :pending="saving" :dirty="user ? dirty : undefined" :can-save="canManage && !apiToken" :on-cancel="goBack" @save="onSubmit" />
   <form class="space-y-6" @submit.prevent="onSubmit">
     <div class="grid items-start gap-6 md:grid-cols-2">
       <FormField name="type">
@@ -215,14 +226,8 @@ const onSubmit = handleSubmit((v) => {
       <CopyText :text="apiToken" />
     </div>
 
-    <div class="flex gap-2">
-      <Button v-if="canManage && !apiToken" type="submit" :disabled="saving">
-        <Loader2 v-if="saving" class="animate-spin" />
-        {{ t('globals.buttons.save') }}
-      </Button>
-      <Button type="button" :variant="apiToken ? 'default' : 'outline'" @click="goBack">
-        {{ canManage && !apiToken ? t('globals.buttons.cancel') : t('globals.buttons.close') }}
-      </Button>
-    </div>
+    <!-- Enter in a field submits; the visible Save button is in the page header. -->
+    <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
   </form>
+  <LeaveConfirm :open="leaveOpen" @decide="decide" />
 </template>

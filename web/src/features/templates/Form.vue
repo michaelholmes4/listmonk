@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
-import { Eye, Loader2 } from '@lucide/vue'
+import { Eye } from '@lucide/vue'
 import { useEventListener } from '@vueuse/core'
 import { useForm } from 'vee-validate'
 import { computed, ref, watch } from 'vue'
@@ -9,6 +9,8 @@ import { toast } from 'vue-sonner'
 import type { Template } from '@/api/types'
 import CodeEditor from '@/components/CodeEditor.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
+import FormActions from '@/components/layout/FormActions.vue'
+import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -17,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useCreateTemplate, usePreviewTemplate, useUpdateTemplate } from '@/composables/queries/useTemplates'
 import { useGoBack } from '@/composables/useGoBack'
 import { usePermission } from '@/composables/usePermission'
+import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import VisualEditor from '@/features/campaigns/visual/VisualEditor.vue'
 import { typeLabelKey } from './columns'
 import { emptyTemplate, hasContentPlaceholder, templateSchema, toForm } from './schema'
@@ -34,7 +37,7 @@ const create = useCreateTemplate()
 const update = useUpdateTemplate()
 const saving = computed(() => create.isPending.value || update.isPending.value)
 
-const { handleSubmit, resetForm, values, setFieldValue } = useForm({
+const { handleSubmit, resetForm, values, setFieldValue, meta } = useForm({
   validationSchema: toTypedSchema(templateSchema(t)),
   initialValues: props.template ? toForm(props.template) : emptyTemplate(),
 })
@@ -53,11 +56,19 @@ function onVisualChange(v: { source: string; body: string }) {
   setFieldValue('bodySource', v.source)
 }
 
+const dirty = computed(() => canManage.value && meta.value.dirty)
+const { leaveOpen, decide } = useUnsavedGuard(dirty, saving)
+/** After a successful save: the form is clean again, then leave. */
+const savedAndBack = () => {
+  resetForm({ values: { ...values } })
+  goBack()
+}
+
 const onSubmit = handleSubmit((v) => {
   const body = { name: v.name, type: v.type, subject: v.type === 'tx' ? v.subject : '', body: v.body, body_source: v.bodySource ?? undefined }
   const done = (name: string | undefined, key: 'created' | 'updated') => {
     toast.success(t(`globals.messages.${key}`, { name: name ?? v.name }))
-    goBack()
+    savedAndBack()
   }
   if (!props.template) create.mutate(body, { onSuccess: (r) => done(r.name, 'created') })
   else update.mutate({ id: props.template.id!, body }, { onSuccess: (r) => done(r.name, 'updated') })
@@ -79,6 +90,7 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
 </script>
 
 <template>
+  <FormActions :pending="saving" :dirty="template ? dirty : undefined" :can-save="canManage" :on-cancel="goBack" @save="onSubmit" />
   <form class="space-y-6" @submit.prevent="onSubmit">
     <div class="grid items-start gap-6 md:grid-cols-[1fr_14rem]">
       <FormField v-slot="{ componentField }" name="name">
@@ -152,16 +164,10 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
       </FormItem>
     </FormField>
 
-    <div class="flex gap-2">
-      <Button v-if="canManage" type="submit" :disabled="saving">
-        <Loader2 v-if="saving" class="animate-spin" />
-        {{ t('globals.buttons.save') }}
-      </Button>
-      <Button type="button" variant="outline" @click="goBack">
-        {{ canManage ? t('globals.buttons.cancel') : t('globals.buttons.close') }}
-      </Button>
-    </div>
+    <!-- Enter in a field submits; the visible Save button is in the page header. -->
+    <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
 
     <PreviewDialog v-model:open="previewOpen" :title="values.name || t('templates.preview')" :html="preview.data.value" :pending="preview.isPending.value" />
   </form>
+  <LeaveConfirm :open="leaveOpen" @decide="decide" />
 </template>

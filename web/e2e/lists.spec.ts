@@ -43,7 +43,7 @@ test('lists: create, edit, archive, delete', async ({ page }) => {
   await expect(row.getByRole('button', { name: 'Send opt-in campaign' })).toBeVisible()
 
   // Edit page: breadcrumb and tab title carry the list's name
-  await row.getByRole('button', { name }).click()
+  await row.getByRole('link', { name }).click()
   await expect(page).toHaveURL(/\/lists\/\d+$/)
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name)
   await expect(page.getByRole('navigation', { name: 'breadcrumb' }).getByText(name)).toBeVisible()
@@ -57,7 +57,7 @@ test('lists: create, edit, archive, delete', async ({ page }) => {
   await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name.replace(/\d+$/, '').trim())
   await expect(page.getByRole('row', { name: new RegExp(name) })).toHaveCount(0)
 
-  await page.getByRole('link', { name: /view archived/i }).click()
+  await page.locator('[data-cy=view-archived]').click()
   await expect(page).toHaveURL(/status=archived/)
   const archived = page.getByRole('row', { name: new RegExp(name) })
   await expect(archived).toBeVisible()

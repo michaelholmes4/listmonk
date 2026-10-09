@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import CopyText from '@/components/CopyText.vue'
-import FormPage from '@/components/layout/FormPage.vue'
+import Page from '@/components/layout/Page.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUser } from '@/composables/queries/useUsers'
@@ -20,7 +20,7 @@ usePageTitle(() => user.value?.name || user.value?.username)
 </script>
 
 <template>
-  <FormPage :title="user?.name || user?.username || '…'">
+  <Page width="form" :title="user?.name || user?.username || '…'">
     <template v-if="user" #badges>
       <Badge v-if="user.type === 'api'" variant="outline">{{ t('users.type.api') }}</Badge>
       <Badge v-if="user.status === 'disabled'" variant="secondary">{{ t('users.status.disabled') }}</Badge>
@@ -36,5 +36,5 @@ usePageTitle(() => user.value?.name || user.value?.username)
     </div>
     <Form v-else :key="user.id" :user="user" />
     <template #help><UserHelp /></template>
-  </FormPage>
+  </Page>
 </template>
