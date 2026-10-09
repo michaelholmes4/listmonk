@@ -1,6 +1,6 @@
 import { onScopeDispose, ref, toValue, watchEffect, type MaybeRefOrGetter } from 'vue'
 
-/** The document title from index.html, e.g. "librelist". Page titles are prefixed to it. */
+/** The document title from index.html, e.g. "listmonk". Page titles are prefixed to it. */
 export const baseTitle = document.title
 
 /** Set by detail pages so the breadcrumb and tab title show the object's name, not the route's. */

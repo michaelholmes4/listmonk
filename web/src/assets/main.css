@@ -59,7 +59,8 @@
 }
 
 /*
- * Theme tokens. Values are adapted from libredesk's DESIGN.md (AGPL-3.0, see NOTICE).
+ * Theme tokens. Values are adapted from libredesk's DESIGN.md (AGPL-3.0, see NOTICE),
+ * with the brand hue swapped from libredesk green to listmonk blue (#0055d4).
  * This is the ONLY place colours are defined: feature code uses the token classes
  * (bg-success, text-muted-foreground, ...) and never a raw palette colour.
  */
@@ -71,7 +72,7 @@
   --card-foreground: hsl(0 0% 1%);
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(0 0% 1%);
-  --primary: hsl(152 39% 30%);
+  --primary: hsl(216 100% 42%);
   --primary-foreground: hsl(0 0% 100%);
   --secondary: hsl(0 0% 96%);
   --secondary-foreground: hsl(0 0% 1%);
@@ -89,7 +90,7 @@
   --link: hsl(210 100% 40%);
   --border: hsl(0 0% 91%);
   --input: hsl(0 0% 85%);
-  --ring: hsl(151 41% 45%);
+  --ring: hsl(216 80% 55%);
   --canvas: hsl(0 0% 82%);
   --chart-1: var(--primary);
   --chart-2: var(--success);
@@ -108,21 +109,21 @@
 }
 
 .dark {
-  --background: hsl(120 2.6% 7.6%);
-  --foreground: hsl(150 6% 93%);
-  --foreground-lighter: hsl(150 1% 60%);
-  --card: hsl(120 2% 10%);
-  --card-foreground: hsl(150 6% 93%);
-  --popover: hsl(120 2% 12%);
-  --popover-foreground: hsl(150 6% 93%);
-  --primary: hsl(152 58% 54%);
-  --primary-foreground: hsl(120 2.6% 7.6%);
-  --secondary: hsl(150 3% 12%);
-  --secondary-foreground: hsl(150 6% 93%);
-  --muted: hsl(150 3% 13%);
-  --muted-foreground: hsl(120 1% 74%);
-  --accent: hsl(150 3% 15%);
-  --accent-foreground: hsl(150 6% 93%);
+  --background: hsl(216 2.6% 7.6%);
+  --foreground: hsl(216 6% 93%);
+  --foreground-lighter: hsl(216 1% 60%);
+  --card: hsl(216 2% 10%);
+  --card-foreground: hsl(216 6% 93%);
+  --popover: hsl(216 2% 12%);
+  --popover-foreground: hsl(216 6% 93%);
+  --primary: hsl(216 100% 68%);
+  --primary-foreground: hsl(216 2.6% 7.6%);
+  --secondary: hsl(216 3% 12%);
+  --secondary-foreground: hsl(216 6% 93%);
+  --muted: hsl(216 3% 13%);
+  --muted-foreground: hsl(216 1% 74%);
+  --accent: hsl(216 3% 15%);
+  --accent-foreground: hsl(216 6% 93%);
   --destructive: hsl(4 92% 74%);
   --destructive-foreground: hsl(12 38% 3%);
   --success: hsl(142 55% 55%);
@@ -131,10 +132,10 @@
   --warning-foreground: hsl(24 45% 2%);
   --warning-600: hsl(36 87% 62%);
   --link: hsl(210 90% 66%);
-  --border: hsl(150 2% 16%);
-  --input: hsl(150 2% 19%);
-  --ring: hsl(152 45% 33%);
-  --canvas: hsl(120 3% 4%);
+  --border: hsl(216 2% 16%);
+  --input: hsl(216 2% 19%);
+  --ring: hsl(216 60% 40%);
+  --canvas: hsl(216 3% 4%);
 }
 
 @layer base {

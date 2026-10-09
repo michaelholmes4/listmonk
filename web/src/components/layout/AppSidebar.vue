@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Mail } from '@lucide/vue'
+import { ArrowLeft } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { navigation, spaceEntry } from '@/nav'
+import AppLogo from './AppLogo.vue'
 import NavMain from './NavMain.vue'
 import NavUser from './NavUser.vue'
 
@@ -36,12 +37,11 @@ watch(
         <SidebarMenuItem>
           <SidebarMenuButton size="lg" as-child>
             <RouterLink :to="{ name: 'dashboard' }">
-              <div
-                class="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
-              >
-                <Mail class="size-4" />
+              <!-- The menu button sizes every svg to size-4, so the logo sizes are forced. -->
+              <AppLogo class="ml-1 h-5! w-auto! group-data-[collapsible=icon]:hidden" />
+              <div class="hidden size-8 items-center justify-center group-data-[collapsible=icon]:flex">
+                <AppLogo mark class="size-5!" />
               </div>
-              <span class="truncate text-base font-semibold">librelist</span>
             </RouterLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
