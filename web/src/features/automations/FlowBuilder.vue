@@ -170,7 +170,7 @@ defineExpose({
 <template>
   <!-- The row reaches up to the page header and down to the bottom edge (the page's padding is cancelled), so the docked panel fills the space below the header. -->
   <div ref="root" :class="cn('-mt-6 flex items-start', docked && panel.subject.value && '-mb-8 min-h-[calc(var(--page-viewport-h)-var(--page-header-h))]')">
-    <div class="flex min-w-0 flex-1 flex-col items-center gap-2 pt-6 pb-8" data-cy="builder">
+    <div :class="cn('flex min-w-0 flex-1 flex-col items-center gap-2 pt-6 pb-8', docked && panel.subject.value && 'pr-6')" data-cy="builder">
       <div v-if="$slots.notices" class="w-full space-y-2"><slot name="notices" /></div>
       <TriggerCard v-for="tr in flow.triggers" :key="tr.id" :trigger="tr" @remove="removeTrigger(tr.id)" />
       <p v-if="flow.triggers.length > 1" class="text-xs text-muted-foreground">{{ t('web.automations.triggersAny') }}</p>
