@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { newStep, type Flow, type Step } from './model'
-import { flowIssues, stepIssues, triggerIssues } from './validate'
+import { flowToGraph, newStep, type Flow, type Step } from './model'
+import { flowIssues, instantLoops, stepIssues, triggerIssues } from './validate'
 
 const flow = (steps: Step[]): Flow => ({ triggers: [{ id: 't', type: 'event', config: { event: 'x' } }], steps })
 const ctx = (f: Flow) => ({ flow: f, allowSQL: false })
@@ -91,5 +91,56 @@ describe('wait for an event', () => {
     expect(fields(wait({ timeout: '1h', events: eleven }))).toEqual(['events'])
     expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: ' ' }] }))).toEqual(['event.0'])
     expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: 'a' }, { id: 'e2', name: ' a' }] }))).toEqual(['event.1'])
+  })
+})
+
+describe('go to', () => {
+  const goTo = (config: Record<string, unknown>): Step => ({ id: 'g', type: 'go_to', config })
+  const fields = (s: Step, f: Flow) => stepIssues(s, ctx(f)).map((i) => i.field)
+  const mailStep = (id: string): Step => ({ id, type: 'send_email', config: { message_type: 'transactional', campaign_id: 1 } })
+
+  it('needs an existing target and a sensible limit', () => {
+    const m = mailStep('m')
+    expect(fields(goTo({}), flow([m]))).toEqual(['target'])
+    expect(fields(goTo({ target: 'gone' }), flow([m]))).toEqual(['target'])
+    expect(fields(goTo({ target: 'm' }), flow([m, goTo({ target: 'm' })]))).toEqual([])
+    expect(fields(goTo({ target: 'm', max_runs: 100 }), flow([m]))).toEqual([])
+    expect(fields(goTo({ target: 'm', max_runs: 0 }), flow([m]))).toEqual(['max_runs'])
+    expect(fields(goTo({ target: 'm', max_runs: 101 }), flow([m]))).toEqual(['max_runs'])
+    expect(fields(goTo({ target: 'm', max_runs: 1.5 }), flow([m]))).toEqual(['max_runs'])
+  })
+
+  // check { yes: [wait, mail, back -> wait] }
+  const looping = (wait: Step): Flow =>
+    flow([
+      {
+        id: 'check',
+        type: 'condition',
+        config: { rule: { type: 'event', name: 'x', operator: 'occurred' } },
+        branches: { yes: [wait, mailStep('m'), { ...goTo({ target: wait.id }), id: 'back' }], no: [] },
+      },
+    ])
+
+  it('rejects a loop with no pause in it', () => {
+    expect(instantLoops(flowToGraph(looping({ id: 'w', type: 'wait_until', config: { attribute: 'when' } })))).toEqual(['back'])
+    expect(flowIssues(looping({ id: 'w', type: 'wait_until', config: { attribute: 'when' } }), false).get('back')?.map((i) => i.key)).toContain('web.automations.goTo.instantLoop')
+  })
+
+  it('accepts a loop through a delay or a wait for an event', () => {
+    expect(instantLoops(flowToGraph(looping({ id: 'w', type: 'delay', config: { duration: '1d' } })))).toEqual([])
+    expect(instantLoops(flowToGraph(looping({ id: 'w', type: 'wait_for_event', config: { timeout: '1d', events: [] }, branches: { timeout: [] } })))).toEqual([])
+  })
+
+  it('accepts a join into another path', () => {
+    const f = flow([
+      {
+        id: 'check',
+        type: 'condition',
+        config: { rule: { type: 'event', name: 'x', operator: 'occurred' } },
+        branches: { yes: [mailStep('a'), mailStep('tail')], no: [{ ...goTo({ target: 'tail' }), id: 'join' }] },
+      },
+    ])
+    expect(instantLoops(flowToGraph(f))).toEqual([])
+    expect(flowIssues(f, false).has('join')).toBe(false)
   })
 })

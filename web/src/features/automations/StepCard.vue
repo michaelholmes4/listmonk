@@ -19,6 +19,7 @@ const summary = computed(() => stepSummary(t, props.step, b.lookups))
 const issues = computed(() => b.issues.value.get(props.step.id) ?? [])
 const problems = computed(() => b.problems.value.get(props.step.id) ?? [])
 const warn = computed(() => issues.value.length > 0 || problems.value.length > 0)
+const alsoReached = computed(() => (b.jumps.value.get(props.step.id) ?? []).length > 0)
 const stat = computed(() => b.stats.value.get(props.step.id))
 </script>
 
@@ -28,10 +29,13 @@ const stat = computed(() => b.stats.value.get(props.step.id))
       cn(
         'group relative flex w-full max-w-md items-center gap-3 rounded-lg border bg-card p-3 text-card-foreground shadow-xs transition-colors hover:border-ring/60',
         warn && 'border-destructive/60',
+        b.highlight.value === step.id && 'ring-2 ring-ring',
       )
     "
     :data-cy="`step-${step.id}`"
     :data-type="step.type"
+    @mouseenter="step.type === 'go_to' && (b.highlight.value = String(step.config.target ?? '') || null)"
+    @mouseleave="step.type === 'go_to' && (b.highlight.value = null)"
   >
     <button
       type="button"
@@ -48,6 +52,7 @@ const stat = computed(() => b.stats.value.get(props.step.id))
         <template v-if="summary">{{ summary }}</template>
         <template v-else-if="step.type !== 'condition' && step.type !== 'exit'">{{ t('web.automations.notSetUp') }}</template>
       </p>
+      <p v-if="alsoReached" class="truncate text-xs text-muted-foreground" data-cy="also-reached">{{ t('web.automations.goTo.alsoReached') }}</p>
     </div>
 
     <div v-if="stat" class="relative z-10 text-right text-xs tabular-nums text-muted-foreground" :title="t('web.automations.statsHelp')">

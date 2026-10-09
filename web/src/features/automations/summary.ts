@@ -1,3 +1,4 @@
+import { stepMeta } from './labels'
 import { waitEvents, type Config, type Step, type Trigger } from './model'
 
 type T = (key: string, params?: Record<string, unknown>) => string
@@ -5,6 +6,8 @@ type T = (key: string, params?: Record<string, unknown>) => string
 export interface Lookups {
   /** List names by id. */
   list: (id: number) => string | undefined
+  /** A step of the flow by id (a go to shows where it goes). */
+  step?: (id: string) => Step | undefined
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -59,6 +62,12 @@ export function stepSummary(t: T, s: Step, l: Lookups, c: Config = s.config): st
     }
     case 'condition':
       return ''
+    case 'go_to': {
+      const target = str(c.target) ? l.step?.(str(c.target)) : undefined
+      if (!target) return ''
+      const inner = target.type === 'go_to' ? '' : stepSummary(t, target, l)
+      return `→ ${t(stepMeta[target.type].title)}${inner ? `: ${inner}` : ''}`
+    }
     case 'update_attribute':
       return !c.attribute ? '' : c.unset ? t('web.automations.removeAttribute', { name: str(c.attribute) }) : `${str(c.attribute)} = ${typeof c.value === 'string' ? c.value : JSON.stringify(c.value)}`
     case 'add_to_list':

@@ -5,8 +5,9 @@ import type { AutomationGraph } from '@/api/types'
  * server stores nodes and edges. These two views of the same thing are converted here, and nothing
  * else in the UI deals with edges.
  *
- * Shape rules (the server enforces the same): a branching step and an exit end their list, because a
- * branching step's continuation is its paths and nothing follows an exit.
+ * Shape rules (the server enforces the same): a branching step, an exit and a go to end their list, because a
+ * branching step's continuation is its paths and nothing follows an exit or a go to. A go to keeps its target
+ * in its config, so it is a leaf here.
  */
 
 export const stepTypes = [
@@ -15,6 +16,7 @@ export const stepTypes = [
   'wait_until',
   'wait_for_event',
   'condition',
+  'go_to',
   'update_attribute',
   'add_to_list',
   'remove_from_list',
@@ -82,8 +84,8 @@ export function syncBranches(s: Step) {
   s.branches = Object.fromEntries(handles.map((h) => [h, old[h] ?? []]))
 }
 
-/** True when nothing can be added after this step in its list: a branching step continues in its paths, nothing follows an exit. */
-export const endsList = (s: Step | undefined) => !!s && (isBranching(s.type) || s.type === 'exit')
+/** True when nothing can be added after this step in its list: a branching step continues in its paths, nothing follows an exit or a go to. */
+export const endsList = (s: Step | undefined) => !!s && (isBranching(s.type) || s.type === 'exit' || s.type === 'go_to')
 
 export const defaultConfig = (type: StepType): Config => {
   switch (type) {
@@ -97,6 +99,8 @@ export const defaultConfig = (type: StepType): Config => {
       return { timeout: '1h', events: [{ id: 'e1', name: '', restart: false }] }
     case 'condition':
       return { rule: { op: 'and', rules: [{ type: 'attribute', path: '', operator: 'eq', value: '' }] } }
+    case 'go_to':
+      return { target: '', max_runs: 25 }
     case 'update_attribute':
       return { attribute: '', value: '' }
     case 'add_to_list':
@@ -267,6 +271,19 @@ function pathTo(list: Step[], id: string, passed: Step[]): Step[] | undefined {
 /** Email steps that come before `id` on its path: the ones a condition there may ask about. */
 export const emailStepsBefore = (f: Flow, id: string): Step[] =>
   (pathTo(f.steps, id, []) ?? []).filter((s) => s.type === 'send_email')
+
+/** The steps a go to can continue at: every step except go to steps, in flow order. */
+export const goToTargets = (f: Flow, id: string): Step[] => [...allSteps(f.steps)].filter((s) => s.id !== id && s.type !== 'go_to')
+
+/** Target step id -> the ids of the go to steps pointing at it. */
+export function jumpsInto(f: Flow): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  for (const s of allSteps(f.steps)) {
+    const to = s.type === 'go_to' ? s.config.target : undefined
+    if (typeof to === 'string' && to) out.set(to, [...(out.get(to) ?? []), s.id])
+  }
+  return out
+}
 
 /** Number of steps, conditions' branches included. */
 export const countSteps = (f: Flow) => [...allSteps(f.steps)].length

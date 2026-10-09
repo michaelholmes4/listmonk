@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import ConditionForm from './forms/ConditionForm.vue'
 import DelayForm from './forms/DelayForm.vue'
+import GoToForm from './forms/GoToForm.vue'
 import ListStepForm from './forms/ListStepForm.vue'
 import SendEmailForm from './forms/SendEmailForm.vue'
 import TriggerForm from './forms/TriggerForm.vue'
@@ -92,6 +93,7 @@ const wide = computed(() => step.value?.type === 'send_email' || step.value?.typ
           <WaitForEventForm v-else-if="step.type === 'wait_for_event'" v-model="draft" :branches="step.branches" :errors="errors" :disabled="readonly" />
           <WaitUntilForm v-else-if="step.type === 'wait_until'" v-model="draft" :errors="errors" :disabled="readonly" />
           <ConditionForm v-else-if="step.type === 'condition'" v-model="draft" :email-steps="emailSteps" :errors="errors" :disabled="readonly" />
+          <GoToForm v-else-if="step.type === 'go_to'" v-model="draft" :flow="flow" :step-id="step.id" :errors="errors" :disabled="readonly" />
           <UpdateAttributeForm v-else-if="step.type === 'update_attribute'" v-model="draft" :errors="errors" :disabled="readonly" />
           <ListStepForm
             v-else-if="step.type === 'add_to_list' || step.type === 'remove_from_list'"

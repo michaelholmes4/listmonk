@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAllLists } from '@/composables/queries/useLists'
 import { provideBuilder } from './context'
 import { triggerMeta } from './labels'
-import { insertStep, locate, moveStep, newId, newStep, removeStep, syncBranches, triggerTypes, type Config, type Flow, type StepType, type Trigger, type TriggerType } from './model'
+import { insertStep, jumpsInto, locate, moveStep, newId, newStep, removeStep, syncBranches, triggerTypes, type Config, type Flow, type StepType, type Trigger, type TriggerType } from './model'
 import StepList from './StepList.vue'
 import StepSheet from './StepSheet.vue'
 import TriggerCard from './TriggerCard.vue'
@@ -35,6 +35,7 @@ const issues = computed(() => flowIssues(props.flow, can('subscribers:sql_query'
 const stats = computed(() => new Map((props.stats ?? []).map((s) => [s.node_id!, s])))
 const serverProblems = computed(() => props.problems ?? new Map<string, string[]>())
 
+const highlight = ref<string | null>(null)
 const target = ref<{ kind: 'step' | 'trigger'; id: string } | null>(null)
 
 provideBuilder({
@@ -42,7 +43,15 @@ provideBuilder({
   stats,
   issues,
   problems: serverProblems,
-  lookups: { list: (id) => lists.value?.find((l) => l.id === id)?.name },
+  lookups: {
+    list: (id) => lists.value?.find((l) => l.id === id)?.name,
+    step: (id) => {
+      const loc = locate(props.flow, id)
+      return loc?.list[loc.index]
+    },
+  },
+  jumps: computed(() => jumpsInto(props.flow)),
+  highlight,
   add(list, index, type: StepType) {
     const s = newStep(props.flow, type)
     if (!insertStep(list, index, s)) return

@@ -14,8 +14,8 @@ const { t } = useI18n()
 const b = useBuilder()
 const open = ref(false)
 
-// A branching step or an exit ends its list, so it can only go last.
-const types = computed(() => stepTypes.filter((s) => !(isBranching(s) || s === 'exit') || props.index >= props.list.length))
+// A branching step, an exit or a go to ends its list, so it can only go last.
+const types = computed(() => stepTypes.filter((s) => !(isBranching(s) || s === 'exit' || s === 'go_to') || props.index >= props.list.length))
 
 function choose(type: StepType) {
   open.value = false

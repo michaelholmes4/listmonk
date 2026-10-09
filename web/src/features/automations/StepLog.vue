@@ -15,6 +15,7 @@ const detail = (s: AutomationStep): string => {
   if (s.error) return s.error
   if (r.reason) return known(`web.automations.skipReason.${String(r.reason).replace(/ /g, '_')}`, String(r.reason))
   // A wait for an event: its result has since/until, and a branch that is an event id or "timeout".
+  if (r.to) return t('web.automations.goTo.log.went', { to: String(r.to) })
   if (r.event) return t('web.automations.waitForEvent.log.continued', { event: String(r.event) })
   if (r.branch === 'timeout') return t('web.automations.waitForEvent.log.timedOut')
   if (r.until && r.since && Number(r.restarts) > 0) return t('web.automations.waitForEvent.log.restarted', { when: stamp(String(r.until)), n: Number(r.restarts) }, Number(r.restarts))
@@ -33,7 +34,7 @@ const detail = (s: AutomationStep): string => {
         <span class="font-mono text-sm">{{ s.node_id }}</span>
         <Badge :variant="variant(s.status)">{{ t(`web.automations.stepStatus.${s.status}`) }}</Badge>
       </div>
-      <p class="mt-1 text-xs text-muted-foreground">{{ stamp(s.started_at) }}</p>
+      <p class="mt-1 text-xs text-muted-foreground">{{ stamp(s.started_at) }}<template v-if="(s.visit ?? 1) > 1"> · {{ t('web.automations.goTo.visit', { n: s.visit }) }}</template></p>
       <p v-if="detail(s)" class="mt-1 text-sm" :class="s.error ? 'text-destructive' : ''">{{ detail(s) }}</p>
     </li>
   </ol>

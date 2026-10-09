@@ -15,6 +15,10 @@ export interface BuilderContext {
   /** Problems the server reported, by step id. */
   problems: Ref<Map<string, string[]>>
   lookups: Lookups
+  /** Go to steps pointing at each step, by target id. */
+  jumps: Ref<Map<string, string[]>>
+  /** The step to highlight (what a hovered go to points at). */
+  highlight: Ref<string | null>
   add: (list: Step[], index: number, type: StepType) => void
   open: (id: string) => void
   remove: (id: string) => void

@@ -7,6 +7,8 @@ import {
   isBranching,
   emailStepsBefore,
   emptyFlow,
+  goToTargets,
+  jumpsInto,
   flowToGraph,
   graphToFlow,
   insertStep,
@@ -203,5 +205,57 @@ describe('wait for an event', () => {
     expect(Object.keys(w.branches!).sort()).toEqual(['e1', 'e4', 'timeout'])
     expect(w.branches!.timeout).toHaveLength(2)
     expect(w.branches!.e4).toEqual([])
+  })
+})
+
+// check { yes: [early, mid], no: [other, goto -> mid] }
+function jumping(): Flow {
+  return {
+    triggers: [{ id: 't1', type: 'event', config: { event: 'x' } }],
+    steps: [
+      {
+        id: 'check',
+        type: 'condition',
+        config: {},
+        branches: {
+          yes: [mail('early'), mail('mid')],
+          no: [mail('other'), { id: 'back', type: 'go_to', config: { target: 'mid', max_runs: 10 } }],
+        },
+      },
+    ],
+  }
+}
+
+describe('go to', () => {
+  it('is a leaf that round-trips with its target in its config', () => {
+    const f = jumping()
+    const g = flowToGraph(f)
+    expect(g.nodes!.find((n) => n.id === 'back')).toEqual({ id: 'back', type: 'go_to', config: { target: 'mid', max_runs: 10 } })
+    expect(g.edges!.some((e) => e.from === 'back')).toBe(false)
+    expect(graphToFlow(g)).toEqual(f)
+  })
+
+  it('ends its list', () => {
+    expect(endsList({ id: 'g', type: 'go_to', config: {} })).toBe(true)
+    const list: Step[] = [mail('a')]
+    expect(insertStep(list, 1, { id: 'g', type: 'go_to', config: {} })).toBe(true)
+    expect(insertStep(list, 2, mail('b'))).toBe(false)
+  })
+
+  it('offers every step but go tos as a target, in flow order', () => {
+    const f = jumping()
+    expect(goToTargets(f, 'back').map((s) => s.id)).toEqual(['check', 'early', 'mid', 'other'])
+    expect(goToTargets(f, 'mid').map((s) => s.id)).toEqual(['check', 'early', 'other'])
+  })
+
+  it('finds the steps jumped into', () => {
+    expect(jumpsInto(jumping())).toEqual(new Map([['mid', ['back']]]))
+    expect(jumpsInto(sample()).size).toBe(0)
+  })
+
+  it('leaves a dangling go to when its target is removed', () => {
+    const f = jumping()
+    expect(removeStep(f, 'mid')).toBe(true)
+    expect(jumpsInto(f).get('mid')).toEqual(['back'])
   })
 })
