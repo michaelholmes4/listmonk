@@ -213,3 +213,62 @@ test('pausing and resuming; a live automation cannot be deleted', async ({ reque
     await request.delete(`/api/automations/${a.id}`)
   }
 })
+
+test('a wait for an event: the event takes its path, a restart event does not', async ({ request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+
+  const stamp = Date.now()
+  const email = `e2e-wait-${stamp}@example.com`
+  const started = `e2e_checkout_started_${stamp}`
+  const completed = `e2e_order_completed_${stamp}`
+  let automationId = 0
+  let subscriberId = 0
+  try {
+    const { campaign_id } = await data(
+      await request.post('/api/automations/emails', { data: { name: `E2E thanks ${stamp}`, subject: `Thanks ${stamp}`, content_type: 'html', body: '<p>Thanks</p>' } }),
+    )
+    const automation = await data(await request.post('/api/automations', { data: { name: `E2E wait ${stamp}`, settings: {} } }))
+    automationId = automation.id
+    const graph = {
+      triggers: [{ id: 't1', type: 'event', config: { event: started } }],
+      root: 'w',
+      nodes: [
+        {
+          id: 'w',
+          type: 'wait_for_event',
+          config: { timeout: '1h', events: [{ id: 'e1', name: completed }, { id: 'e2', name: started, restart: true }] },
+        },
+        { id: 'thanks', type: 'send_email', config: { message_type: 'transactional', campaign_id } },
+      ],
+      edges: [{ from: 'w', to: 'thanks', handle: 'e1' }],
+    }
+    expect((await data(await request.put(`/api/automations/${automationId}/draft`, { data: graph }))).problems).toEqual([])
+    await data(await request.post(`/api/automations/${automationId}/publish`, { data: {} }))
+
+    // A restart event has no path of its own.
+    const bad = { ...graph, edges: [{ from: 'w', to: 'thanks', handle: 'e2' }] }
+    expect((await data(await request.put(`/api/automations/${automationId}/draft`, { data: bad }))).problems.length).toBeGreaterThan(0)
+
+    const tracked = await data(await request.post('/api/track', { data: { subscriber: { email }, name: started, properties: {} } }))
+    subscriberId = tracked.subscriber_id
+    const enrollments = () => request.get(`/api/automations/${automationId}/enrollments`).then(data)
+    await expect.poll(async () => (await enrollments()).results.map((e: { status: string }) => e.status), { timeout: 15_000 }).toEqual(['waiting'])
+
+    await data(await request.post('/api/track', { data: { subscriber: { email }, name: completed, properties: {} } }))
+    await expect.poll(async () => (await enrollments()).results.map((e: { status: string }) => e.status), { timeout: 15_000 }).toEqual(['completed'])
+
+    const enrollment = (await enrollments()).results[0]
+    const steps = await data(await request.get(`/api/automations/${automationId}/enrollments/${enrollment.id}/steps`))
+    const wait = steps.find((s: { node_id: string }) => s.node_id === 'w')
+    expect(wait.status).toBe('done')
+    expect(wait.result).toMatchObject({ branch: 'e1', event: completed })
+    expect(steps.map((s: { node_id: string; status: string }) => [s.node_id, s.status])).toContainEqual(['thanks', 'done'])
+    expect((await logEntry(request, automationId)).subject).toBe(`Thanks ${stamp}`)
+  } finally {
+    if (automationId) {
+      await request.post(`/api/automations/${automationId}/archive`)
+      await request.delete(`/api/automations/${automationId}`)
+    }
+    if (subscriberId) await request.delete(`/api/subscribers/${subscriberId}`)
+  }
+})

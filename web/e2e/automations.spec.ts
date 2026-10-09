@@ -221,3 +221,39 @@ test('an email step: write the email in the step, publish, and it is sent', asyn
     await request.delete(`/api/lists/${list.id}`)
   }
 })
+
+test('a wait for an event: two events, one that restarts, and its two paths', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+
+  const name = `E2E wait builder ${Date.now()}`
+  let id = 0
+  try {
+    await page.goto('/admin/automations')
+    await page.getByRole('button', { name: 'New' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('textbox').fill(name)
+    await dialog.getByRole('button', { name: 'New' }).click()
+    await expect(page.getByRole('heading', { name })).toBeVisible()
+    id = Number(new URL(page.url()).pathname.split('/').pop())
+
+    await page.locator('[data-cy=add-step]').last().click()
+    await page.locator('[data-cy=add-wait_for_event]').click()
+    const sheet = page.locator('[data-cy=step-sheet]')
+    await sheet.getByLabel('Event name').fill('order_completed')
+    await sheet.locator('[data-cy=wait-event-add]').click()
+    await sheet.getByLabel('Event name').nth(1).fill('checkout_started')
+    await sheet.locator('[data-cy=wait-event-e2]').getByRole('checkbox').click()
+    await closeSheet(page)
+
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('Up to 1 hour · order_completed, checkout_started (restarts)')
+    // The restart event has no path; the other event and "Time's up" do.
+    await expect(page.locator('[data-cy=branch-s1-e1]')).toContainText('order_completed')
+    await expect(page.locator('[data-cy=branch-s1-timeout]')).toContainText("Time's up")
+    await expect(page.locator('[data-cy=branch-s1-e2]')).toHaveCount(0)
+  } finally {
+    if (id) {
+      await request.post(`/api/automations/${id}/archive`)
+      await request.delete(`/api/automations/${id}`)
+    }
+  }
+})
