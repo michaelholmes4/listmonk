@@ -10,7 +10,24 @@ const backend = process.env.LISTMONK_URL ?? 'http://localhost:9000'
 
 export default defineConfig({
   base: '/admin/',
-  plugins: [vue(), tailwindcss()],
+  plugins: [
+    vue(),
+    tailwindcss(),
+    // The backend sends logins (and other redirects) to "/admin", which Vite's dev server answers
+    // with a "did you mean /admin/?" 404 because of `base`. Send it on to "/admin/".
+    {
+      name: 'admin-trailing-slash',
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const [p, q] = (req.url ?? '').split('?', 2)
+          if (p !== '/admin') return next()
+          res.statusCode = 302
+          res.setHeader('Location', '/admin/' + (q ? `?${q}` : ''))
+          res.end()
+        })
+      },
+    },
+  ],
   resolve: {
     alias: { '@': path.resolve(import.meta.dirname, 'src') },
   },
