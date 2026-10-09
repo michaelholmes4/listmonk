@@ -7,7 +7,8 @@ INSERT INTO automations (uuid, name, settings) VALUES ($1, $2, $3) RETURNING *;
 SELECT * FROM automations WHERE id = $1;
 
 -- name: automation-list-automations
--- $1 search text, $2 statuses (NULL = any), $3 offset, $4 limit. %order% is substituted from a whitelist.
+-- $1 search text, $2 statuses (NULL = any), $3 offset, $4 limit, $5 only those whose published version
+-- people can be added to by hand. %order% is substituted from a whitelist.
 SELECT a.*,
     COUNT(*) OVER () AS total,
     COALESCE(c.active, 0) AS active, COALESCE(c.waiting, 0) AS waiting, COALESCE(c.completed, 0) AS completed,
@@ -23,6 +24,7 @@ LEFT JOIN LATERAL (
 ) c ON TRUE
 WHERE ($1 = '' OR a.name ILIKE '%' || $1 || '%')
   AND ($2::automation_status[] IS NULL OR a.status = ANY($2::automation_status[]))
+  AND (NOT $5::BOOLEAN OR EXISTS (SELECT 1 FROM automation_triggers t WHERE t.automation_id = a.id AND t.type = 'manual'))
 ORDER BY %order% OFFSET $3 LIMIT (CASE WHEN $4 < 1 THEN NULL ELSE $4 END);
 
 -- name: automation-update-automation
@@ -70,6 +72,10 @@ SELECT t.automation_id, t.version_id, t.type, t.config, a.settings
 FROM automation_triggers t
 JOIN automations a ON a.id = t.automation_id AND a.current_version_id = t.version_id
 WHERE t.type = $1 AND a.status = 'active';
+
+-- name: automation-has-trigger
+-- Whether the published version has a trigger of this type.
+SELECT EXISTS (SELECT 1 FROM automation_triggers WHERE automation_id = $1 AND type = $2);
 
 -- name: automation-insert-enrollment
 -- Fails quietly (no row) if the subscriber is already live in this automation.

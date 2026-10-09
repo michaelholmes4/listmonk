@@ -63,10 +63,12 @@ type Row struct {
 type ListOpts struct {
 	Query    string
 	Statuses []Status
-	OrderBy  string // name | status | created_at | updated_at
-	Order    string // asc | desc
-	Page     int
-	PerPage  int // 0 = all
+	// Manual keeps only those whose published version people can be added to by hand.
+	Manual  bool
+	OrderBy string // name | status | created_at | updated_at
+	Order   string // asc | desc
+	Page    int
+	PerPage int // 0 = all
 }
 
 // List returns automations and the total matching.
@@ -95,7 +97,7 @@ func (s *Store) List(ctx context.Context, o ListOpts) ([]Row, int, error) {
 		offset = (o.Page - 1) * o.PerPage
 	}
 	var rows []Row
-	if err := s.db.SelectContext(ctx, &rows, query, o.Query, statuses, offset, o.PerPage); err != nil {
+	if err := s.db.SelectContext(ctx, &rows, query, o.Query, statuses, offset, o.PerPage, o.Manual); err != nil {
 		return nil, 0, err
 	}
 	total := 0
@@ -144,6 +146,13 @@ func (s *Store) Get(ctx context.Context, id int) (*Automation, error) {
 		return nil, notFound(err)
 	}
 	return &a, nil
+}
+
+// HasTrigger reports whether an automation's published version has a trigger of this type.
+func (s *Store) HasTrigger(ctx context.Context, id int, typ string) (bool, error) {
+	var ok bool
+	err := s.db.GetContext(ctx, &ok, s.q.get("has-trigger"), id, typ)
+	return ok, err
 }
 
 // Update changes the name and settings.

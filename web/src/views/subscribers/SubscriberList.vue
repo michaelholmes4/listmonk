@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, ListChecks, Plus, Search, Settings2, Trash2, Upload, Users, UserX } from '@lucide/vue'
+import { Download, ListChecks, Plus, Search, Settings2, Trash2, Upload, UserPlus, Users, UserX } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -26,6 +26,7 @@ import {
 import { usePermission } from '@/composables/usePermission'
 import { useRowSelection, useUrlTable } from '@/composables/useTableState'
 import { useUrlState } from '@/composables/useUrlState'
+import EnrollDialog from '@/features/automations/EnrollDialog.vue'
 import BulkListsDialog from '@/features/subscribers/BulkListsDialog.vue'
 import { createColumns } from '@/features/subscribers/columns'
 
@@ -103,6 +104,8 @@ const target = computed<BulkTarget>(() => (sel.selectAll ? { filter: filter.valu
 
 // --- Actions. -----------------------------------------------------------------------------------
 const bulkListsOpen = ref(false)
+// Enrolling takes explicit IDs only, so not "all N matching".
+const enrollOpen = ref(false)
 const confirm = ref<'delete' | 'blocklist' | 'export' | null>(null)
 const confirmOpen = computed({ get: () => confirm.value !== null, set: (o) => !o && (confirm.value = null) })
 
@@ -177,6 +180,11 @@ const columns = createColumns({
           <Button variant="ghost" size="sm" @click="bulkListsOpen = true"><ListChecks />{{ t('subscribers.manageLists') }}</Button>
           <Button variant="ghost" size="sm" @click="confirm = 'blocklist'"><UserX />{{ t('import.blocklist') }}</Button>
         </template>
+        <span v-if="can('automations:manage')" :title="sel.selectAll ? t('web.automations.enroll.pageOnly') : undefined">
+          <Button variant="ghost" size="sm" :disabled="sel.selectAll" data-cy="btn-enroll" @click="enrollOpen = true">
+            <UserPlus />{{ t('web.automations.enroll.action') }}
+          </Button>
+        </span>
         <Button variant="ghost" size="sm" @click="confirm = 'export'"><Download />{{ t('subscribers.export') }}</Button>
         <Button v-if="can('subscribers:manage')" variant="ghost" size="sm" class="text-destructive" @click="confirm = 'delete'">
           <Trash2 />{{ t('globals.buttons.delete') }}
@@ -231,6 +239,7 @@ const columns = createColumns({
   </Page>
 
   <BulkListsDialog v-model:open="bulkListsOpen" :target="target" :count="sel.count" />
+  <EnrollDialog v-model:open="enrollOpen" :subscriber-ids="sel.ids" @done="sel.clear" />
 
   <ConfirmDialog
     v-model:open="confirmOpen"

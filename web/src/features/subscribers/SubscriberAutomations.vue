@@ -1,15 +1,22 @@
 <script setup lang="ts">
+import { UserPlus } from '@lucide/vue'
 import { format } from 'date-fns'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSubscriberAutomations, useSubscriberEvents } from '@/composables/queries/useAutomations'
+import { usePermission } from '@/composables/usePermission'
+import EnrollDialog from '@/features/automations/EnrollDialog.vue'
 import { enrollmentVariant } from '@/features/automations/status'
 
 /** The automations a subscriber is or was in, and the events recorded about them. */
 const props = defineProps<{ subscriberId: number }>()
 const { t } = useI18n()
+const { can } = usePermission()
+const enrollOpen = ref(false)
 const { data: enrollments, isPending } = useSubscriberAutomations(() => props.subscriberId)
 const { data: events, isPending: eventsPending } = useSubscriberEvents(() => props.subscriberId)
 const stamp = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
@@ -18,7 +25,12 @@ const stamp = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : ''
 <template>
   <div class="space-y-6" data-cy="subscriber-automations">
     <section class="space-y-2">
-      <h3 class="text-sm font-medium">{{ t('web.automations.title') }}</h3>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="text-sm font-medium">{{ t('web.automations.title') }}</h3>
+        <Button v-if="can('automations:manage')" type="button" variant="outline" size="sm" data-cy="btn-enroll" @click="enrollOpen = true">
+          <UserPlus />{{ t('web.automations.enroll.action') }}
+        </Button>
+      </div>
       <Skeleton v-if="isPending" class="h-10 w-full" />
       <p v-else-if="!enrollments?.length" class="text-sm text-muted-foreground">{{ t('web.subscribers.noAutomations') }}</p>
       <ul v-else class="divide-y rounded-lg border">
@@ -48,5 +60,6 @@ const stamp = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : ''
         </li>
       </ul>
     </section>
+    <EnrollDialog v-model:open="enrollOpen" :subscriber-ids="[subscriberId]" />
   </div>
 </template>

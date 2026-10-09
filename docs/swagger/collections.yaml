@@ -2795,6 +2795,7 @@ paths:
       parameters:
         - { in: query, name: query, schema: { type: string } }
         - { in: query, name: status, schema: { type: array, items: { $ref: "#/components/schemas/AutomationStatus" } }, style: form, explode: true }
+        - { in: query, name: manual, description: Only automations whose published version has a `manual` trigger (people can be enrolled by hand or by API)., schema: { type: boolean } }
         - { in: query, name: order_by, schema: { type: string, enum: [name, status, created_at, updated_at] } }
         - { in: query, name: order, schema: { type: string, enum: [asc, desc] } }
         - { in: query, name: page, schema: { type: integer } }
@@ -3012,7 +3013,7 @@ paths:
       - { in: path, name: id, required: true, schema: { type: integer } }
     post:
       tags: [Automations]
-      description: enrolls subscribers into an active automation (those inside already, or barred by the re-entry rule, are skipped)
+      description: enrolls subscribers into an active automation whose published version has a `manual` trigger (those inside already, blocklisted, or barred by the re-entry rule, are skipped)
       operationId: enrollInAutomation
       requestBody:
         content:
@@ -3028,6 +3029,8 @@ paths:
           content:
             application/json:
               schema: { type: object, properties: { data: { type: object, properties: { enrolled: { type: integer } } } } }
+        "409":
+          description: The automation is not active, or its published version has no `manual` trigger
 
   "/automations/{id}/versions":
     parameters:

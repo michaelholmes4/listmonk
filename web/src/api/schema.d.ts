@@ -1301,7 +1301,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description enrolls subscribers into an active automation (those inside already, or barred by the re-entry rule, are skipped) */
+        /** @description enrolls subscribers into an active automation whose published version has a `manual` trigger (those inside already, blocklisted, or barred by the re-entry rule, are skipped) */
         post: operations["enrollInAutomation"];
         delete?: never;
         options?: never;
@@ -5778,6 +5778,8 @@ export interface operations {
             query?: {
                 query?: string;
                 status?: components["schemas"]["AutomationStatus"][];
+                /** @description Only automations whose published version has a `manual` trigger (people can be enrolled by hand or by API). */
+                manual?: boolean;
                 order_by?: "name" | "status" | "created_at" | "updated_at";
                 order?: "asc" | "desc";
                 page?: number;
@@ -6149,6 +6151,13 @@ export interface operations {
                         };
                     };
                 };
+            };
+            /** @description The automation is not active, or its published version has no `manual` trigger */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

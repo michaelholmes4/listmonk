@@ -371,8 +371,28 @@ func jsonEqual(a, b any) bool {
 	return string(x) == string(y)
 }
 
-// EnrollMany manually enrolls subscribers (an API call or "also enroll current matches"). It
-// returns how many went in.
+// EnrollManually enrolls subscribers picked by hand (in the admin or through the API). Only an
+// automation with an "added by hand or by API" trigger takes them. It returns how many went in.
+func (e *Engine) EnrollManually(ctx context.Context, automationID int, subscriberIDs []int) (int, error) {
+	a, err := e.store.Get(ctx, automationID)
+	if err != nil {
+		return 0, err
+	}
+	if a.Status != StatusActive || a.CurrentVersionID == nil {
+		return 0, fmt.Errorf("%w: the automation is not active", ErrConflict)
+	}
+	ok, err := e.store.HasTrigger(ctx, automationID, TriggerManual)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, fmt.Errorf("%w: the automation does not take people added by hand: add the \"Added by hand or by API\" trigger and publish", ErrConflict)
+	}
+	return e.EnrollMany(ctx, automationID, subscriberIDs, TriggerManual)
+}
+
+// EnrollMany enrolls subscribers whatever the automation's triggers (EnrollManually, or "also
+// enroll current matches" on publish). It returns how many went in.
 func (e *Engine) EnrollMany(ctx context.Context, automationID int, subscriberIDs []int, trigger string) (int, error) {
 	a, err := e.store.Get(ctx, automationID)
 	if err != nil {

@@ -4,11 +4,12 @@ import * as api from '@/api/automations'
 import type { AutomationGraph, AutomationSettings } from '@/api/types'
 import { keys } from './keys'
 
-export const useAutomations = (query: MaybeRefOrGetter<api.AutomationQuery>) =>
+export const useAutomations = (query: MaybeRefOrGetter<api.AutomationQuery>, enabled: MaybeRefOrGetter<boolean> = true) =>
   useQuery({
     queryKey: () => keys.automations.page(toValue(query)),
     queryFn: ({ signal }) => api.queryAutomations(toValue(query), signal),
     placeholderData: keepPreviousData,
+    enabled: () => toValue(enabled),
   })
 
 export const useAutomation = (id: MaybeRefOrGetter<number | undefined>) =>

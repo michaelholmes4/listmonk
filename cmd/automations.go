@@ -113,6 +113,7 @@ func (a *App) GetAutomations(c echo.Context) error {
 	pg := a.pg.NewFromURL(c.Request().URL.Query())
 	o := automation.ListOpts{
 		Query:   strings.TrimSpace(c.FormValue("query")),
+		Manual:  c.FormValue("manual") == "true",
 		OrderBy: c.FormValue("order_by"),
 		Order:   c.FormValue("order"),
 		Page:    pg.Page,
@@ -282,7 +283,7 @@ func (a *App) ArchiveAutomation(c echo.Context) error {
 	return c.JSON(http.StatusOK, okResp{au})
 }
 
-// EnrollInAutomation manually enrolls subscribers into an active automation.
+// EnrollInAutomation enrolls subscribers into an active automation that has a manual trigger.
 func (a *App) EnrollInAutomation(c echo.Context) error {
 	var req struct {
 		SubscriberIDs []int `json:"subscriber_ids"`
@@ -293,7 +294,7 @@ func (a *App) EnrollInAutomation(c echo.Context) error {
 	if len(req.SubscriberIDs) == 0 || len(req.SubscriberIDs) > 1000 {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.Ts("globals.messages.invalidFields", "name", "subscriber_ids (1 to 1000)"))
 	}
-	n, err := a.automation.EnrollMany(c.Request().Context(), getID(c), req.SubscriberIDs, "manual")
+	n, err := a.automation.EnrollManually(c.Request().Context(), getID(c), req.SubscriberIDs)
 	if err != nil {
 		return a.autoErr(c, err)
 	}

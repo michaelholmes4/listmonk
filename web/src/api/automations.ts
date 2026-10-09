@@ -21,6 +21,8 @@ import type {
 export interface AutomationQuery {
   query?: string
   status?: AutomationStatus[]
+  /** Only those whose published version takes people added by hand. */
+  manual?: boolean
   page: number
   perPage: number | 'all'
   orderBy?: 'name' | 'status' | 'created_at' | 'updated_at'
@@ -30,7 +32,7 @@ export interface AutomationQuery {
 export const queryAutomations = (q: AutomationQuery, signal?: AbortSignal) =>
   api.get<Paginated<AutomationRow>>(
     '/api/automations',
-    { query: q.query || undefined, status: q.status, page: q.page, per_page: q.perPage, order_by: q.orderBy, order: q.order },
+    { query: q.query || undefined, status: q.status, manual: q.manual || undefined, page: q.page, per_page: q.perPage, order_by: q.orderBy, order: q.order },
     { signal },
   )
 
