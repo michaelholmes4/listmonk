@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { Mail } from '@lucide/vue'
+import { ArrowLeft, Mail } from '@lucide/vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import {
   Sidebar,
   SidebarContent,
@@ -9,8 +12,21 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
+import { navigation, spaceEntry } from '@/nav'
 import NavMain from './NavMain.vue'
 import NavUser from './NavUser.vue'
+
+const { t } = useI18n()
+const route = useRoute()
+
+// Inside a space (Settings) the sidebar lists the space, with a way back to where you were.
+const space = computed(() => spaceEntry(route))
+const backTo = ref('/')
+watch(
+  () => route.fullPath,
+  () => !space.value && (backTo.value = route.fullPath),
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -29,10 +45,18 @@ import NavUser from './NavUser.vue'
             </RouterLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
+        <SidebarMenuItem v-if="space">
+          <SidebarMenuButton as-child :tooltip="t('web.nav.back')">
+            <RouterLink :to="backTo" data-cy="nav-back">
+              <ArrowLeft />
+              <span>{{ t('web.nav.back') }}</span>
+            </RouterLink>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
       </SidebarMenu>
     </SidebarHeader>
     <SidebarContent>
-      <NavMain />
+      <NavMain :sections="space?.space ?? navigation" />
     </SidebarContent>
     <SidebarFooter>
       <NavUser />

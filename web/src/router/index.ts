@@ -100,7 +100,7 @@ export const router = createRouter({
       component: () => import('@/views/campaigns/CampaignAnalytics.vue'),
       meta: {
         title: 'globals.terms.analytics',
-        parents: [{ title: 'globals.terms.campaigns', to: { name: 'campaigns' } }],
+        parents: [{ title: 'web.nav.reports', to: { name: 'campaign-analytics' } }],
         perms: ['campaigns:get_analytics'],
       },
     },
@@ -108,7 +108,11 @@ export const router = createRouter({
       path: '/messages',
       name: 'messages',
       component: () => import('@/views/messages/MessageList.vue'),
-      meta: { title: 'web.messages.title', perms: ['message_log:get'] },
+      meta: {
+        title: 'web.messages.title',
+        parents: [{ title: 'web.nav.reports', to: { name: 'campaign-analytics' } }],
+        perms: ['message_log:get'],
+      },
     },
     {
       path: '/messages/:id(\\d+)',
@@ -116,7 +120,10 @@ export const router = createRouter({
       component: () => import('@/views/messages/MessageView.vue'),
       meta: {
         title: 'web.messages.one',
-        parents: [{ title: 'web.messages.title', to: { name: 'messages' } }],
+        parents: [
+          { title: 'web.nav.reports', to: { name: 'campaign-analytics' } },
+          { title: 'web.messages.title', to: { name: 'messages' } },
+        ],
         perms: ['message_log:get'],
       },
     },
@@ -124,7 +131,7 @@ export const router = createRouter({
       path: '/campaigns/media',
       name: 'media',
       component: () => import('@/views/media/MediaList.vue'),
-      meta: { title: 'media.title', perms: ['media:get'] },
+      meta: { title: 'media.title', parents: [{ title: 'globals.terms.templates', to: { name: 'templates' } }], perms: ['media:get'] },
     },
     {
       path: '/campaigns/templates',
@@ -158,7 +165,7 @@ export const router = createRouter({
       component: () => import('@/views/bounces/BounceList.vue'),
       meta: {
         title: 'globals.terms.bounces',
-        parents: [{ title: 'globals.terms.subscribers', to: { name: 'subscribers' } }],
+        parents: [{ title: 'web.nav.reports', to: { name: 'campaign-analytics' } }],
         perms: ['bounces:get'],
       },
     },
@@ -210,26 +217,26 @@ export const router = createRouter({
       path: '/users',
       name: 'users',
       component: () => import('@/views/users/UserList.vue'),
-      meta: { title: 'globals.terms.users', perms: ['users:get'] },
+      meta: { title: 'globals.terms.users', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['users:get'] },
     },
     {
       path: '/users/new',
       name: 'user-new',
       component: () => import('@/views/users/UserCreate.vue'),
-      meta: { title: 'users.newUser', parents: [{ title: 'globals.terms.users', to: { name: 'users' } }], perms: ['users:manage'] },
+      meta: { title: 'users.newUser', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }, { title: 'globals.terms.users', to: { name: 'users' } }], perms: ['users:manage'] },
     },
     {
       path: '/users/:id(\\d+)',
       name: 'user',
       component: () => import('@/views/users/UserEdit.vue'),
-      meta: { title: 'globals.terms.user', parents: [{ title: 'globals.terms.users', to: { name: 'users' } }], perms: ['users:get'] },
+      meta: { title: 'globals.terms.user', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }, { title: 'globals.terms.users', to: { name: 'users' } }], perms: ['users:get'] },
     },
     {
       path: '/users/roles/users',
       name: 'user-roles',
       component: () => import('@/views/roles/RoleList.vue'),
       props: { kind: 'user' },
-      meta: { title: 'users.userRoles', perms: ['roles:get'] },
+      meta: { title: 'users.userRoles', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['roles:get'] },
     },
     {
       path: '/users/roles/users/new',
@@ -238,7 +245,10 @@ export const router = createRouter({
       props: { kind: 'user' },
       meta: {
         title: 'users.newUserRole',
-        parents: [{ title: 'users.userRoles', to: { name: 'user-roles' } }],
+        parents: [
+          { title: 'globals.terms.settings', to: { name: 'settings' } },
+          { title: 'users.userRoles', to: { name: 'user-roles' } },
+        ],
         perms: ['roles:manage'],
       },
     },
@@ -249,7 +259,10 @@ export const router = createRouter({
       props: { kind: 'user' },
       meta: {
         title: 'users.role',
-        parents: [{ title: 'users.userRoles', to: { name: 'user-roles' } }],
+        parents: [
+          { title: 'globals.terms.settings', to: { name: 'settings' } },
+          { title: 'users.userRoles', to: { name: 'user-roles' } },
+        ],
         perms: ['roles:get'],
       },
     },
@@ -258,7 +271,7 @@ export const router = createRouter({
       name: 'list-roles',
       component: () => import('@/views/roles/RoleList.vue'),
       props: { kind: 'list' },
-      meta: { title: 'users.listRoles', perms: ['roles:get'] },
+      meta: { title: 'users.listRoles', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['roles:get'] },
     },
     {
       path: '/users/roles/lists/new',
@@ -267,7 +280,10 @@ export const router = createRouter({
       props: { kind: 'list' },
       meta: {
         title: 'users.newListRole',
-        parents: [{ title: 'users.listRoles', to: { name: 'list-roles' } }],
+        parents: [
+          { title: 'globals.terms.settings', to: { name: 'settings' } },
+          { title: 'users.listRoles', to: { name: 'list-roles' } },
+        ],
         perms: ['roles:manage'],
       },
     },
@@ -278,27 +294,12 @@ export const router = createRouter({
       props: { kind: 'list' },
       meta: {
         title: 'users.role',
-        parents: [{ title: 'users.listRoles', to: { name: 'list-roles' } }],
+        parents: [
+          { title: 'globals.terms.settings', to: { name: 'settings' } },
+          { title: 'users.listRoles', to: { name: 'list-roles' } },
+        ],
         perms: ['roles:get'],
       },
-    },
-    {
-      path: '/settings',
-      name: 'settings',
-      component: () => import('@/views/settings/SettingsView.vue'),
-      meta: { title: 'globals.terms.settings', perms: ['settings:get'] },
-    },
-    {
-      path: '/settings/maintenance',
-      name: 'maintenance',
-      component: () => import('@/views/maintenance/MaintenanceView.vue'),
-      meta: { title: 'maintenance.title', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['settings:maintain'] },
-    },
-    {
-      path: '/settings/logs',
-      name: 'logs',
-      component: () => import('@/views/logs/LogsView.vue'),
-      meta: { title: 'logs.title', parents: [{ title: 'globals.terms.settings', to: { name: 'settings' } }], perms: ['settings:get'] },
     },
     {
       path: '/settings',

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FilePlus, ListPlus, Moon, Rocket, Sun, UserPlus } from '@lucide/vue'
+import { FilePlus, ListPlus, Moon, Rocket, Sun, Upload, UserPlus } from '@lucide/vue'
 import { onScopeDispose } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -8,7 +8,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { usePermission } from '@/composables/usePermission'
 import { useTheme } from '@/composables/useTheme'
 import { registerCommandProvider } from '@/lib/commands'
-import { navigation } from '@/nav'
+import { navigation, tabPages, type NavPage } from '@/nav'
 import AppSidebar from './AppSidebar.vue'
 import CommandPalette from './CommandPalette.vue'
 import GlobalNotices from './GlobalNotices.vue'
@@ -19,20 +19,29 @@ const router = useRouter()
 const { can } = usePermission()
 const theme = useTheme()
 
-// Navigation commands: one per visible nav entry (the palette respects the same permissions).
+// Navigation commands: one per page the user may open, tabs and spaces included (the palette is
+// the way to any page without a sidebar row of its own). A space's pages get its own group.
+const toCommand = (group: string) => (page: NavPage) => ({
+  id: `nav:${page.key}`,
+  group,
+  label: t(page.label),
+  icon: page.icon,
+  run: () => router.push(page.to),
+})
 onScopeDispose(
-  registerCommandProvider('navigation', () =>
-    navigation
-      .flatMap((s) => s.items)
-      .filter((leaf) => can(...(leaf.perms ?? [])))
-      .map((leaf) => ({
-        id: `nav:${leaf.key}`,
-        group: t('web.commands.navigation'),
-        label: t(leaf.label),
-        icon: leaf.icon,
-        run: () => router.push(leaf.to),
-      })),
-  ),
+  registerCommandProvider('navigation', () => {
+    const entries = navigation.flatMap((s) => s.items)
+    const allowed = (p: NavPage) => can(...(p.perms ?? []))
+    return [
+      ...entries.flatMap(tabPages).filter(allowed).map(toCommand(t('web.commands.navigation'))),
+      ...entries.flatMap((e) =>
+        (e.space ?? [])
+          .flatMap((s) => s.items)
+          .filter(allowed)
+          .map(toCommand(t(e.label))),
+      ),
+    ]
+  }),
 )
 
 // "Create" commands: actions live here and in page headers, not in the sidebar.
@@ -41,6 +50,7 @@ const creates = [
   { id: 'subscriber', label: 'subscribers.newSubscriber', icon: UserPlus, perm: 'subscribers:manage', route: 'subscriber-new' },
   { id: 'list', label: 'lists.newList', icon: ListPlus, perm: 'lists:manage_all', route: 'list-new' },
   { id: 'template', label: 'templates.newTemplate', icon: FilePlus, perm: 'templates:manage', route: 'template-new' },
+  { id: 'import', label: 'import.title', icon: Upload, perm: 'subscribers:import', route: 'import' },
 ]
 onScopeDispose(
   registerCommandProvider('create', () =>

@@ -15,7 +15,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 test('media: upload several files, search, delete', async ({ page }) => {
   const tag = `e2emedia${Date.now()}`
   await page.goto('/admin/campaigns/media')
-  await expect(page.getByRole('heading', { name: /^Media/ })).toBeVisible()
+  await expect(page.locator('[data-cy=pagetab-media]')).toHaveAttribute('aria-current', 'page')
   await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
   if (!(await page.locator('[data-cy=upload]').isVisible())) await page.getByRole('button', { name: 'Upload' }).click()

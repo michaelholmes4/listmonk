@@ -3,9 +3,13 @@ import { CircleHelp } from '@lucide/vue'
 import { useIntersectionObserver } from '@vueuse/core'
 import { computed, ref, useSlots } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { usePermission } from '@/composables/usePermission'
 import { cn } from '@/lib/utils'
+import { isPageActive, tabbedEntry, tabPages } from '@/nav'
+import PageTabs from './PageTabs.vue'
 
 /**
  * The frame of every page (see web/UX.md): a header with the title on the left and the page's
@@ -16,6 +20,9 @@ import { cn } from '@/lib/utils'
  *   button there, see FormActions).
  * - `help` slot: a rail beside the content on wide screens, a "?" popover in the header otherwise.
  * - `width`: `full` for tables and builders, `form` caps the content at a readable width.
+ * - Tabs: on the pages of a sidebar entry with secondary pages (nav.ts `pages`), the header is the
+ *   entry's (its name, then tabs) and identical on every tab, so the tabs never move. The page's
+ *   description, badges and meta open the content instead; its count is left to the table's pager.
  */
 const props = withDefaults(
   defineProps<{
@@ -37,6 +44,15 @@ const stuck = ref(false)
 useIntersectionObserver(sentinel, ([e]) => (stuck.value = !e?.isIntersecting))
 
 const hasHelp = computed(() => !!slots.help)
+
+// The entry's pages this user may open; a lone tab is no navigation, so it isn't shown.
+const route = useRoute()
+const { can } = usePermission()
+const tabEntry = computed(() => tabbedEntry(route))
+const tabs = computed(() => (tabEntry.value ? tabPages(tabEntry.value).filter((p) => can(...(p.perms ?? []))) : []))
+const tabbed = computed(() => tabs.value.length > 1)
+const activeTab = computed(() => tabs.value.find((p) => isPageActive(p, route))?.key)
+const hasIntro = computed(() => !!(props.description || slots.meta || slots.badges))
 </script>
 
 <template>
@@ -45,21 +61,26 @@ const hasHelp = computed(() => !!slots.help)
     <header
       :class="
         cn(
-          'sticky top-0 z-20 -mt-px bg-background px-4 pt-5 pb-4 transition-shadow sm:px-6',
-          stuck && 'border-b shadow-xs',
+          'sticky top-0 z-20 -mt-px bg-background px-4 pt-5 transition-shadow sm:px-6',
+          tabbed ? 'pb-0' : 'pb-4',
+          stuck && 'shadow-xs',
+          stuck && !tabbed && 'border-b',
         )
       "
       data-cy="page-header"
     >
-      <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+      <div :class="cn('flex flex-wrap justify-between gap-x-4 gap-y-3', tabbed ? 'min-h-8 items-center' : 'items-start')">
         <div class="min-w-0 space-y-1">
-          <h1 class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-semibold">
-            <span class="min-w-0 break-words">{{ title }}</span>
-            <span v-if="props.count !== undefined" class="font-normal text-muted-foreground tabular-nums">{{ n(props.count) }}</span>
-            <slot name="badges" />
-          </h1>
-          <p v-if="description" class="max-w-2xl text-sm text-muted-foreground">{{ description }}</p>
-          <div v-if="$slots.meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"><slot name="meta" /></div>
+          <h1 v-if="tabbed && tabEntry" class="text-xl font-semibold">{{ t(tabEntry.label) }}</h1>
+          <template v-else>
+            <h1 class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-semibold">
+              <span class="min-w-0 break-words">{{ title }}</span>
+              <span v-if="props.count !== undefined" class="font-normal text-muted-foreground tabular-nums">{{ n(props.count) }}</span>
+              <slot name="badges" />
+            </h1>
+            <p v-if="description" class="max-w-2xl text-sm text-muted-foreground">{{ description }}</p>
+            <div v-if="$slots.meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"><slot name="meta" /></div>
+          </template>
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <slot name="actions" />
@@ -74,17 +95,27 @@ const hasHelp = computed(() => !!slots.help)
           </Popover>
         </div>
       </div>
+      <PageTabs v-if="tabbed && tabEntry" :label="t(tabEntry.label)" :pages="tabs" :active="activeTab" />
     </header>
 
     <div
       :class="
         cn(
-          'flex-1 px-4 pt-1 pb-8 sm:px-6',
+          'flex-1 px-4 pb-8 sm:px-6',
+          tabbed ? 'pt-5' : 'pt-1',
           hasHelp && 'xl:grid xl:grid-cols-[minmax(0,1fr)_16rem] xl:gap-12',
         )
       "
     >
-      <div :class="cn('min-w-0 space-y-4', width === 'form' && 'max-w-3xl')"><slot /></div>
+      <div :class="cn('min-w-0 space-y-4', width === 'form' && 'max-w-3xl')">
+        <!-- With tabs, what describes this one page opens its content, below the shared header. -->
+        <div v-if="tabbed && hasIntro" class="space-y-1">
+          <div v-if="$slots.badges" class="flex flex-wrap items-center gap-2"><slot name="badges" /></div>
+          <p v-if="description" class="max-w-2xl text-sm text-muted-foreground">{{ description }}</p>
+          <div v-if="$slots.meta" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"><slot name="meta" /></div>
+        </div>
+        <slot />
+      </div>
       <aside v-if="hasHelp" class="hidden xl:block">
         <div class="sticky top-24 space-y-3 border-l pl-6 text-sm text-muted-foreground"><slot name="help" /></div>
       </aside>

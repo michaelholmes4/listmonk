@@ -31,3 +31,19 @@ export function tabOfPath(path: string): SettingsTab {
       return 'general'
   }
 }
+
+/** i18n key of each section's name (the sidebar's Settings space and the page title). */
+export const tabLabels: Record<SettingsTab, string> = {
+  general: 'settings.general.name',
+  performance: 'settings.performance.name',
+  privacy: 'settings.privacy.name',
+  security: 'settings.security.name',
+  media: 'settings.media.title',
+  smtp: 'settings.smtp.name',
+  bounces: 'settings.bounces.name',
+  messengers: 'settings.messengers.name',
+  appearance: 'settings.appearance.name',
+}
+
+/** The section a `?tab=` query value names; General when it names none. */
+export const tabOfQuery = (q: unknown): SettingsTab => (tabs.includes(q as SettingsTab) ? (q as SettingsTab) : 'general')

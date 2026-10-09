@@ -83,11 +83,11 @@ test('settings: one save across tabs changes only what was edited', async ({ pag
     await page.getByRole('textbox', { name: /notification/i }).fill('e2e-notify@example.com')
     await page.getByRole('textbox', { name: /notification/i }).press('Enter')
 
-    await page.locator('[data-cy=tab-performance]').click()
+    await page.locator('[data-cy=nav-settings-performance]').click()
     await expect(page).toHaveURL(/tab=performance/)
     await page.getByLabel('Concurrency').fill(String(concurrency))
 
-    await page.locator('[data-cy=tab-privacy]').click()
+    await page.locator('[data-cy=nav-settings-privacy]').click()
     await page.locator('#sw-privacy-record-optin-ip').click()
 
     await expect(page.locator('[data-cy=btn-save]')).toBeEnabled()

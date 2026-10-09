@@ -10,19 +10,21 @@ test.beforeEach(({ page }) => {
   })
 })
 
-test('settings: validation stays on the page and finds the tab with the problem', async ({ page }) => {
+test('settings: validation stays on the page and finds the section with the problem', async ({ page }) => {
   await page.goto('/admin/settings')
-  await page.locator('[data-cy=tab-smtp]').click()
+  await page.locator('[data-cy=nav-settings-smtp]').click()
   await page.getByLabel('Idle timeout').first().fill('soon')
 
   let puts = 0
   page.on('request', (r) => r.method() === 'PUT' && r.url().includes('/api/settings') && puts++)
 
-  await page.locator('[data-cy=tab-general]').click()
+  await page.locator('[data-cy=nav-settings-general]').click()
   await page.locator('[data-cy=btn-save]').click()
 
-  // It jumps to the offending tab and says what is wrong.
-  await expect(page.locator('[data-cy=tab-smtp]')).toHaveAttribute('data-state', 'active')
+  // It jumps to the offending section (marked in the sidebar) and says what is wrong.
+  await expect(page).toHaveURL(/tab=smtp/)
+  await expect(page.locator('[data-cy=nav-settings-smtp]')).toHaveAttribute('data-active', 'true')
+  await expect(page.locator('li', { has: page.locator('[data-cy=nav-settings-smtp]') }).locator('[data-sidebar=menu-badge]')).toBeVisible()
   await expect(page.getByText('Invalid fields: idle_timeout').first()).toBeVisible()
   expect(puts).toBe(0)
 })
@@ -82,7 +84,7 @@ test('settings: blocks can be added and removed without saving', async ({ page }
   await expect(page.locator('section[data-cy^=smtp-]')).toHaveCount(before)
   await expect(page.locator('[data-cy=btn-save]')).toBeDisabled()
 
-  await page.locator('[data-cy=tab-messengers]').click()
+  await page.locator('[data-cy=nav-settings-messengers]').click()
   const m = await page.locator('section[data-cy^=messenger-]').count()
   await page.locator('[data-cy=messenger-add]').click()
   await expect(page.locator('section[data-cy^=messenger-]')).toHaveCount(m + 1)

@@ -58,7 +58,7 @@ async function mockBounces(page: Page) {
 test('bounces: rows, details and filter chips', async ({ page }) => {
   await mockBounces(page)
   await page.goto('/admin/subscribers/bounces')
-  await expect(page.getByRole('heading', { name: /^Bounces/ })).toBeVisible()
+  await expect(page.locator('[data-cy=pagetab-bounces]')).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('link', { name: 'one@example.com' })).toHaveAttribute('href', /\/admin\/subscribers\/7$/)
 
   // Details dialog shows the raw meta

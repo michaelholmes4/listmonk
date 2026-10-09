@@ -52,10 +52,20 @@ Atlassian, GitHub Primer) and by Nielsen's heuristics (consistency, recognition 
 visibility of system status).
 
 1. **Navigation shows destinations, grouped by job, all visible.** Use a flat sidebar with section
-   labels (*Audience*, *Messaging*, *Administration*) instead of collapsible groups, so every
-   destination is one click away and the sections explain the app. Actions ("new campaign") go in
-   page headers and the command palette (⌘K), not in the nav. A nav item is active on its own
-   route and on every route below it.
+   labels (*Audience*, *Messaging*) instead of collapsible groups, so every destination is one
+   click away and the sections explain the app. Keep it to the pages used day to day (5–9
+   entries), ordered by how often they're used. Group by the job a page serves, not by where its
+   data lives (Bounces is a report, not a subscriber page). Actions ("new campaign") go in page
+   headers and the command palette (⌘K), not in the nav. A nav item is active on its own route and
+   on every route below it.
+   - **Secondary pages are tabs** on their entry (`pages` in `nav.ts`): Lists · Forms,
+     Templates · Media, Reports: Analytics · Sent messages · Bounces. The tabs sit under a header
+     that belongs to the entry and is the same on every tab, so they never move.
+   - **Settings and administration are a space of their own** (`space` in `nav.ts`), as in Linear
+     and Stripe: one *Settings* entry at the foot of the sidebar. On its pages the sidebar lists
+     the settings sections, team (users, roles), system (maintenance, logs) and account pages,
+     with *Back to app* returning to where you were.
+   - Every page, tab or not, is in the ⌘K palette; a space's pages under its own heading.
 2. **One page header everywhere.** Title (with count or status badges) and an optional short
    description on the left; the page's actions on the right, with at most one primary button.
    The header sticks to the top while scrolling, so Save and Publish stay in reach on long forms.
@@ -74,8 +84,8 @@ visibility of system status).
    marker when the form is dirty. ⌘S still works, and leaving with unsaved edits still asks.
 8. **Forms are grouped into titled sections** (heading plus a one-line explanation) and kept to a
    readable width.
-9. **Settings use a vertical section nav** (left column) instead of a wrapping tab strip. Each
-   section's help text appears at the top of the section.
+9. **Settings sections are links in the Settings space's sidebar** instead of a wrapping tab
+   strip. Each section is its own page header: its name, with its help text as the description.
 10. **Loading stays per component** (skeletons and button spinners), as before.
 
 ## 3. Building blocks
@@ -85,7 +95,7 @@ visibility of system status).
 | `components/layout/Page.vue` | Every page. Props: `title`, `count`, `description`, `width` (`full` for tables and builders, `form` for a readable column). Slots: `badges`, `meta`, `actions`, `help`, default. It renders a `#page-actions` target, so a form component can teleport its Save button into the header. |
 | `components/layout/FormActions.vue` | Save/Cancel (plus "Unsaved changes") teleported into the page header. |
 | `components/layout/FormSection.vue` | A titled group of fields inside a form. |
-| `components/layout/SectionNav.vue` | Vertical section navigation (Settings). It switches a reka `Tabs` that has no `TabsList`. |
+| `components/layout/PageTabs.vue` | Tabs linking a sidebar entry's pages. `Page` renders it from `nav.ts`; views don't use it directly. |
 | `components/datatable/DataTableToolbar.vue` | Search, filters and right-side actions. Turns into the bulk bar when rows are selected. |
 | `components/datatable/SearchInput.vue` | Debounced, clearable search box. |
 | `components/datatable/FilterSelect.vue` | "Label: value" select with an *All* option. |
@@ -110,6 +120,19 @@ visibility of system status).
 | F3 | The campaign form is split into Details / Audience / Delivery / Send test sections, at a readable width. |
 | F4 | Settings uses a vertical section nav, with each section's help under its heading. After a failed save it jumps to the section with the problem and re-validates, so that field's message shows. |
 | D1–D2 | The dashboard title is "Dashboard" (the date is the description), the count tiles link to their pages, and the header has *Import* and *New campaign*. |
+
+Later (October 2026), the sidebar went from 18 entries to 8:
+
+| Before | Now |
+|--------|-----|
+| Import, Bounces under *Audience* | Import is the Subscribers header button (and ⌘K). Bounces is a Reports tab. |
+| Forms under *Audience* | A tab on Lists. |
+| Media, Analytics, Sent messages under *Messaging* | Media is a tab on Templates. Analytics and Sent messages are Reports tabs. |
+| *Administration*: Users, User roles, List roles, Settings, Maintenance, Logs | All in the Settings space, with the settings sections and Profile. The in-page section nav (`SectionNav`) is gone. |
+
+On a tabbed page the `h1` is the entry's name (*Reports*); the page's own name is the active tab,
+the breadcrumb and the document title. Its description and meta open the content, and its count is
+left to the pager, so nothing in the header changes from tab to tab.
 
 Also changed: Maintenance's delete buttons use the destructive style, and the template clone name is
 translated (it was hard-coded "Copy of").

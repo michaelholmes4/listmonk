@@ -17,7 +17,7 @@ test('forms: ticking a public list generates its embed HTML', async ({ page }) =
 
   try {
     await page.goto('/admin/lists/forms')
-    await expect(page.getByRole('heading', { name: 'Forms' })).toBeVisible()
+    await expect(page.locator('[data-cy=pagetab-forms]')).toHaveAttribute('aria-current', 'page')
     await expect(page.locator('[data-slot=skeleton]')).toHaveCount(0)
 
     // Nothing is generated until a list is ticked.

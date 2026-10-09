@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/zod'
 import { useEventListener } from '@vueuse/core'
+import { storeToRefs } from 'pinia'
 import { useForm } from 'vee-validate'
-import { computed, nextTick, ref, watch, type Component } from 'vue'
+import { computed, nextTick, onScopeDispose, ref, watch, watchEffect, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import type { Settings } from '@/api/types'
 import FormActions from '@/components/layout/FormActions.vue'
-import SectionNav from '@/components/layout/SectionNav.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { useSaveSettings } from '@/composables/queries/useSettings'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import { usePermission } from '@/composables/usePermission'
+import { useUiStore } from '@/stores/ui'
 import AppearanceTab from './tabs/AppearanceTab.vue'
 import BouncesTab from './tabs/BouncesTab.vue'
 import GeneralTab from './tabs/GeneralTab.vue'
@@ -24,7 +25,7 @@ import PrivacyTab from './tabs/PrivacyTab.vue'
 import SecurityTab from './tabs/SecurityTab.vue'
 import SmtpTab from './tabs/SmtpTab.vue'
 import { halfEditedSecret, settingsSchema, toForm, toRequest } from './schema'
-import { tabOfPath, tabs, type SettingsTab } from './tabIds'
+import { tabOfPath, tabOfQuery, tabs, type SettingsTab } from './tabIds'
 
 const props = defineProps<{ settings: Settings }>()
 
@@ -59,14 +60,16 @@ watch(
 
 const { leaveOpen, decide } = useUnsavedGuard(dirty, computed(() => save.isPending.value))
 
-// --- Tabs live in the URL. ---------------------------------------------------------------------------
-const tab = computed<SettingsTab>({
-  get: () => (tabs.includes(route.query.tab as SettingsTab) ? (route.query.tab as SettingsTab) : 'general'),
-  set: (v) => void router.replace({ query: { ...route.query, tab: v } }),
-})
+// --- Sections live in the URL (`?tab=`); the sidebar's Settings space links them. -------------------
+const tab = computed(() => tabOfQuery(route.query.tab))
 
-// Tabs holding an error get a dot, so a problem on another tab isn't invisible.
-const tabsWithErrors = computed(() => new Set(Object.keys(errors.value).map(tabOfPath)))
+// Sections holding an error get a dot in the sidebar, so a problem in another section isn't invisible.
+const { navAlerts } = storeToRefs(useUiStore())
+watchEffect(() => {
+  const label = t('web.settings.hasErrors')
+  navAlerts.value = Object.fromEntries(Object.keys(errors.value).map((path) => [`settings-${tabOfPath(path)}`, label]))
+})
+onScopeDispose(() => (navAlerts.value = {}))
 
 // --- Save. -------------------------------------------------------------------------------------------
 const submit = handleSubmit(
@@ -110,47 +113,22 @@ const sections: Record<SettingsTab, Component> = {
   messengers: MessengersTab,
   appearance: AppearanceTab,
 }
-const navItems = computed(() =>
-  tabs.map((id) => ({ id, label: t(tabLabels[id]), alert: tabsWithErrors.value.has(id), alertLabel: t('web.settings.hasErrors') })),
-)
-
-const tabLabels: Record<SettingsTab, string> = {
-  general: 'settings.general.name',
-  performance: 'settings.performance.name',
-  privacy: 'settings.privacy.name',
-  security: 'settings.security.name',
-  media: 'settings.media.title',
-  smtp: 'settings.smtp.name',
-  bounces: 'settings.bounces.name',
-  messengers: 'settings.messengers.name',
-  appearance: 'settings.appearance.name',
-}
 </script>
 
 <template>
   <FormActions :pending="save.isPending.value" :dirty="dirty" :can-save="canManage" @save="submit" />
 
-  <!-- Sections: a vertical nav on the left (a scrolling row on small screens), the section on the right. -->
-  <div class="grid grid-cols-1 gap-6 md:grid-cols-[11rem_minmax(0,1fr)] md:gap-10">
-    <div>
-      <SectionNav v-model="tab" :items="navItems" :label="t('settings.title')" data-cy="settings-tabs" />
-    </div>
-
-    <form novalidate class="max-w-3xl min-w-0 space-y-6" @submit.prevent="submit">
-      <header class="space-y-1 border-b pb-4">
-        <h2 class="text-lg font-semibold">{{ t(tabLabels[tab]) }}</h2>
-        <p class="text-sm text-muted-foreground">{{ t(`web.settings.help.${tab}`) }}</p>
-      </header>
-      <!-- Tabs without a TabsList: SectionNav is the switcher, TabsContent mounts the active section. -->
-      <Tabs v-model="tab" orientation="vertical">
-        <fieldset :disabled="!canManage" class="min-w-0 border-0 p-0">
-          <TabsContent v-for="id in tabs" :key="id" :value="id"><component :is="sections[id]" /></TabsContent>
-        </fieldset>
-      </Tabs>
-      <p class="text-xs text-muted-foreground">{{ t('web.settings.saveHint') }}</p>
-      <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
-    </form>
-  </div>
+  <!-- The section's name and help are the page header (SettingsView); the sidebar switches sections. -->
+  <form novalidate class="max-w-3xl min-w-0 space-y-6" @submit.prevent="submit">
+    <!-- Tabs without a TabsList: the sidebar is the switcher, TabsContent mounts the active section. -->
+    <Tabs :model-value="tab" orientation="vertical">
+      <fieldset :disabled="!canManage" class="min-w-0 border-0 p-0">
+        <TabsContent v-for="id in tabs" :key="id" :value="id"><component :is="sections[id]" /></TabsContent>
+      </fieldset>
+    </Tabs>
+    <p class="text-xs text-muted-foreground">{{ t('web.settings.saveHint') }}</p>
+    <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />
+  </form>
 
   <LeaveConfirm :open="leaveOpen" @decide="decide" />
 </template>
