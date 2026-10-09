@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { Role } from '@/api/types'
 import FormActions from '@/components/layout/FormActions.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -84,25 +85,26 @@ const onSubmit = handleSubmit((v) => {
 
 <template>
   <FormActions :pending="saving" :dirty="role ? dirty : undefined" :can-save="!readonly" :on-cancel="goBack" @save="onSubmit" />
-  <form class="space-y-6" @submit.prevent="onSubmit">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
-        <FormControl><Input v-bind="componentField" maxlength="200" :disabled="readonly" autofocus /></FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+  <form class="space-y-8" @submit.prevent="onSubmit">
+    <FormSection :title="t('web.common.details')">
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
+          <FormControl><Input v-bind="componentField" maxlength="200" :disabled="readonly" autofocus /></FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormSection>
 
-    <section class="space-y-3">
-      <div class="flex items-center justify-between">
-        <h2 class="text-sm font-medium">{{ t('users.perms') }}</h2>
-        <Button v-if="!readonly" type="button" variant="link" size="sm" class="h-auto p-0" @click="toggleAll">
+    <FormSection :title="t('users.perms')">
+      <div v-if="!readonly" class="-mb-3 flex justify-end">
+        <Button type="button" variant="link" size="sm" class="h-auto p-0" @click="toggleAll">
           {{ t('globals.buttons.toggleSelect') }}
         </Button>
       </div>
 
       <div class="divide-y rounded-lg border">
-        <div v-for="g in groups" :key="g.group" class="grid gap-3 p-4 sm:grid-cols-[9rem_1fr]" :data-cy="`perm-group-${g.group}`">
+        <div v-for="g in groups" :key="g.group" class="space-y-3 p-4" :data-cy="`perm-group-${g.group}`">
           <h3 class="text-sm font-medium">{{ t(`globals.terms.${g.group}`) }}</h3>
           <div class="grid gap-2 sm:grid-cols-2">
             <div v-for="p in g.permissions" :key="p" class="flex items-center gap-2">
@@ -127,7 +129,7 @@ const onSubmit = handleSubmit((v) => {
           </div>
         </div>
       </div>
-    </section>
+    </FormSection>
 
     <!-- Enter in a field submits; the visible Save button is in the page header. -->
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />

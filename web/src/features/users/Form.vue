@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 import type { User } from '@/api/types'
 import CopyText from '@/components/CopyText.vue'
 import FormActions from '@/components/layout/FormActions.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -88,102 +89,101 @@ const onSubmit = handleSubmit((v) => {
 
 <template>
   <FormActions :pending="saving" :dirty="user ? dirty : undefined" :can-save="canManage && !apiToken" :on-cancel="goBack" @save="onSubmit" />
-  <form class="space-y-6" @submit.prevent="onSubmit">
-    <div class="grid items-start gap-6 md:grid-cols-2">
-      <FormField name="type">
-        <FormItem>
-          <FormLabel>{{ t('users.type') }}</FormLabel>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            class="w-full"
-            :model-value="values.type"
-            :disabled="isEditing || !canManage"
-            @update:model-value="$event && setFieldValue('type', $event as 'user' | 'api')"
-          >
-            <ToggleGroupItem value="user" class="flex-1"><UserRound />{{ t('users.type.user') }}</ToggleGroupItem>
-            <ToggleGroupItem value="api" class="flex-1"><Code />{{ t('users.type.api') }}</ToggleGroupItem>
-          </ToggleGroup>
-        </FormItem>
-      </FormField>
+  <form class="space-y-8" @submit.prevent="onSubmit">
+    <FormSection :title="t('web.common.details')">
+      <div class="grid items-start gap-6 md:grid-cols-2">
+        <FormField name="type">
+          <FormItem>
+            <FormLabel>{{ t('users.type') }}</FormLabel>
+            <ToggleGroup
+              type="single"
+              variant="outline"
+              class="w-full"
+              :model-value="values.type"
+              :disabled="isEditing || !canManage"
+              @update:model-value="$event && setFieldValue('type', $event as 'user' | 'api')"
+            >
+              <ToggleGroupItem value="user" class="flex-1"><UserRound />{{ t('users.type.user') }}</ToggleGroupItem>
+              <ToggleGroupItem value="api" class="flex-1"><Code />{{ t('users.type.api') }}</ToggleGroupItem>
+            </ToggleGroup>
+          </FormItem>
+        </FormField>
 
-      <FormField v-slot="{ componentField }" name="status">
-        <FormItem>
-          <FormLabel>{{ t('globals.fields.status') }}</FormLabel>
-          <Select v-bind="componentField" :disabled="!canManage">
-            <FormControl><SelectTrigger class="w-full"><SelectValue /></SelectTrigger></FormControl>
-            <SelectContent>
-              <SelectItem value="enabled">{{ t('users.status.enabled') }}</SelectItem>
-              <SelectItem value="disabled">{{ t('users.status.disabled') }}</SelectItem>
-            </SelectContent>
-          </Select>
-        </FormItem>
-      </FormField>
-    </div>
+        <FormField v-slot="{ componentField }" name="status">
+          <FormItem>
+            <FormLabel>{{ t('globals.fields.status') }}</FormLabel>
+            <Select v-bind="componentField" :disabled="!canManage">
+              <FormControl><SelectTrigger class="w-full"><SelectValue /></SelectTrigger></FormControl>
+              <SelectContent>
+                <SelectItem value="enabled">{{ t('users.status.enabled') }}</SelectItem>
+                <SelectItem value="disabled">{{ t('users.status.disabled') }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </FormItem>
+        </FormField>
+      </div>
 
-    <div class="grid items-start gap-6 md:grid-cols-2">
-      <FormField v-slot="{ componentField }" name="username">
-        <FormItem>
-          <FormLabel>{{ t('users.username') }}</FormLabel>
-          <FormControl><Input v-bind="componentField" maxlength="200" autocomplete="off" :disabled="!canManage" autofocus /></FormControl>
-          <FormDescription>{{ t('users.usernameHelp') }}</FormDescription>
-          <FormMessage />
-        </FormItem>
-      </FormField>
+      <div class="grid items-start gap-6 md:grid-cols-2">
+        <FormField v-slot="{ componentField }" name="username">
+          <FormItem>
+            <FormLabel>{{ t('users.username') }}</FormLabel>
+            <FormControl><Input v-bind="componentField" maxlength="200" autocomplete="off" :disabled="!canManage" autofocus /></FormControl>
+            <FormDescription>{{ t('users.usernameHelp') }}</FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
 
-      <FormField v-slot="{ componentField }" name="name">
-        <FormItem>
-          <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
-          <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canManage" /></FormControl>
-          <FormMessage />
-        </FormItem>
-      </FormField>
-    </div>
+        <FormField v-slot="{ componentField }" name="name">
+          <FormItem>
+            <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
+            <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canManage" /></FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
 
-    <template v-if="!isAPI">
-      <FormField v-slot="{ componentField }" name="email">
+      <FormField v-if="!isAPI" v-slot="{ componentField }" name="email">
         <FormItem>
           <FormLabel>{{ t('subscribers.email') }}</FormLabel>
           <FormControl><Input v-bind="componentField" type="email" maxlength="200" :disabled="!canManage" /></FormControl>
           <FormMessage />
         </FormItem>
       </FormField>
+    </FormSection>
 
-      <section class="space-y-4 rounded-lg border p-4">
-        <div class="flex items-center gap-2">
-          <Checkbox
-            id="password-login"
-            :model-value="values.passwordLogin"
-            :disabled="!canManage"
-            @update:model-value="setFieldValue('passwordLogin', $event === true)"
-          />
-          <label for="password-login" class="text-sm font-medium">{{ t('users.passwordEnable') }}</label>
-        </div>
-        <div class="grid items-start gap-6 md:grid-cols-2">
-          <FormField v-slot="{ componentField }" name="password">
-            <FormItem>
-              <FormLabel>{{ t('users.password') }}</FormLabel>
-              <FormControl>
-                <Input v-bind="componentField" type="password" maxlength="200" autocomplete="new-password" :disabled="!values.passwordLogin || !canManage" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-          <FormField v-slot="{ componentField }" name="password2">
-            <FormItem>
-              <FormLabel>{{ t('users.passwordRepeat') }}</FormLabel>
-              <FormControl>
-                <Input v-bind="componentField" type="password" maxlength="200" autocomplete="new-password" :disabled="!values.passwordLogin || !canManage" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
-      </section>
-    </template>
+    <FormSection v-if="!isAPI" :title="t('users.password')">
+      <div class="flex items-center gap-2">
+        <Checkbox
+          id="password-login"
+          :model-value="values.passwordLogin"
+          :disabled="!canManage"
+          @update:model-value="setFieldValue('passwordLogin', $event === true)"
+        />
+        <label for="password-login" class="text-sm font-medium">{{ t('users.passwordEnable') }}</label>
+      </div>
+      <div class="grid items-start gap-6 md:grid-cols-2">
+        <FormField v-slot="{ componentField }" name="password">
+          <FormItem>
+            <FormLabel>{{ t('users.password') }}</FormLabel>
+            <FormControl>
+              <Input v-bind="componentField" type="password" maxlength="200" autocomplete="new-password" :disabled="!values.passwordLogin || !canManage" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+        <FormField v-slot="{ componentField }" name="password2">
+          <FormItem>
+            <FormLabel>{{ t('users.passwordRepeat') }}</FormLabel>
+            <FormControl>
+              <Input v-bind="componentField" type="password" maxlength="200" autocomplete="new-password" :disabled="!values.passwordLogin || !canManage" />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+      </div>
+    </FormSection>
 
-    <section class="space-y-4 rounded-lg border p-4">
-      <h2 class="text-sm font-medium">{{ t('users.roles') }}</h2>
+    <FormSection :title="t('users.roles')">
       <div class="grid items-start gap-6 md:grid-cols-2">
         <FormField name="userRoleId">
           <FormItem>
@@ -219,7 +219,7 @@ const onSubmit = handleSubmit((v) => {
           </FormItem>
         </FormField>
       </div>
-    </section>
+    </FormSection>
 
     <div v-if="apiToken" class="space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-4" data-cy="api-token">
       <p class="text-sm">{{ t('users.apiOneTimeToken') }}</p>

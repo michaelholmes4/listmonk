@@ -8,6 +8,7 @@ import { RouterLink } from 'vue-router'
 import { toast } from 'vue-sonner'
 import type { ListRole } from '@/api/types'
 import FormActions from '@/components/layout/FormActions.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -86,18 +87,18 @@ const onSubmit = handleSubmit((v) => {
 
 <template>
   <FormActions :pending="saving" :dirty="role ? dirty : undefined" :can-save="!readonly" :on-cancel="goBack" @save="onSubmit" />
-  <form class="space-y-6" @submit.prevent="onSubmit">
-    <FormField v-slot="{ componentField }" name="name">
-      <FormItem>
-        <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
-        <FormControl><Input v-bind="componentField" maxlength="200" :disabled="readonly" autofocus /></FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
+  <form class="space-y-8" @submit.prevent="onSubmit">
+    <FormSection :title="t('web.common.details')">
+      <FormField v-slot="{ componentField }" name="name">
+        <FormItem>
+          <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
+          <FormControl><Input v-bind="componentField" maxlength="200" :disabled="readonly" autofocus /></FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+    </FormSection>
 
-    <section class="space-y-3">
-      <h2 class="text-sm font-medium">{{ t('users.listPerms') }}</h2>
-
+    <FormSection :title="t('users.listPerms')">
       <div v-if="!readonly" class="flex gap-2">
         <Select v-model="picked" :disabled="available.length < 1">
           <SelectTrigger class="w-full max-w-sm" data-cy="pick-list"><SelectValue :placeholder="t('globals.terms.list', 1)" /></SelectTrigger>
@@ -139,7 +140,7 @@ const onSubmit = handleSubmit((v) => {
           </div>
         </div>
       </div>
-    </section>
+    </FormSection>
 
     <!-- Enter in a field submits; the visible Save button is in the page header. -->
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />

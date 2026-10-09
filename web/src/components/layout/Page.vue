@@ -20,6 +20,7 @@ import PageTabs from './PageTabs.vue'
  *   button there, see FormActions).
  * - `help` slot: a rail beside the content on wide screens, a "?" popover in the header otherwise.
  * - `width`: `full` for tables and builders, `form` caps the content at a readable width.
+ * - Record tabs: a view's `RecordTabs` render along the bottom of the header (`#page-tabs`).
  * - Tabs: on the pages of a sidebar entry with secondary pages (nav.ts `pages`), the header is the
  *   entry's (its name, then tabs) and identical on every tab, so the tabs never move. The page's
  *   description, badges and meta open the content instead; its count is left to the table's pager.
@@ -56,15 +57,15 @@ const hasIntro = computed(() => !!(props.description || slots.meta || slots.badg
 </script>
 
 <template>
-  <div class="flex min-h-full flex-col">
+  <div class="group/page flex min-h-full flex-col">
     <div ref="sentinel" class="h-px" aria-hidden="true" />
     <header
       :class="
         cn(
           'sticky top-0 z-20 -mt-px bg-background px-4 pt-5 transition-shadow sm:px-6',
-          tabbed ? 'pb-0' : 'pb-4',
+          tabbed ? 'pb-0' : 'pb-4 has-data-[slot=page-tabs]:pb-0',
           stuck && 'shadow-xs',
-          stuck && !tabbed && 'border-b',
+          stuck && !tabbed && 'border-b has-data-[slot=page-tabs]:border-b-0',
         )
       "
       data-cy="page-header"
@@ -96,18 +97,21 @@ const hasIntro = computed(() => !!(props.description || slots.meta || slots.badg
         </div>
       </div>
       <PageTabs v-if="tabbed && tabEntry" :label="t(tabEntry.label)" :pages="tabs" :active="activeTab" />
+      <!-- A record page's own tabs (RecordTabs) render here. -->
+      <div id="page-tabs" class="contents" />
     </header>
 
     <div
       :class="
         cn(
           'flex-1 px-4 pb-8 sm:px-6',
-          tabbed ? 'pt-5' : 'pt-1',
+          tabbed ? 'pt-5' : 'pt-1 group-has-data-[slot=page-tabs]/page:pt-6',
           hasHelp && 'xl:grid xl:grid-cols-[minmax(0,1fr)_16rem] xl:gap-12',
         )
       "
     >
-      <div :class="cn('min-w-0 space-y-4', width === 'form' && 'max-w-3xl')">
+      <!-- A size container, so FormSections lay out by the room they actually have. -->
+      <div :class="cn('@container min-w-0 space-y-4', width === 'form' && 'max-w-4xl')">
         <!-- With tabs, what describes this one page opens its content, below the shared header. -->
         <div v-if="tabbed && hasIntro" class="space-y-1">
           <div v-if="$slots.badges" class="flex flex-wrap items-center gap-2"><slot name="badges" /></div>

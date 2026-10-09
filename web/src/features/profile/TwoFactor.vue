@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { User } from '@/api/types'
 import CopyText from '@/components/CopyText.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -70,12 +71,16 @@ function confirmDisable() {
 </script>
 
 <template>
-  <section class="space-y-4 rounded-lg border p-4" data-cy="twofa">
-    <div class="flex items-center justify-between gap-4">
-      <h2 class="flex items-center gap-2 text-sm font-medium">
+  <FormSection
+    :title="t('users.twoFA')"
+    :description="enabled() ? t('users.twoFAEnabledDesc', { type: (user.twofa_type ?? '').toUpperCase() }) : t('users.twoFANotEnabled')"
+    data-cy="twofa"
+  >
+    <div class="flex items-center justify-between gap-4 rounded-lg border p-3">
+      <p class="flex items-center gap-2 text-sm font-medium">
         <CircleCheck v-if="enabled()" class="size-4 text-primary" />
-        {{ enabled() ? t('users.twoFAEnabled') : t('users.twoFA') }}
-      </h2>
+        {{ enabled() ? t('users.twoFAEnabled') : t('globals.buttons.enable') }}
+      </p>
       <Switch
         v-if="step === 'idle'"
         :model-value="enabled()"
@@ -85,10 +90,6 @@ function confirmDisable() {
         @update:model-value="onToggle"
       />
     </div>
-
-    <p class="text-sm text-muted-foreground">
-      {{ enabled() ? t('users.twoFAEnabledDesc', { type: (user.twofa_type ?? '').toUpperCase() }) : t('users.twoFANotEnabled') }}
-    </p>
 
     <form v-if="step === 'enroll'" class="space-y-4" @submit.prevent="confirmEnable">
       <p class="text-sm text-muted-foreground">{{ t('users.totpScanQR') }}</p>
@@ -132,5 +133,5 @@ function confirmDisable() {
         <Button type="button" variant="outline" @click="reset">{{ t('globals.buttons.cancel') }}</Button>
       </div>
     </form>
-  </section>
+  </FormSection>
 </template>

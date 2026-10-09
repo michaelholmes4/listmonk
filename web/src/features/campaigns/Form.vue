@@ -12,6 +12,8 @@ import type { Campaign } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import FormActions from '@/components/layout/FormActions.vue'
 import FormSection from '@/components/layout/FormSection.vue'
+import RecordTab from '@/components/layout/RecordTab.vue'
+import RecordTabs from '@/components/layout/RecordTabs.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import PreviewDialog from '@/components/PreviewDialog.vue'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +22,7 @@ import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessa
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { TagsInput, TagsInputInput, TagsInputItem, TagsInputItemDelete, TagsInputItemText } from '@/components/ui/tags-input'
 import { Textarea } from '@/components/ui/textarea'
 import { useConfig } from '@/composables/queries/useConfig'
@@ -243,15 +245,16 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
 
   <form class="space-y-6" @submit.prevent="submit">
     <Tabs v-model="tab">
-      <TabsList>
-        <TabsTrigger value="campaign">{{ t('globals.terms.campaign', 1) }}</TabsTrigger>
-        <TabsTrigger value="content" :disabled="isNew">{{ t('campaigns.content') }}</TabsTrigger>
-        <TabsTrigger value="attribs" :disabled="isNew">{{ t('globals.terms.attribs') }}</TabsTrigger>
-        <TabsTrigger value="archive" :disabled="isNew">{{ t('campaigns.archive') }}</TabsTrigger>
-      </TabsList>
+      <!-- A new campaign is only its settings; the other tabs appear once the draft exists. -->
+      <RecordTabs v-if="!isNew">
+        <RecordTab value="campaign">{{ t('globals.terms.campaign', 1) }}</RecordTab>
+        <RecordTab value="content">{{ t('campaigns.content') }}</RecordTab>
+        <RecordTab value="attribs">{{ t('globals.terms.attribs') }}</RecordTab>
+        <RecordTab value="archive">{{ t('campaigns.archive') }}</RecordTab>
+      </RecordTabs>
 
       <!-- Settings -->
-      <TabsContent value="campaign" class="max-w-3xl space-y-8 pt-4">
+      <TabsContent value="campaign" class="space-y-8">
         <FormSection :title="t('web.common.details')">
           <FormField v-slot="{ componentField }" name="name">
             <FormItem>
@@ -383,7 +386,7 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
       </TabsContent>
 
       <!-- Content -->
-      <TabsContent v-if="!isNew" value="content" class="space-y-6 pt-4">
+      <TabsContent v-if="!isNew" value="content" class="space-y-6">
         <ContentEditor
           :campaign-id="campaign!.id!"
           :title="campaign!.name ?? ''"
@@ -423,69 +426,72 @@ const canUnschedule = computed(() => canSend.value && status.value === 'schedule
       </TabsContent>
 
       <!-- Attributes -->
-      <TabsContent v-if="!isNew" value="attribs" class="max-w-3xl pt-4">
-        <FormField v-slot="{ componentField }" name="attribs">
-          <FormItem>
-            <FormLabel>{{ t('globals.terms.attribs') }}</FormLabel>
-            <FormControl><Textarea v-bind="componentField" class="font-mono text-xs" rows="15" :disabled="!canEdit" /></FormControl>
-            <FormDescription>{{ t('campaigns.attribsHelp') }}</FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+      <TabsContent v-if="!isNew" value="attribs">
+        <FormSection :title="t('globals.terms.attribs')" :description="t('campaigns.attribsHelp')">
+          <FormField v-slot="{ componentField }" name="attribs">
+            <FormItem>
+              <FormControl><Textarea v-bind="componentField" class="font-mono text-xs" rows="15" :disabled="!canEdit" :aria-label="t('globals.terms.attribs')" /></FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </FormSection>
       </TabsContent>
 
       <!-- Archive -->
-      <TabsContent v-if="!isNew" value="archive" class="max-w-3xl space-y-6 pt-4">
-        <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
-          <div class="space-y-0.5">
-            <label for="archive" class="text-sm font-medium">{{ t('campaigns.archiveEnable') }}</label>
-            <p class="text-xs text-muted-foreground">{{ t('campaigns.archiveHelp') }}</p>
-            <a v-if="values.archive && config?.root_url" :href="`${config.root_url}/archive/${campaign!.uuid}`" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">
-              {{ config.root_url }}/archive/{{ campaign!.uuid }}
-            </a>
+      <TabsContent v-if="!isNew" value="archive" class="space-y-8">
+        <FormSection :title="t('campaigns.archive')" :description="t('campaigns.archiveHelp')">
+          <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
+            <div class="min-w-0 space-y-0.5">
+              <label for="archive" class="text-sm font-medium">{{ t('campaigns.archiveEnable') }}</label>
+              <a v-if="values.archive && config?.root_url" :href="`${config.root_url}/archive/${campaign!.uuid}`" target="_blank" rel="noopener noreferrer" class="block text-xs break-all text-primary hover:underline">
+                {{ config.root_url }}/archive/{{ campaign!.uuid }}
+              </a>
+            </div>
+            <Switch id="archive" :model-value="values.archive" :disabled="!canArchive" data-cy="btn-archive" @update:model-value="setFieldValue('archive', $event)" />
           </div>
-          <Switch id="archive" :model-value="values.archive" :disabled="!canArchive" data-cy="btn-archive" @update:model-value="setFieldValue('archive', $event)" />
-        </div>
 
-        <div class="grid items-start gap-6 md:grid-cols-2">
-          <FormField v-slot="{ componentField }" name="archiveTemplateId">
-            <FormItem>
-              <FormLabel>{{ t('globals.terms.template', 1) }}</FormLabel>
-              <Select :model-value="componentField.modelValue == null ? undefined : String(componentField.modelValue)" :disabled="!canArchive || !values.archive || values.contentType === 'visual'" @update:model-value="setFieldValue('archiveTemplateId', Number($event))">
-                <FormControl><SelectTrigger class="w-full"><SelectValue :placeholder="t('globals.terms.none')" /></SelectTrigger></FormControl>
-                <SelectContent>
-                  <SelectItem v-for="tpl in archiveTemplates" :key="tpl.id" :value="String(tpl.id)">{{ tpl.name }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormItem>
-          </FormField>
-          <FormField v-slot="{ componentField }" name="archiveSlug">
-            <FormItem>
-              <FormLabel>{{ t('campaigns.archiveSlug') }}</FormLabel>
-              <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canArchive || !values.archive" data-cy="archive-slug" /></FormControl>
-              <FormDescription>{{ t('campaigns.archiveSlugHelp') }}</FormDescription>
-            </FormItem>
-          </FormField>
-        </div>
+          <div class="grid items-start gap-6 md:grid-cols-2">
+            <FormField v-slot="{ componentField }" name="archiveTemplateId">
+              <FormItem>
+                <FormLabel>{{ t('globals.terms.template', 1) }}</FormLabel>
+                <Select :model-value="componentField.modelValue == null ? undefined : String(componentField.modelValue)" :disabled="!canArchive || !values.archive || values.contentType === 'visual'" @update:model-value="setFieldValue('archiveTemplateId', Number($event))">
+                  <FormControl><SelectTrigger class="w-full"><SelectValue :placeholder="t('globals.terms.none')" /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    <SelectItem v-for="tpl in archiveTemplates" :key="tpl.id" :value="String(tpl.id)">{{ tpl.name }}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            </FormField>
+            <FormField v-slot="{ componentField }" name="archiveSlug">
+              <FormItem>
+                <FormLabel>{{ t('campaigns.archiveSlug') }}</FormLabel>
+                <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canArchive || !values.archive" data-cy="archive-slug" /></FormControl>
+                <FormDescription>{{ t('campaigns.archiveSlugHelp') }}</FormDescription>
+              </FormItem>
+            </FormField>
+          </div>
+        </FormSection>
 
-        <FormField v-slot="{ componentField }" name="archiveMeta">
-          <FormItem>
-            <div class="flex items-center justify-between">
-              <FormLabel>{{ t('campaigns.archiveMeta') }}</FormLabel>
-              <div v-if="values.archive" class="flex gap-2">
+        <FormSection :title="t('campaigns.archiveMeta')" :description="t('campaigns.archiveMetaHelp')">
+          <FormField v-slot="{ componentField }" name="archiveMeta">
+            <FormItem>
+              <div v-if="values.archive" class="flex justify-end gap-2">
                 <Button v-if="!values.archiveMeta || values.archiveMeta === '{}'" type="button" variant="outline" size="sm" @click="fillArchiveMeta">{ }</Button>
                 <Button type="button" variant="outline" size="sm" data-cy="btn-archive-preview" @click="showArchivePreview"><Eye />{{ t('campaigns.preview') }}</Button>
               </div>
-            </div>
-            <FormControl><Textarea v-bind="componentField" class="font-mono text-xs" rows="14" :disabled="!canArchive || !values.archive" data-cy="archive-meta" /></FormControl>
-            <FormDescription>{{ t('campaigns.archiveMetaHelp') }}</FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+              <FormControl>
+                <Textarea v-bind="componentField" class="font-mono text-xs" rows="14" :disabled="!canArchive || !values.archive" :aria-label="t('campaigns.archiveMeta')" data-cy="archive-meta" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
 
-        <Button v-if="!canEdit && canArchive" type="button" :disabled="archiveUpdate.isPending.value" data-cy="btn-archive-save" @click="saveArchiveOnly">
-          <Loader2 v-if="archiveUpdate.isPending.value" class="animate-spin" />{{ t('globals.buttons.saveChanges') }}
-        </Button>
+          <div v-if="!canEdit && canArchive">
+            <Button type="button" :disabled="archiveUpdate.isPending.value" data-cy="btn-archive-save" @click="saveArchiveOnly">
+              <Loader2 v-if="archiveUpdate.isPending.value" class="animate-spin" />{{ t('globals.buttons.saveChanges') }}
+            </Button>
+          </div>
+        </FormSection>
       </TabsContent>
     </Tabs>
 

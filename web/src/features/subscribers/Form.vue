@@ -9,6 +9,8 @@ import { toast } from 'vue-sonner'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import FormActions from '@/components/layout/FormActions.vue'
 import FormSection from '@/components/layout/FormSection.vue'
+import RecordTab from '@/components/layout/RecordTab.vue'
+import RecordTabs from '@/components/layout/RecordTabs.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,7 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { useAllLists } from '@/composables/queries/useLists'
 import {
@@ -116,18 +118,14 @@ const when = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
   <FormActions :pending="saving" :dirty="isEditing ? dirty : undefined" :can-save="canManage" :on-cancel="goBack" @save="onSubmit" />
 
   <Tabs v-model="tab">
-    <TabsList v-if="isEditing" class="mb-6">
-      <TabsTrigger value="profile">{{ t('web.subscribers.profile') }}</TabsTrigger>
-      <TabsTrigger value="subscriptions" :disabled="!subscriber?.lists?.length">
-        {{ t('globals.terms.subscriptions', 2) }} ({{ subscriber?.lists?.length ?? 0 }})
-      </TabsTrigger>
-      <TabsTrigger v-if="can('bounces:get')" value="bounces" :disabled="!bounces?.length">
-        {{ t('globals.terms.bounces') }} ({{ bounces?.length ?? 0 }})
-      </TabsTrigger>
-      <TabsTrigger value="activity">{{ t('subscribers.activity') }}</TabsTrigger>
-      <TabsTrigger v-if="can('automations:get')" value="automations">{{ t('web.automations.title') }}</TabsTrigger>
-      <TabsTrigger v-if="can('message_log:get')" value="messages">{{ t('web.messages.tab') }}</TabsTrigger>
-    </TabsList>
+    <RecordTabs v-if="isEditing">
+      <RecordTab value="profile">{{ t('web.subscribers.profile') }}</RecordTab>
+      <RecordTab value="subscriptions" :count="subscriber?.lists?.length ?? 0">{{ t('globals.terms.subscriptions', 2) }}</RecordTab>
+      <RecordTab v-if="can('bounces:get')" value="bounces" :count="bounces?.length ?? 0">{{ t('globals.terms.bounces') }}</RecordTab>
+      <RecordTab value="activity">{{ t('subscribers.activity') }}</RecordTab>
+      <RecordTab v-if="can('automations:get')" value="automations">{{ t('web.automations.title') }}</RecordTab>
+      <RecordTab v-if="can('message_log:get')" value="messages">{{ t('web.messages.tab') }}</RecordTab>
+    </RecordTabs>
 
     <!-- Profile: the only editable part, saved with the header's Save. -->
     <TabsContent value="profile" force-mount class="data-[state=inactive]:hidden">
@@ -221,7 +219,8 @@ const when = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
     </TabsContent>
 
     <TabsContent value="subscriptions">
-      <div class="box overflow-hidden">
+      <p v-if="!subscriber?.lists?.length" class="text-sm text-muted-foreground">{{ t('web.subscribers.noSubscriptions') }}</p>
+      <div v-else class="box overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -256,12 +255,13 @@ const when = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
     </TabsContent>
 
     <TabsContent v-if="can('bounces:get')" value="bounces" class="space-y-3">
-      <div v-if="can('bounces:manage')" class="flex justify-end">
+      <p v-if="!bounces?.length" class="text-sm text-muted-foreground">{{ t('web.subscribers.noBounces') }}</p>
+      <div v-if="bounces?.length && can('bounces:manage')" class="flex justify-end">
         <Button type="button" variant="outline" size="sm" class="text-destructive" @click="confirmBounces = true">
           <Trash2 />{{ t('globals.buttons.delete') }}
         </Button>
       </div>
-      <div class="box overflow-hidden">
+      <div v-if="bounces?.length" class="box overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>

@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { List } from '@/api/types'
 import FormActions from '@/components/layout/FormActions.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -65,61 +66,13 @@ const onSubmit = handleSubmit((v) => {
 
 <template>
   <FormActions :pending="saving" :dirty="list ? dirty : undefined" :can-save="canManage" :on-cancel="goBack" @save="onSubmit" />
-  <form class="space-y-6" @submit.prevent="onSubmit">
-    <div class="space-y-6">
+  <form class="space-y-8" @submit.prevent="onSubmit">
+    <FormSection :title="t('web.common.details')" :description="t('web.lists.detailsHelp')">
       <FormField v-slot="{ componentField }" name="name">
         <FormItem>
           <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
           <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canManage" autofocus /></FormControl>
           <FormMessage />
-        </FormItem>
-      </FormField>
-
-      <div class="grid items-start gap-6 md:grid-cols-2">
-        <FormField v-slot="{ componentField }" name="type">
-          <FormItem>
-            <FormLabel>{{ t('lists.type') }}</FormLabel>
-            <Select v-bind="componentField" :disabled="!canManage">
-              <FormControl><SelectTrigger class="w-full"><SelectValue /></SelectTrigger></FormControl>
-              <SelectContent>
-                <SelectItem value="private">{{ t('lists.types.private') }}</SelectItem>
-                <SelectItem value="public">{{ t('lists.types.public') }}</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormDescription>{{ t('lists.typeHelp') }}</FormDescription>
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ componentField }" name="optin">
-          <FormItem>
-            <FormLabel>{{ t('lists.optin') }}</FormLabel>
-            <Select v-bind="componentField" :disabled="!canManage">
-              <FormControl><SelectTrigger class="w-full"><SelectValue /></SelectTrigger></FormControl>
-              <SelectContent>
-                <SelectItem value="single">{{ t('lists.optins.single') }}</SelectItem>
-                <SelectItem value="double">{{ t('lists.optins.double') }}</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormDescription>{{ t('lists.optinHelp') }}</FormDescription>
-          </FormItem>
-        </FormField>
-      </div>
-
-      <FormField name="tags">
-        <FormItem>
-          <FormLabel>{{ t('globals.terms.tags') }}</FormLabel>
-          <TagsInput
-            :model-value="values.tags ?? []"
-            :disabled="!canManage"
-            add-on-blur
-            @update:model-value="setFieldValue('tags', $event as string[])"
-          >
-            <TagsInputItem v-for="tag in values.tags" :key="tag" :value="tag">
-              <TagsInputItemText />
-              <TagsInputItemDelete />
-            </TagsInputItem>
-            <TagsInputInput :placeholder="t('globals.terms.tags')" />
-          </TagsInput>
         </FormItem>
       </FormField>
 
@@ -131,19 +84,56 @@ const onSubmit = handleSubmit((v) => {
         </FormItem>
       </FormField>
 
-      <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
-        <div class="space-y-0.5">
-          <label for="list-archived" class="text-sm font-medium">{{ t('lists.archived') }}</label>
-          <p class="text-xs text-muted-foreground">{{ t('lists.archivedHelp') }}</p>
-        </div>
-        <Switch
-          id="list-archived"
-          :model-value="values.archived"
-          :disabled="!canManage"
-          @update:model-value="setFieldValue('archived', $event)"
-        />
+      <FormField name="tags">
+        <FormItem>
+          <FormLabel>{{ t('globals.terms.tags') }}</FormLabel>
+          <TagsInput :model-value="values.tags ?? []" :disabled="!canManage" add-on-blur @update:model-value="setFieldValue('tags', $event as string[])">
+            <TagsInputItem v-for="tag in values.tags" :key="tag" :value="tag">
+              <TagsInputItemText />
+              <TagsInputItemDelete />
+            </TagsInputItem>
+            <TagsInputInput :placeholder="t('globals.terms.tags')" />
+          </TagsInput>
+        </FormItem>
+      </FormField>
+    </FormSection>
+
+    <FormSection :title="t('web.lists.access')" :description="t('web.lists.accessHelp')">
+      <FormField v-slot="{ componentField }" name="type">
+        <FormItem>
+          <FormLabel>{{ t('lists.type') }}</FormLabel>
+          <Select v-bind="componentField" :disabled="!canManage">
+            <FormControl><SelectTrigger class="w-56"><SelectValue /></SelectTrigger></FormControl>
+            <SelectContent>
+              <SelectItem value="private">{{ t('lists.types.private') }}</SelectItem>
+              <SelectItem value="public">{{ t('lists.types.public') }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <FormDescription>{{ t('lists.typeHelp') }}</FormDescription>
+        </FormItem>
+      </FormField>
+
+      <FormField v-slot="{ componentField }" name="optin">
+        <FormItem>
+          <FormLabel>{{ t('lists.optin') }}</FormLabel>
+          <Select v-bind="componentField" :disabled="!canManage">
+            <FormControl><SelectTrigger class="w-56"><SelectValue /></SelectTrigger></FormControl>
+            <SelectContent>
+              <SelectItem value="single">{{ t('lists.optins.single') }}</SelectItem>
+              <SelectItem value="double">{{ t('lists.optins.double') }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <FormDescription>{{ t('lists.optinHelp') }}</FormDescription>
+        </FormItem>
+      </FormField>
+    </FormSection>
+
+    <FormSection :title="t('web.lists.archive')" :description="t('lists.archivedHelp')">
+      <div class="flex items-center justify-between gap-4 rounded-lg border p-3">
+        <label for="list-archived" class="text-sm font-medium">{{ t('lists.archived') }}</label>
+        <Switch id="list-archived" :model-value="values.archived" :disabled="!canManage" @update:model-value="setFieldValue('archived', $event)" />
       </div>
-    </div>
+    </FormSection>
 
     <!-- Enter in a field submits; the visible Save button is in the page header. -->
     <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true" />

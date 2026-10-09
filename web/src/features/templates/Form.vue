@@ -14,7 +14,6 @@ import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCreateTemplate, usePreviewTemplate, useUpdateTemplate } from '@/composables/queries/useTemplates'
 import { useGoBack } from '@/composables/useGoBack'
@@ -91,10 +90,11 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
 
 <template>
   <FormActions :pending="saving" :dirty="template ? dirty : undefined" :can-save="canManage" :on-cancel="goBack" @save="onSubmit" />
-  <form class="space-y-6" @submit.prevent="onSubmit">
-    <div class="grid items-start gap-6 md:grid-cols-[1fr_14rem]">
+  <!-- An editor page: a toolbar of compact fields (as on a campaign's Content tab), then the editor at full width. -->
+  <form class="space-y-4" @submit.prevent="onSubmit">
+    <div class="flex flex-wrap items-end gap-4">
       <FormField v-slot="{ componentField }" name="name">
-        <FormItem>
+        <FormItem class="w-full sm:w-80">
           <FormLabel>{{ t('globals.fields.name') }}</FormLabel>
           <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canManage" autofocus /></FormControl>
           <FormMessage />
@@ -105,7 +105,7 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
         <FormItem>
           <FormLabel>{{ t('globals.fields.type') }}</FormLabel>
           <Select v-bind="componentField" :disabled="isEditing || !canManage">
-            <FormControl><SelectTrigger class="w-full"><SelectValue /></SelectTrigger></FormControl>
+            <FormControl><SelectTrigger class="w-56"><SelectValue /></SelectTrigger></FormControl>
             <SelectContent>
               <SelectItem v-for="ty in ['campaign', 'campaign_visual', 'tx']" :key="ty" :value="ty">
                 {{ t(typeLabelKey(ty)) }}
@@ -114,44 +114,36 @@ useEventListener(window, 'keydown', (e: KeyboardEvent) => {
           </Select>
         </FormItem>
       </FormField>
+
+      <FormField v-if="values.type === 'tx'" v-slot="{ componentField }" name="subject">
+        <FormItem class="w-full sm:w-96">
+          <FormLabel>{{ t('templates.subject') }}</FormLabel>
+          <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canManage" /></FormControl>
+          <FormMessage />
+        </FormItem>
+      </FormField>
+
+      <Button type="button" variant="outline" size="sm" class="ml-auto" @click="showPreview">
+        <Eye />{{ t('templates.preview') }} (F9)
+      </Button>
     </div>
 
-    <FormField v-if="values.type === 'tx'" v-slot="{ componentField }" name="subject">
-      <FormItem>
-        <FormLabel>{{ t('templates.subject') }}</FormLabel>
-        <FormControl><Input v-bind="componentField" maxlength="200" :disabled="!canManage" /></FormControl>
-        <FormMessage />
-      </FormItem>
-    </FormField>
-
-    <div v-if="isVisual" class="space-y-2">
-      <div class="flex items-center justify-between">
-        <Label>{{ t('templates.typeCampaignVisual') }}</Label>
-        <Button type="button" variant="outline" size="sm" @click="showPreview">
-          <Eye />{{ t('templates.preview') }} (F9)
-        </Button>
-      </div>
-      <VisualEditor
-        :source="values.bodySource ?? null"
-        :body="values.body ?? ''"
-        :disabled="!canManage"
-        @change="onVisualChange"
-      />
-    </div>
+    <VisualEditor
+      v-if="isVisual"
+      :source="values.bodySource ?? null"
+      :body="values.body ?? ''"
+      :disabled="!canManage"
+      @change="onVisualChange"
+    />
 
     <FormField v-else name="body">
       <FormItem>
-        <div class="flex items-center justify-between">
-          <FormLabel>{{ t('templates.rawHTML') }}</FormLabel>
-          <Button type="button" variant="outline" size="sm" @click="showPreview">
-            <Eye />{{ t('templates.preview') }} (F9)
-          </Button>
-        </div>
+        <FormLabel class="sr-only">{{ t('templates.rawHTML') }}</FormLabel>
         <CodeEditor
           :model-value="values.body ?? ''"
           lang="html"
           :readonly="!canManage"
-          class="h-[55vh]"
+          class="h-[60vh]"
           @update:model-value="setFieldValue('body', $event)"
         />
         <FormDescription v-if="values.type === 'campaign'" :class="missingPlaceholder && 'text-destructive'">

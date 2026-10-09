@@ -17,7 +17,8 @@ defineProps<{
 
 <template>
   <FormField v-slot="{ componentField }" :name="name">
-    <FormItem>
+    <!-- A lone text field stays at a readable width, like FormSection's fields column; grids size their own cells. -->
+    <FormItem class="max-w-xl">
       <FormLabel>{{ label }}</FormLabel>
       <FormControl>
         <Input

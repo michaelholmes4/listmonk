@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Archive, Loader2, Pause, Play, Rocket } from '@lucide/vue'
+import { Archive, Loader2, MoreHorizontal, Pause, Play, Rocket } from '@lucide/vue'
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -8,12 +8,15 @@ import { PublishError } from '@/api/automations'
 import type { AutomationProblem } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Page from '@/components/layout/Page.vue'
+import RecordTab from '@/components/layout/RecordTab.vue'
+import RecordTabs from '@/components/layout/RecordTabs.vue'
 import LeaveConfirm from '@/components/LeaveConfirm.vue'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import {
   useArchiveAutomation,
   useAutomation,
@@ -154,7 +157,11 @@ function confirmAct() {
 const tabs = ['flow', 'activity', 'settings', 'versions'] as const
 type Tab = (typeof tabs)[number]
 const tab = computed<Tab>({
-  get: () => (tabs.includes(route.query.tab as Tab) ? (route.query.tab as Tab) : 'flow'),
+  get: () => {
+    const q = route.query.tab as Tab
+    // Activity and Versions aren't there until the first publish.
+    return tabs.includes(q) && !(neverPublished.value && (q === 'activity' || q === 'versions')) ? q : 'flow'
+  },
   set: (v) => router.replace({ query: { ...route.query, tab: v === 'flow' ? undefined : v } }),
 })
 
@@ -179,15 +186,17 @@ function onKey(e: KeyboardEvent) {
     </template>
 
     <template v-if="automation && can('automations:manage')" #actions>
-      <Button v-if="canPause(status)" variant="outline" size="sm" @click="acting = 'pause'">
-        <Pause />{{ t('web.automations.pause') }}
-      </Button>
-      <Button v-if="canResume(status)" variant="outline" size="sm" @click="acting = 'resume'">
-        <Play />{{ t('web.automations.resume') }}
-      </Button>
-      <Button v-if="canArchive(status)" variant="outline" size="sm" @click="acting = 'archive'">
-        <Archive />{{ t('web.automations.archive') }}
-      </Button>
+      <!-- Lifecycle actions are occasional: they live in the "⋯" menu, so Publish is the one primary button. -->
+      <DropdownMenu v-if="canPause(status) || canResume(status) || canArchive(status)">
+        <DropdownMenuTrigger as-child>
+          <Button variant="outline" size="icon-sm" :aria-label="t('web.common.actions')" data-cy="automation-actions"><MoreHorizontal /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem v-if="canPause(status)" @select="acting = 'pause'"><Pause />{{ t('web.automations.pause') }}</DropdownMenuItem>
+          <DropdownMenuItem v-if="canResume(status)" @select="acting = 'resume'"><Play />{{ t('web.automations.resume') }}</DropdownMenuItem>
+          <DropdownMenuItem v-if="canArchive(status)" @select="acting = 'archive'"><Archive />{{ t('web.automations.archive') }}</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <template v-if="!readonly">
         <Button variant="outline" size="sm" :disabled="!dirty || busy" data-cy="save-draft" @click="saveDraft">
           <Loader2 v-if="save.isPending.value" class="animate-spin" />{{ t('web.automations.saveDraft') }}
@@ -213,14 +222,15 @@ function onKey(e: KeyboardEvent) {
       <Skeleton class="mx-auto h-16 w-md max-w-full" /><Skeleton class="mx-auto h-16 w-md max-w-full" />
     </div>
     <Tabs v-else v-model="tab">
-      <TabsList>
-        <TabsTrigger value="flow">{{ t('web.automations.tabs.flow') }}</TabsTrigger>
-        <TabsTrigger value="activity" :disabled="neverPublished">{{ t('web.automations.tabs.activity') }}</TabsTrigger>
-        <TabsTrigger value="settings">{{ t('web.automations.tabs.settings') }}</TabsTrigger>
-        <TabsTrigger value="versions" :disabled="neverPublished">{{ t('web.automations.tabs.versions') }}</TabsTrigger>
-      </TabsList>
+      <!-- Activity and Versions only exist once the automation has been published. -->
+      <RecordTabs>
+        <RecordTab value="flow">{{ t('web.automations.tabs.flow') }}</RecordTab>
+        <RecordTab v-if="!neverPublished" value="activity">{{ t('web.automations.tabs.activity') }}</RecordTab>
+        <RecordTab value="settings">{{ t('web.automations.tabs.settings') }}</RecordTab>
+        <RecordTab v-if="!neverPublished" value="versions">{{ t('web.automations.tabs.versions') }}</RecordTab>
+      </RecordTabs>
 
-      <TabsContent value="flow" class="pt-4">
+      <TabsContent value="flow">
         <Alert v-if="live && status !== 'archived'" class="mb-4">
           <AlertDescription>{{ t('web.automations.liveNote') }}</AlertDescription>
         </Alert>
@@ -229,11 +239,11 @@ function onKey(e: KeyboardEvent) {
         </p>
         <FlowBuilder :flow="flow" :readonly="readonly" :stats="stats" :problems="problems" />
       </TabsContent>
-      <TabsContent value="activity" class="pt-4"><EnrollmentsPanel :automation-id="id" /></TabsContent>
-      <TabsContent value="settings" class="pt-4">
+      <TabsContent value="activity"><EnrollmentsPanel :automation-id="id" /></TabsContent>
+      <TabsContent value="settings">
         <SettingsPanel ref="settingsPanel" :automation="automation" :flow="flow" :readonly="readonly" />
       </TabsContent>
-      <TabsContent value="versions" class="pt-4">
+      <TabsContent value="versions">
         <VersionsPanel :automation-id="id" :current-version-id="automation.current_version_id" />
       </TabsContent>
     </Tabs>

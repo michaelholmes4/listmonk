@@ -78,12 +78,36 @@ visibility of system status).
    Destructive actions are never the most prominent control on a row.
 5. **Empty states say why and what next.** "No campaigns yet" plus a *New campaign* button when
    there's nothing at all. "No results" plus *Clear filters* when filters caused it.
-6. **Detail pages = header → tabs → content.** Tabs sit directly under the header and split the
-   record into views. Form fields never sit outside the tab they belong to.
+6. **Detail pages = header → tabs → content.** A record's tabs (`RecordTabs`) are line tabs
+   along the bottom of the sticky header, drawn like an entry's tabs, so they stay in reach while
+   you scroll. Form fields never sit outside the tab they belong to.
+   - Keep tab labels to one or two words. A count goes in a small counter after the label
+     ("Bounces 0"), never in brackets.
+   - Never grey out a tab. If it can't apply yet, hide it (a new campaign has only its settings;
+     an automation's Activity and Versions appear after the first publish). If it's just empty,
+     keep it and say so in the panel.
+   - The segmented "pill" tabs (`TabsList` default variant) are only for switching views inside
+     one panel, such as Appearance's admin / public CSS. They are not page navigation.
+   - The header has one primary button. Occasional actions (pause, archive) go in a "⋯" menu
+     next to it.
 7. **Save lives in the page header, with Cancel.** The header also shows an "Unsaved changes"
    marker when the form is dirty. ⌘S still works, and leaving with unsaved edits still asks.
-8. **Forms are grouped into titled sections** (heading plus a one-line explanation) and kept to a
-   readable width.
+8. **Forms are grouped into titled sections, at a readable width.** Every editor's fields sit
+   in `FormSection`s. Where there's room, the section title and description form a 14rem column
+   left of the fields, as in GitHub's, Vercel's and Polaris' settings. On narrower screens they
+   stack above the fields. The fields column is capped at 36rem (about 60 characters), so an
+   input is never wider than what goes in it. Inside that column, stack fields vertically and
+   pair them only when they're short and belong together (Name · Status).
+   - Split a form by meaning (Details · Access · Archive), not one catch-all "Details" section.
+     A lone section leaves the left column empty. Give a section a description whenever its
+     fields need explaining, so the left column explains rather than just labels.
+   - Don't put fields with long help text side by side: the uneven help makes ragged columns.
+     Stack them.
+   - Size selects and short inputs to their content (`w-56` for a status or type select).
+   - **Editor pages are the exception.** When the page's real content is a full-width editor
+     (a template, a campaign's Content tab), don't use `FormSection`. Put a toolbar row of
+     compact fields above the editor (Name, Type… on the left, Preview on the right), then the
+     editor at full width. A section above an editor creates two left edges that don't line up.
 9. **Settings sections are links in the Settings space's sidebar** instead of a wrapping tab
    strip. Each section is its own page header: its name, with its help text as the description.
 10. **Loading stays per component** (skeletons and button spinners), as before.
@@ -94,8 +118,9 @@ visibility of system status).
 |-----------|-----|
 | `components/layout/Page.vue` | Every page. Props: `title`, `count`, `description`, `width` (`full` for tables and builders, `form` for a readable column). Slots: `badges`, `meta`, `actions`, `help`, default. It renders a `#page-actions` target, so a form component can teleport its Save button into the header. |
 | `components/layout/FormActions.vue` | Save/Cancel (plus "Unsaved changes") teleported into the page header. |
-| `components/layout/FormSection.vue` | A titled group of fields inside a form. |
+| `components/layout/FormSection.vue` | A titled group of fields inside a form. Lays out by the width of `Page`'s content (a size container): title column on the left where there's room, stacked otherwise. The fields column is capped at 36rem. |
 | `components/layout/PageTabs.vue` | Tabs linking a sidebar entry's pages. `Page` renders it from `nav.ts`; views don't use it directly. |
+| `components/layout/RecordTabs.vue`, `RecordTab.vue` | A record page's tabs. Put them inside the view's `<Tabs>`; they render into the page header (`#page-tabs`). `RecordTab` takes an optional `count`. They share their look with `PageTabs` (`layout/tabs.ts`). |
 | `components/datatable/DataTableToolbar.vue` | Search, filters and right-side actions. Turns into the bulk bar when rows are selected. |
 | `components/datatable/SearchInput.vue` | Debounced, clearable search box. |
 | `components/datatable/FilterSelect.vue` | "Label: value" select with an *All* option. |
@@ -139,3 +164,31 @@ translated (it was hard-coded "Copy of").
 
 Not reviewed in depth yet: the inside of the automation flow builder, the template editor and the
 media browser. They now sit in the standard page frame, but their own layouts are unchanged.
+
+### Detail pages and forms (October 2026, second pass)
+
+Two complaints about record pages: the tabs felt cluttered, and on desktop the inputs ran up to
+768px wide, which made them hard to read across. What the research said:
+
+- **Tabs.** NN/g ("Tabs, Used Right"): use few tabs with short labels, put them directly above
+  their panel, mark the selected tab in at least two ways, and don't fade the unselected ones.
+  Design systems keep underline tabs for separate views and segmented controls for switching one
+  view's presentation. Our record tabs used the segmented style and greyed out tabs that didn't
+  apply.
+- **Field width.** Baymard, Primer and Carbon all say to size a field to its expected content.
+  Primer adds: stack fields vertically, and don't flow them into columns just to save space.
+- **Layout.** Polaris' annotated layout, GitHub's settings, GitLab's settings proposal and
+  Vercel's dashboard all put each section's title and explanation in a narrow left column and
+  the fields in a capped right column. Polaris says the same about page actions: one primary and
+  a few secondary.
+
+| Before | Now |
+|--------|-----|
+| Record tabs were a grey pill strip under the header, with counts in brackets and greyed-out empty tabs. | `RecordTabs`: line tabs in the sticky header, matching entry tabs, with counter badges. Empty tabs stay enabled and say so in the panel, and tabs that can't apply yet are hidden. |
+| Inputs spanned the whole form width (48rem), and sections were a heading over a full-width column. | `FormSection` puts the title and description on the left and the fields in a column capped at 36rem. Subscriber, campaign, automation settings, list (Details · Access · Archive), user, role and profile editors all use it. The template editor uses the toolbar-and-editor layout of a campaign's Content tab. |
+| Users, roles, lists, templates and profile each grouped fields their own way: bordered boxes, `h2`s or none. | The same sections everywhere. Profile saves from the header like every other editor. |
+| The automation header had Pause, Archive, Save draft and Publish side by side. | Pause / Resume / Archive moved to a "⋯" menu, leaving Save draft and the one primary Publish. |
+| Settings text fields were 48rem wide. | Lone text and tag fields are capped at 36rem. The multi-column SMTP, bounce and messenger cards keep the full column. |
+
+Settings keeps one column with sub-headings rather than annotated sections: each settings page's
+header already names and explains the section, and the server cards need the width.

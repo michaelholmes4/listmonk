@@ -5,9 +5,11 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import CopyText from '@/components/CopyText.vue'
 import Page from '@/components/layout/Page.vue'
+import RecordTab from '@/components/layout/RecordTab.vue'
+import RecordTabs from '@/components/layout/RecordTabs.vue'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { useMessage, useMessagePreview } from '@/composables/queries/useMessageLog'
 import { usePageTitle } from '@/lib/page-title'
 
@@ -53,11 +55,11 @@ const when = computed(() => (message.value?.created_at ? format(new Date(message
       <Skeleton class="h-96 w-full" />
     </div>
     <Tabs v-else default-value="email">
-      <TabsList>
-        <TabsTrigger value="email">{{ t('web.messages.email') }}</TabsTrigger>
-        <TabsTrigger v-if="message.alt_body" value="text">{{ t('web.messages.plainText') }}</TabsTrigger>
-        <TabsTrigger value="details">{{ t('web.common.details') }}</TabsTrigger>
-      </TabsList>
+      <RecordTabs>
+        <RecordTab value="email">{{ t('web.messages.email') }}</RecordTab>
+        <RecordTab v-if="message.alt_body" value="text">{{ t('web.messages.plainText') }}</RecordTab>
+        <RecordTab value="details">{{ t('web.common.details') }}</RecordTab>
+      </RecordTabs>
 
       <TabsContent value="email" class="space-y-3">
         <p v-if="message.content === 'none'" class="text-sm text-muted-foreground" data-cy="message-no-content">{{ t('web.messages.noContent') }}</p>

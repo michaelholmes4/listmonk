@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import type { Automation, AutomationSettings } from '@/api/types'
+import FormSection from '@/components/layout/FormSection.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -100,16 +101,17 @@ defineExpose({ dirty })
 </script>
 
 <template>
-  <form class="max-w-2xl space-y-8" data-cy="automation-settings" @submit.prevent="save">
-    <div class="space-y-2">
-      <Label for="a-name">{{ t('globals.fields.name') }}</Label>
-      <Input id="a-name" v-model="form.name" maxlength="200" :disabled="readonly" :aria-invalid="!!errors.name || undefined" />
-      <p v-if="errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
-    </div>
+  <form class="space-y-8" data-cy="automation-settings" @submit.prevent="save">
+    <FormSection :title="t('web.common.details')">
+      <div class="space-y-2">
+        <Label for="a-name">{{ t('globals.fields.name') }}</Label>
+        <Input id="a-name" v-model="form.name" maxlength="200" :disabled="readonly" :aria-invalid="!!errors.name || undefined" />
+        <p v-if="errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
+      </div>
+    </FormSection>
 
-    <section class="space-y-3">
-      <h3 class="text-sm font-medium">{{ t('web.automations.reentry.title') }}</h3>
-      <RadioGroup v-model="form.reentry.mode" class="gap-3" :disabled="readonly">
+    <FormSection :title="t('web.automations.reentry.title')">
+      <RadioGroup v-model="form.reentry.mode" class="gap-3" :disabled="readonly" :aria-label="t('web.automations.reentry.title')">
         <div v-for="m in ['once', 'interval', 'always']" :key="m" class="flex items-start gap-2">
           <RadioGroupItem :id="`re-${m}`" :value="m" class="mt-1" />
           <Label :for="`re-${m}`" class="block font-normal">
@@ -122,24 +124,23 @@ defineExpose({ dirty })
         <DurationInput v-model="form.reentry.interval" :invalid="!!errors.interval" :disabled="readonly" />
         <p v-if="errors.interval" class="text-sm text-destructive">{{ errors.interval }}</p>
       </div>
-    </section>
+    </FormSection>
 
-    <section class="space-y-3">
-      <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
-        <div class="space-y-0.5">
-          <Label for="a-window" class="font-medium">{{ t('web.automations.window.title') }}</Label>
-          <p class="text-xs text-muted-foreground">{{ t('web.automations.window.help') }}</p>
-        </div>
+    <FormSection :title="t('web.automations.window.title')" :description="t('web.automations.window.help')">
+      <div class="flex items-center justify-between gap-4 rounded-lg border p-3">
+        <Label for="a-window" class="font-medium">{{ t('globals.buttons.enabled') }}</Label>
         <Switch id="a-window" v-model="form.window" :disabled="readonly" />
       </div>
-      <div v-if="form.window" class="space-y-4 pl-1">
-        <div class="flex flex-wrap gap-3">
-          <label v-for="d in dayNames" :key="d" class="flex items-center gap-1.5 text-sm">
-            <Checkbox :model-value="form.days.includes(d)" :disabled="readonly" @update:model-value="toggleDay(d, !!$event)" />
-            {{ dayLabel(d) }}
-          </label>
+      <div v-if="form.window" class="space-y-4">
+        <div class="space-y-2">
+          <div class="flex flex-wrap gap-3">
+            <label v-for="d in dayNames" :key="d" class="flex items-center gap-1.5 text-sm">
+              <Checkbox :model-value="form.days.includes(d)" :disabled="readonly" @update:model-value="toggleDay(d, !!$event)" />
+              {{ dayLabel(d) }}
+            </label>
+          </div>
+          <p class="text-xs text-muted-foreground">{{ t('web.automations.window.daysHelp') }}</p>
         </div>
-        <p class="text-xs text-muted-foreground">{{ t('web.automations.window.daysHelp') }}</p>
         <div class="flex items-center gap-2">
           <Input v-model="form.start" type="time" class="w-32" :disabled="readonly" :aria-label="t('web.automations.window.from')" />
           <span class="text-sm text-muted-foreground">–</span>
@@ -147,27 +148,28 @@ defineExpose({ dirty })
         </div>
         <p v-if="errors.window" class="text-sm text-destructive">{{ errors.window }}</p>
       </div>
-    </section>
+      <div class="space-y-2">
+        <Label for="a-tz">{{ t('web.automations.timezone.title') }}</Label>
+        <Input id="a-tz" v-model="form.timezone" placeholder="Europe/Berlin" class="max-w-xs" :disabled="readonly" />
+        <p class="text-xs text-muted-foreground">{{ t('web.automations.timezone.help') }}</p>
+      </div>
+    </FormSection>
 
-    <div class="space-y-2">
-      <Label for="a-tz">{{ t('web.automations.timezone.title') }}</Label>
-      <Input id="a-tz" v-model="form.timezone" placeholder="Europe/Berlin" class="max-w-xs" :disabled="readonly" />
-      <p class="text-xs text-muted-foreground">{{ t('web.automations.timezone.help') }}</p>
-    </div>
-
-    <section class="space-y-3">
-      <div class="flex items-start justify-between gap-4 rounded-lg border p-3">
-        <div class="space-y-0.5">
-          <Label for="a-goal" class="font-medium">{{ t('web.automations.goal.title') }}</Label>
-          <p class="text-xs text-muted-foreground">{{ t('web.automations.goal.help') }}</p>
-        </div>
+    <FormSection :title="t('web.automations.goal.title')" :description="t('web.automations.goal.help')">
+      <div class="flex items-center justify-between gap-4 rounded-lg border p-3">
+        <Label for="a-goal" class="font-medium">{{ t('globals.buttons.enabled') }}</Label>
         <Switch id="a-goal" :model-value="!!form.goal" :disabled="readonly" @update:model-value="form.goal = $event ? emptyGroup() : null" />
       </div>
       <RuleEditor v-if="form.goal" v-model="form.goal" :email-steps="emailSteps" :allow-sql="allowSQL" :errors="ruleErrors" :disabled="readonly" />
-    </section>
+    </FormSection>
 
-    <Button v-if="!readonly" type="submit" :disabled="!dirty || invalid || update.isPending.value" data-cy="save-settings">
-      <Loader2 v-if="update.isPending.value" class="animate-spin" />{{ t('web.common.save') }}
-    </Button>
+    <!-- The flow saves from the header; these settings save on their own, under the fields column. -->
+    <div v-if="!readonly" class="grid border-t pt-6 @3xl:max-w-210 @3xl:grid-cols-[14rem_minmax(0,36rem)] @3xl:gap-x-10">
+      <div class="@3xl:col-start-2">
+        <Button type="submit" :disabled="!dirty || invalid || update.isPending.value" data-cy="save-settings">
+          <Loader2 v-if="update.isPending.value" class="animate-spin" />{{ t('web.common.save') }}
+        </Button>
+      </div>
+    </div>
   </form>
 </template>
