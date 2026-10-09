@@ -257,3 +257,54 @@ test('a wait for an event: two events, one that restarts, and its two paths', as
     }
   }
 })
+
+test('a go to step: pick its target, see the hints, and be told about an instant loop', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+
+  const name = `E2E go to builder ${Date.now()}`
+  let id = 0
+  try {
+    await page.goto('/admin/automations')
+    await page.getByRole('button', { name: 'New' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('textbox').fill(name)
+    await dialog.getByRole('button', { name: 'New' }).click()
+    await expect(page.getByRole('heading', { name })).toBeVisible()
+    id = Number(new URL(page.url()).pathname.split('/').pop())
+
+    // s1: wait for an event; its "time's up" path ends with a go to.
+    await page.locator('[data-cy=add-step]').last().click()
+    await page.locator('[data-cy=add-wait_for_event]').click()
+    await page.locator('[data-cy=step-sheet]').getByLabel('Event name').fill('activated')
+    await closeSheet(page)
+
+    await page.locator('[data-cy=branch-s1-timeout] [data-cy=add-step]').last().click()
+    await page.locator('[data-cy=add-go_to]').click()
+    const sheet = page.locator('[data-cy=step-sheet]')
+    await sheet.locator('[data-cy=goto-target]').click()
+    await page.locator('[data-cy=goto-option-s1]').click()
+    await closeSheet(page)
+
+    await expect(page.locator('[data-cy=step-s2]')).toContainText('→ Wait for an event: Up to 1 hour · activated')
+    await expect(page.locator('[data-cy=step-s1] [data-cy=also-reached]')).toContainText('Also reached by a Go to step')
+    // Nothing can be added after a go to.
+    await expect(page.locator('[data-cy=branch-s1-timeout] [data-cy=add-step]')).toHaveCount(1)
+
+    // Going back to a wait for an event is a loop with a pause in it, so no complaint.
+    await expect(page.locator('[data-cy=step-s2]')).not.toContainText('would repeat instantly')
+
+    // A wait until never pauses for sure, so looping back to one is.
+    await page.locator('[data-cy=branch-s1-timeout] [data-cy=add-step]').first().click()
+    await page.locator('[data-cy=add-wait_until]').click()
+    await closeSheet(page)
+    await page.locator('[data-cy=step-s2]').click()
+    await page.locator('[data-cy=step-sheet] [data-cy=goto-target]').click()
+    await page.locator('[data-cy=goto-option-s3]').click()
+    await expect(page.locator('[data-cy=step-sheet]')).toContainText('would repeat instantly')
+  } finally {
+    if (id) {
+      await request.post(`/api/automations/${id}/archive`)
+      await request.delete(`/api/automations/${id}`)
+    }
+  }
+})

@@ -58,6 +58,12 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
 - **Wait for an event.** `POST /api/track` events also reach runs waiting on a `wait_for_event` step (before triggers fire).
   `.Event` in emails is the event that started the run, or the latest one that restarted a wait.
+- **Go to.** A `go_to` step ends its path and sends the run to another step of the same version (join a path further down, or
+  go back to a wait). A run can therefore visit a step more than once (migration 7: `enrollments.current_visit`,
+  `enrollment_steps.visit`); each visit sends and waits afresh, and "has this step run?" looks only at the current visit. Every
+  loop must pass through a Delay or Wait for an event (checked on save; a Wait until doesn't count). A run passes one go-to at
+  most its `max_runs` times (default 25, up to 100), then exits as `loop_limit`. Opened / clicked conditions look at the step's
+  latest visit; stats count people, not visits.
 - **Retention.** `DELETE /api/maintenance/events?before_date=` prunes events. Deleting a subscriber cascades to their events
   and enrollments.
 

@@ -24,6 +24,8 @@ const options = computed(() => {
   })
 })
 
+// A loop with no pause is found on the whole flow, which the builder keeps up to date as this form edits it.
+const loopIssue = computed(() => (b.issues.value.get(props.stepId) ?? []).find((i) => i.key === 'web.automations.goTo.instantLoop'))
 const target = computed(() => (typeof config.value.target === 'string' ? config.value.target : ''))
 const maxRuns = computed(() => (typeof config.value.max_runs === 'number' ? String(config.value.max_runs) : ''))
 const setTarget = (v: unknown) => (config.value = { ...config.value, target: String(v ?? '') })
@@ -48,6 +50,7 @@ const setRuns = (v: string | number) => {
         </SelectContent>
       </Select>
       <p v-if="errors.target" class="text-sm text-destructive">{{ errors.target }}</p>
+      <p v-if="loopIssue" class="text-sm text-destructive" data-cy="goto-loop">{{ t(loopIssue.key) }}</p>
       <p class="text-xs text-muted-foreground">{{ t('web.automations.goTo.help') }}</p>
     </div>
 

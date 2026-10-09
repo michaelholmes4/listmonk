@@ -272,3 +272,74 @@ test('a wait for an event: the event takes its path, a restart event does not', 
     if (subscriberId) await request.delete(`/api/subscribers/${subscriberId}`)
   }
 })
+
+test('a go to step sends the run back to a wait, and each visit sends again', async ({ request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+
+  const stamp = Date.now()
+  const email = `e2e-goto-${stamp}@example.com`
+  const started = `e2e_trial_started_${stamp}`
+  let automationId = 0
+  let subscriberId = 0
+  try {
+    const { campaign_id } = await data(
+      await request.post('/api/automations/emails', { data: { name: `E2E welcome again ${stamp}`, subject: `Welcome ${stamp}`, content_type: 'html', body: '<p>Welcome</p>' } }),
+    )
+    const automation = await data(await request.post('/api/automations', { data: { name: `E2E go to ${stamp}`, settings: {} } }))
+    automationId = automation.id
+    // Waits for the same event that started it; taking its path sends an email and goes back to the wait.
+    const graph = {
+      triggers: [{ id: 't1', type: 'event', config: { event: started } }],
+      root: 'w',
+      nodes: [
+        { id: 'w', type: 'wait_for_event', config: { timeout: '1h', events: [{ id: 'again', name: started }] } },
+        { id: 'hello', type: 'send_email', config: { message_type: 'transactional', campaign_id } },
+        { id: 'back', type: 'go_to', config: { target: 'w', max_runs: 5 } },
+      ],
+      edges: [
+        { from: 'w', to: 'hello', handle: 'again' },
+        { from: 'hello', to: 'back' },
+      ],
+    }
+    expect((await data(await request.put(`/api/automations/${automationId}/draft`, { data: graph }))).problems).toEqual([])
+    await data(await request.post(`/api/automations/${automationId}/publish`, { data: {} }))
+
+    // A loop with no pause is refused.
+    const instant = {
+      ...graph,
+      nodes: [{ id: 'u', type: 'wait_until', config: { attribute: 'when' } }, { id: 'again', type: 'go_to', config: { target: 'u' } }],
+      edges: [{ from: 'u', to: 'again' }],
+      root: 'u',
+    }
+    const refused = (await data(await request.put(`/api/automations/${automationId}/draft`, { data: instant }))).problems
+    expect(refused.map((p: { message: string }) => p.message).join()).toContain('repeat instantly')
+    await data(await request.put(`/api/automations/${automationId}/draft`, { data: graph }))
+
+    const track = () => request.post('/api/track', { data: { subscriber: { email }, name: started, properties: {} } }).then(data)
+    subscriberId = (await track()).subscriber_id
+    const enrollments = () => request.get(`/api/automations/${automationId}/enrollments`).then(data)
+    await expect.poll(async () => (await enrollments()).results.map((e: { status: string }) => e.status), { timeout: 15_000 }).toEqual(['waiting'])
+
+    // The second and third events each send the email and put the run back on the wait.
+    for (const visit of [2, 3]) {
+      await track()
+      await expect
+        .poll(async () => (await enrollments()).results.map((e: { status: string; current_node_id: string; current_visit: number }) => [e.status, e.current_node_id, e.current_visit]), { timeout: 15_000 })
+        .toEqual([['waiting', 'w', visit]])
+    }
+    await expect
+      .poll(async () => (await data(await request.get(`/api/message-log?automation_id=${automationId}`))).total, { timeout: 15_000 })
+      .toBe(2)
+
+    const enrollment = (await enrollments()).results[0]
+    const steps = await data(await request.get(`/api/automations/${automationId}/enrollments/${enrollment.id}/steps`))
+    expect(steps.filter((s: { node_id: string }) => s.node_id === 'w').map((s: { visit: number }) => s.visit)).toEqual([1, 2, 3])
+    expect(steps.filter((s: { node_id: string }) => s.node_id === 'back').map((s: { result: unknown }) => s.result)).toEqual([{ to: 'w' }, { to: 'w' }])
+  } finally {
+    if (automationId) {
+      await request.post(`/api/automations/${automationId}/archive`)
+      await request.delete(`/api/automations/${automationId}`)
+    }
+    if (subscriberId) await request.delete(`/api/subscribers/${subscriberId}`)
+  }
+})
