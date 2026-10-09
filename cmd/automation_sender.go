@@ -61,7 +61,7 @@ func (s *automationSender) SendEmail(_ context.Context, m automation.Message) er
 			}
 		}
 	}
-	auto := map[string]any{"Name": m.AutomationName, "UUID": m.AutomationUUID, "ID": m.AutomationID, "Step": m.NodeID, "Enrollment": m.EnrollmentID}
+	auto := map[string]any{"Name": m.AutomationName, "UUID": m.AutomationUUID, "ID": m.AutomationID, "Step": m.NodeID, "Enrollment": m.EnrollmentID, "MessageType": m.MessageType}
 
 	if m.CampaignID != 0 {
 		camp, err := s.campaign(m.CampaignID)

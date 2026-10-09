@@ -384,7 +384,8 @@ func (s *Store) CreateStepCampaign(ctx context.Context, p StepCampaign) (int, er
 }
 
 // syncStepCampaigns checks that every email step points at a hidden automation campaign (never an
-// ordinary campaign, which it could otherwise hijack) and links each to its topic list.
+// ordinary campaign, which it could otherwise hijack) and links each to its topic list (marketing
+// emails only).
 func (s *Store) syncStepCampaigns(ctx context.Context, g *Graph) error {
 	var ids []int
 	topic := map[int]int{}
@@ -397,7 +398,13 @@ func (s *Store) syncStepCampaigns(ctx context.Context, g *Graph) error {
 			continue
 		}
 		ids = append(ids, c.CampaignID)
-		topic[c.CampaignID] = c.ListID
+		// A transactional email has no topic: its unsubscribe link would take people off a list
+		// that never stopped it.
+		if c.MessageType == MessageMarketing {
+			topic[c.CampaignID] = c.ListID
+		} else {
+			topic[c.CampaignID] = 0
+		}
 	}
 	if len(ids) == 0 {
 		return nil

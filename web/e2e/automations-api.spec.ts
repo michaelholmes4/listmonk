@@ -1,4 +1,4 @@
-import { expect, test, type APIResponse } from '@playwright/test'
+import { expect, test, type APIRequestContext, type APIResponse } from '@playwright/test'
 
 // The automation API and /api/track, driven end to end against the real backend. No screen yet
 // (that is the builder's job); this pins the contract the builder will use.
@@ -7,6 +7,20 @@ import { expect, test, type APIResponse } from '@playwright/test'
 async function data<T = any>(res: APIResponse): Promise<T> {
   expect(res.ok(), await res.text()).toBeTruthy()
   return (await res.json()).data as T
+}
+
+// The message log's entry for an automation's (only) email. Logging is batched, so it is polled.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- untyped JSON
+async function logEntry(request: APIRequestContext, automationId: number): Promise<any> {
+  let id = 0
+  await expect
+    .poll(async () => {
+      const page = await data(await request.get(`/api/message-log?automation_id=${automationId}`))
+      id = page.results[0]?.id ?? 0
+      return page.total
+    }, { timeout: 15_000 })
+    .toBe(1)
+  return data(await request.get(`/api/message-log/${id}`))
 }
 
 test('an event starts an automation: track, enroll, send step, stats, subscriber views', async ({ request }) => {
@@ -78,6 +92,13 @@ test('an event starts an automation: track, enroll, send step, stats, subscriber
     const steps = await data(await request.get(`/api/automations/${automationId}/enrollments/${enrollment.id}/steps`))
     expect(steps.map((s: { node_id: string; status: string }) => [s.node_id, s.status])).toEqual([['mail', 'done']])
 
+    // A marketing email carries List-Unsubscribe (when the setting is on); a transactional one
+    // doesn't (next test).
+    const settings = await data(await request.get('/api/settings'))
+    if (settings['privacy.unsubscribe_header']) {
+      expect((await logEntry(request, automationId)).headers?.['List-Unsubscribe']).toBeTruthy()
+    }
+
     const sub = await data(await request.get(`/api/subscribers/${subscriberId}`))
     expect(sub.attribs.company).toBe('Acme')
     // Sending recorded the subscription, so the unsubscribe link has something to act on.
@@ -99,6 +120,68 @@ test('an event starts an automation: track, enroll, send step, stats, subscriber
     }
     if (subscriberId) await request.delete(`/api/subscribers/${subscriberId}`)
     await request.delete(`/api/lists/${list.id}`)
+  }
+})
+
+test('a transactional email step: no topic, content updated over the API, no List-Unsubscribe', async ({ request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+
+  const stamp = Date.now()
+  const email = `e2e-tx-${stamp}@example.com`
+  const event = `e2e_ordered_${stamp}`
+  let automationId = 0
+  let subscriberId = 0
+  try {
+    // No list: a transactional email has no topic.
+    const { campaign_id } = await data(
+      await request.post('/api/automations/emails', { data: { name: `E2E receipt ${stamp}`, content_type: 'html', body: '<p>draft</p>' } }),
+    )
+
+    // Its content is updated without `lists`, which PUT /api/campaigns/:id would insist on.
+    const updated = await data(
+      await request.put(`/api/automations/emails/${campaign_id}`, {
+        data: { subject: `Receipt ${stamp}`, content_type: 'html', body: '<p>Order {{ .Event.Properties.order }}</p>' },
+      }),
+    )
+    expect(updated.subject).toBe(`Receipt ${stamp}`)
+    expect(updated.lists).toEqual([])
+    expect(updated.type).toBe('automation')
+    // Only automation emails: not an ordinary campaign, nor a missing one.
+    expect((await request.put('/api/automations/emails/99999999', { data: { subject: 'x' } })).ok()).toBeFalsy()
+    const regular = await data(await request.get('/api/campaigns?per_page=1'))
+    if (regular.results.length) {
+      expect((await request.put(`/api/automations/emails/${regular.results[0].id}`, { data: { subject: 'x' } })).status()).toBe(404)
+    }
+
+    const automation = await data(await request.post('/api/automations', { data: { name: `E2E tx flow ${stamp}`, settings: {} } }))
+    automationId = automation.id
+    const graph = {
+      triggers: [{ id: 't1', type: 'event', config: { event } }],
+      root: 'mail',
+      nodes: [{ id: 'mail', type: 'send_email', config: { message_type: 'transactional', campaign_id } }],
+      edges: [],
+    }
+    expect((await data(await request.put(`/api/automations/${automationId}/draft`, { data: graph }))).problems).toEqual([])
+    await data(await request.post(`/api/automations/${automationId}/publish`, { data: {} }))
+
+    const tracked = await data(await request.post('/api/track', { data: { subscriber: { email }, name: event, properties: { order: `A-${stamp}` } } }))
+    subscriberId = tracked.subscriber_id
+    await expect
+      .poll(async () => (await data(await request.get(`/api/automations/${automationId}/enrollments`))).results.map((e: { status: string }) => e.status), { timeout: 15_000 })
+      .toEqual(['completed'])
+
+    // The message log has the email as it went out: the updated content, and no List-Unsubscribe.
+    // (Checked before cleanup: deleting the subscriber deletes their log.)
+    const entry = await logEntry(request, automationId)
+    expect(entry.subject).toBe(`Receipt ${stamp}`)
+    expect(await (await request.get(`/api/message-log/${entry.id}/preview`)).text()).toContain(`Order A-${stamp}`)
+    expect(entry.headers?.['List-Unsubscribe']).toBeUndefined()
+  } finally {
+    if (automationId) {
+      await request.post(`/api/automations/${automationId}/archive`)
+      await request.delete(`/api/automations/${automationId}`)
+    }
+    if (subscriberId) await request.delete(`/api/subscribers/${subscriberId}`)
   }
 })
 

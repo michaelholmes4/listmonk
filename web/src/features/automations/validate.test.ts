@@ -16,6 +16,13 @@ describe('step issues', () => {
     expect(stepIssues(s, ctx(flow([s]))).map((i) => i.field)).toEqual(['content'])
   })
 
+  it('needs no topic for a transactional email', () => {
+    const s: Step = { id: 'm', type: 'send_email', config: { message_type: 'transactional', campaign_id: 9 } }
+    expect(stepIssues(s, ctx(flow([s])))).toEqual([])
+    s.config = { message_type: 'marketing', campaign_id: 9 }
+    expect(stepIssues(s, ctx(flow([s]))).map((i) => i.field)).toEqual(['list_id'])
+  })
+
   it('checks delays and wait-untils', () => {
     expect(stepIssues({ id: 'a', type: 'delay', config: { duration: '2d' } }, ctx(flow([])))).toEqual([])
     expect(stepIssues({ id: 'a', type: 'delay', config: { duration: 'soon' } }, ctx(flow([]))).map((i) => i.field)).toEqual(['duration'])

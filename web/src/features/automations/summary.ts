@@ -40,7 +40,9 @@ export function triggerSummary(t: T, tr: Trigger, l: Lookups): string {
 export function stepSummary(t: T, s: Step, l: Lookups, c: Config = s.config): string {
   switch (s.type) {
     case 'send_email':
-      return c.list_id ? `${t(`web.automations.messageType.${str(c.message_type) || 'marketing'}`)} · ${listName(l, c.list_id)}` : ''
+      // A transactional email has no topic.
+      if (c.message_type === 'transactional') return t('web.automations.messageType.transactional')
+      return c.list_id ? `${t('web.automations.messageType.marketing')} · ${listName(l, c.list_id)}` : ''
     case 'delay':
       return str(c.duration) ? duration(t, str(c.duration)) : ''
     case 'wait_until': {

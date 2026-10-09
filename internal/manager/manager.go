@@ -530,7 +530,7 @@ func (m *Manager) worker() {
 			h.Set(models.EmailHeaderSubscriberUUID, msg.Subscriber.UUID)
 
 			// Attach List-Unsubscribe headers?
-			if m.cfg.UnsubHeader {
+			if m.cfg.UnsubHeader && !msg.forkTransactional() {
 				h.Set("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
 				h.Set("List-Unsubscribe", `<`+msg.unsubURL+`>`)
 			}

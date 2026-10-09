@@ -12,7 +12,7 @@ Known conflict hotspots (the only upstream files we edit):
 - `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list and the dashboard counts)
 - `internal/core/core.go`, `subscribers.go`, `subscriptions.go` (automation trigger hooks: `Hooks.OnSubscriptionsConfirmed`
   / `OnAttribsChanged`, and one `forkBegin`/`forkEnd` pair around each mutation; the logic is in `fork_hooks.go`)
-- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to)
+- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to; `&& !msg.forkTransactional()` on the List-Unsubscribe condition leaves the header off transactional automation emails)
 - `internal/notifs/notifs.go` (a 1-line `Pusher` interface in place of `*email.Emailer`, so notifications can go through the message log)
 - `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `eng.Stop` in the shutdown closure; `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)

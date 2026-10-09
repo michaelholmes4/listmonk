@@ -11,7 +11,9 @@ import type {
   AutomationStatus,
   AutomationStep,
   AutomationVersion,
+  Campaign,
   EnrollmentStatus,
+  NewCampaign,
   Paginated,
   SubscriberAutomation,
 } from './types'
@@ -111,6 +113,9 @@ export interface NewStepEmail {
 /** Creates the hidden campaign that holds a new email step's content. */
 export const createStepEmail = (b: NewStepEmail) =>
   api.post<{ campaign_id: number }>('/api/automations/emails', b).then((r) => r.campaign_id)
+
+/** Updates an email step's content. Same fields as a campaign update, but no lists: the step sets those. */
+export const updateStepEmail = (id: number, b: Omit<NewCampaign, 'lists'>) => api.put<Campaign>(`/api/automations/emails/${id}`, b)
 
 export const getSubscriberAutomations = (subscriberId: number) =>
   api.get<SubscriberAutomation[]>(`/api/subscribers/${subscriberId}/automations`)

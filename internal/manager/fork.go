@@ -39,6 +39,12 @@ func (m *Manager) NewAutomationMessage(c *models.Campaign, s models.Subscriber, 
 	return msg, nil
 }
 
+// forkTransactional reports a transactional automation email, which gets no List-Unsubscribe
+// header: it has no topic to unsubscribe from, and unsubscribing would not stop it.
+func (msg *CampaignMessage) forkTransactional() bool {
+	return msg.Automation["MessageType"] == "transactional"
+}
+
 // forkLogHeaders adds the internal headers that tell the message log which automation and
 // enrollment a message belongs to. The log's messenger wrapper removes them before sending.
 func (msg *CampaignMessage) forkLogHeaders(h textproto.MIMEHeader) {

@@ -122,6 +122,48 @@ test('an incomplete flow is flagged and cannot be published', async ({ page, req
   }
 })
 
+test('a transactional email step has no topic and saves its email without one', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const stamp = Date.now()
+  const a = (await (await request.post('/api/automations', { data: { name: `E2E tx mail ${stamp}`, settings: {} } })).json()).data
+  try {
+    await page.goto(`/admin/automations/${a.id}`)
+    const sheet = page.locator('[data-cy=step-sheet]')
+    await page.locator('[data-cy=add-trigger]').click()
+    await page.locator('[data-cy=add-trigger-event]').click()
+    await sheet.getByLabel('Event name').fill(`e2e_tx_${stamp}`)
+    await closeSheet(page)
+
+    await page.locator('[data-cy=add-step]').last().click()
+    await page.locator('[data-cy=add-send_email]').click()
+    await expect(sheet.locator('#email-topic')).toBeVisible()
+    await sheet.locator('#mt-tx').click()
+    await expect(sheet.locator('#email-topic')).toHaveCount(0)
+
+    await sheet.locator('[data-cy=create-email]').click()
+    const editor = sheet.locator('[data-cy=email-editor]')
+    await expect(editor).toBeVisible()
+    await editor.locator('#email-subject').fill(`Receipt ${stamp}`)
+    await sheet.locator('[data-cy=save-email]').click()
+    await expect(page.getByText('Email saved').first()).toBeVisible()
+    await closeSheet(page)
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('Transactional')
+
+    // Publishable as is: no topic needed.
+    await page.locator('[data-cy=publish]').click()
+    await page.locator('[data-cy=confirm-publish]').click()
+    await expect(page.locator('[data-cy=status]')).toHaveText('Active')
+    const graph = (await (await request.get(`/api/automations/${a.id}/draft`)).json()).data.graph
+    expect(graph.nodes[0].config.list_id).toBeUndefined()
+    const camp = (await (await request.get(`/api/campaigns/${graph.nodes[0].config.campaign_id}`)).json()).data
+    expect(camp.subject).toBe(`Receipt ${stamp}`)
+    expect(camp.lists).toEqual([])
+  } finally {
+    await request.post(`/api/automations/${a.id}/archive`)
+    await request.delete(`/api/automations/${a.id}`)
+  }
+})
+
 test('an email step: write the email in the step, publish, and it is sent', async ({ page, request }) => {
   test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
   const stamp = Date.now()
@@ -140,7 +182,7 @@ test('an email step: write the email in the step, publish, and it is sent', asyn
 
     await page.locator('[data-cy=add-step]').last().click()
     await page.locator('[data-cy=add-send_email]').click()
-    // Topic first, then the email can be written.
+    // The topic (a marketing email needs one).
     await sheet.locator('#email-topic').click()
     await page.getByRole('option', { name: list.name }).click()
     await sheet.locator('[data-cy=create-email]').click()

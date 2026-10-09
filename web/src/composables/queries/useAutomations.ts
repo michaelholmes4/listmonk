@@ -98,3 +98,11 @@ export const useSaveDraft = () =>
   useMutation({ mutationFn: (v: { id: number; graph: AutomationGraph }) => api.saveDraft(v.id, v.graph) })
 
 export const useCreateStepEmail = () => useMutation({ mutationFn: api.createStepEmail })
+
+export const useUpdateStepEmail = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { id: number; body: Parameters<typeof api.updateStepEmail>[1] }) => api.updateStepEmail(v.id, v.body),
+    onSuccess: (c) => qc.setQueryData(keys.campaigns.detail(c.id!), c),
+  })
+}

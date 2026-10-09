@@ -9,8 +9,8 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useUpdateCampaign, useCampaign } from '@/composables/queries/useCampaigns'
-import { useCreateStepEmail } from '@/composables/queries/useAutomations'
+import { useCampaign } from '@/composables/queries/useCampaigns'
+import { useCreateStepEmail, useUpdateStepEmail } from '@/composables/queries/useAutomations'
 import { useTemplates } from '@/composables/queries/useTemplates'
 import ContentEditor from '@/features/campaigns/ContentEditor.vue'
 import type { ContentType } from '@/features/campaigns/schema'
@@ -19,8 +19,9 @@ import ListSelect from '../ListSelect.vue'
 import type { Config } from '../model'
 
 /**
- * An email step: marketing or transactional, its topic, and either its own content (a hidden
- * campaign edited with the ordinary campaign editor) or a transactional template.
+ * An email step: marketing (with its topic) or transactional (no topic: consent does not depend on
+ * one), and either its own content (a hidden campaign edited with the ordinary campaign editor) or a
+ * transactional template.
  * The content is saved with its own button: it is a campaign, not part of the automation's draft.
  */
 const props = defineProps<{ stepId: string; errors: Record<string, string>; disabled?: boolean }>()
@@ -37,6 +38,9 @@ const patch = (p: Config) => {
 const messageType = computed(() => (config.value.message_type as string) ?? 'marketing')
 const campaignId = computed(() => (config.value.campaign_id as number | undefined) || undefined)
 const mode = computed(() => (config.value.template_id ? 'template' : 'custom'))
+function setMessageType(v: string) {
+  patch(v === 'marketing' ? { message_type: v } : { message_type: v, list_id: undefined })
+}
 
 // --- Transactional template ------------------------------------------------------------------------
 const { data: templates } = useTemplates()
@@ -50,7 +54,7 @@ function setMode(m: string) {
 const create = useCreateStepEmail()
 function createEmail() {
   create.mutate(
-    { name: `Automation email ${props.stepId}`, list_id: config.value.list_id as number, content_type: 'richtext', body: '' },
+    { name: `Automation email ${props.stepId}`, list_id: num(config.value.list_id), content_type: 'richtext', body: '' },
     { onSuccess: (id) => patch({ campaign_id: id, template_id: undefined }) },
   )
 }
@@ -81,7 +85,7 @@ watch(
   { immediate: true },
 )
 
-const update = useUpdateCampaign()
+const update = useUpdateStepEmail()
 const dirty = computed(() => {
   const c = campaign.value
   if (!c) return false
@@ -90,8 +94,10 @@ const dirty = computed(() => {
 })
 function saveEmail() {
   const c = campaign.value!
-  const f = { ...toForm(c), subject: subject.value, fromEmail: fromEmail.value, contentType: contentType.value, body: body.value, bodySource: bodySource.value, templateId: templateId.value, lists: config.value.list_id ? [config.value.list_id as number] : toForm(c).lists }
-  update.mutate({ id: c.id!, body: toRequest(f) }, { onSuccess: () => toast.success(t('web.automations.email.saved')) })
+  const f = { ...toForm(c), subject: subject.value, fromEmail: fromEmail.value, contentType: contentType.value, body: body.value, bodySource: bodySource.value, templateId: templateId.value }
+  // The list is the step's topic, which the automation's draft sets.
+  const { lists: _lists, ...req } = toRequest(f)
+  update.mutate({ id: c.id!, body: req }, { onSuccess: () => toast.success(t('web.automations.email.saved')) })
 }
 defineExpose({ dirty })
 </script>
@@ -100,7 +106,7 @@ defineExpose({ dirty })
   <div class="space-y-6">
     <div class="space-y-2">
       <Label>{{ t('web.automations.email.type') }}</Label>
-      <RadioGroup :model-value="messageType" class="gap-3" :disabled="disabled" @update:model-value="patch({ message_type: String($event) })">
+      <RadioGroup :model-value="messageType" class="gap-3" :disabled="disabled" @update:model-value="setMessageType(String($event))">
         <div class="flex items-start gap-2">
           <RadioGroupItem id="mt-marketing" value="marketing" class="mt-1" />
           <Label for="mt-marketing" class="block font-normal">
@@ -118,7 +124,7 @@ defineExpose({ dirty })
       </RadioGroup>
     </div>
 
-    <div class="space-y-2">
+    <div v-if="messageType === 'marketing'" class="space-y-2">
       <Label for="email-topic">{{ t('web.automations.email.topic') }}</Label>
       <ListSelect id="email-topic" :model-value="num(config.list_id)" :invalid="!!errors.list_id" :disabled="disabled" @update:model-value="patch({ list_id: $event })" />
       <p v-if="errors.list_id" class="text-sm text-destructive">{{ errors.list_id }}</p>
@@ -148,10 +154,9 @@ defineExpose({ dirty })
     <!-- Own content -->
     <template v-else>
       <div v-if="!campaignId">
-        <Button type="button" :disabled="disabled || !config.list_id || create.isPending.value" data-cy="create-email" @click="createEmail">
+        <Button type="button" :disabled="disabled || create.isPending.value" data-cy="create-email" @click="createEmail">
           <Loader2 v-if="create.isPending.value" class="animate-spin" />{{ t('web.automations.email.write') }}
         </Button>
-        <p v-if="!config.list_id" class="mt-2 text-xs text-muted-foreground">{{ t('web.automations.email.pickTopicFirst') }}</p>
       </div>
       <div v-else-if="loading" class="space-y-3"><Skeleton class="h-9 w-full" /><Skeleton class="h-64 w-full" /></div>
       <div v-else-if="campaign" class="space-y-4" data-cy="email-editor">

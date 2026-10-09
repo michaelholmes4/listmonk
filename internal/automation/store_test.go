@@ -80,6 +80,17 @@ func TestStepCampaignsAreHiddenAndOnlyAutomationOnesCanBeUsed(t *testing.T) {
 	if len(linked) != 1 || linked[0] != other {
 		t.Fatalf("campaign lists = %v, want [%d]", linked, other)
 	}
+
+	// A transactional step has no topic: its campaign is unlinked, whatever list_id says.
+	g = &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageTransactional, other, id)}}}
+	if _, problems, err := h.store.SaveDraft(ctx, a.ID, g, false); err != nil || len(problems) > 0 {
+		t.Fatalf("save: %v %v", problems, err)
+	}
+	linked = nil
+	h.must(h.db.Select(&linked, `SELECT list_id FROM campaign_lists WHERE campaign_id = $1`, id))
+	if len(linked) != 0 {
+		t.Fatalf("transactional campaign lists = %v, want none", linked)
+	}
 }
 
 func TestStepCampaignsDoNotShowInCampaignQueries(t *testing.T) {

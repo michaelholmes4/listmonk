@@ -412,6 +412,60 @@ func (a *App) CreateAutomationEmail(c echo.Context) error {
 	return c.JSON(http.StatusOK, okResp{map[string]int{"campaign_id": id}})
 }
 
+// UpdateAutomationEmail updates the content of an email step's hidden campaign. It takes the same
+// fields as PUT /api/campaigns/:id but needs no `lists`: the campaign's list is its step's topic,
+// which the automation's draft sets (a transactional step has none). Edits go out on the next send.
+func (a *App) UpdateAutomationEmail(c echo.Context) error {
+	id := getID(c)
+	cm, err := a.core.GetCampaign(id, "", "")
+	if err != nil {
+		return err
+	}
+	if cm.Type != "automation" {
+		return echo.NewHTTPError(http.StatusNotFound, a.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.campaign}"))
+	}
+
+	// As in UpdateCampaign: fields not in the request keep their stored values.
+	cm.Attribs = nil
+	o := campReq{Campaign: cm}
+	if err := c.Bind(&o); err != nil {
+		return err
+	}
+	lists, media := jsonIDs(cm.Lists), jsonIDs(cm.Media)
+	if o.MediaIDs != nil {
+		media = o.MediaIDs
+	}
+	// Never scheduled or archived: the automation engine sends it, one subscriber at a time.
+	o.SendAt.Valid, o.Archive = false, false
+
+	// validateCampaignFields insists on lists, which an automation email may not have.
+	o.ListIDs = []int{0}
+	if o, err = a.validateCampaignFields(o); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	out, err := a.core.UpdateCampaign(id, o.Campaign, lists, media)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, okResp{out})
+}
+
+// jsonIDs reads the IDs out of a campaign's `lists` or `media` JSON ([{"id": 1, ...}, ...]).
+func jsonIDs(j []byte) []int {
+	var rows []struct {
+		ID int `json:"id"`
+	}
+	_ = json.Unmarshal(j, &rows)
+	ids := make([]int, 0, len(rows))
+	for _, r := range rows {
+		if r.ID > 0 {
+			ids = append(ids, r.ID)
+		}
+	}
+	return ids
+}
+
 // --- A subscriber's side --------------------------------------------------------------------------
 
 // GetSubscriberAutomations lists the automations a subscriber is, or was, in.
@@ -469,6 +523,7 @@ func initAutomationRoutes(g *echo.Group, a *App) {
 	g.GET("/api/automations/:id/enrollments/:eid/steps", pm(hasID(a.GetEnrollmentSteps), get))
 	g.GET("/api/automations/:id/stats", pm(hasID(a.GetAutomationStats), get))
 	g.POST("/api/automations/emails", pm(a.CreateAutomationEmail, manage))
+	g.PUT("/api/automations/emails/:id", pm(hasID(a.UpdateAutomationEmail), manage))
 
 	g.GET("/api/subscribers/:id/automations", pm(hasID(a.GetSubscriberAutomations), "subscribers:get_all", "subscribers:get"))
 	g.GET("/api/subscribers/:id/events", pm(hasID(a.GetSubscriberEvents), "subscribers:get_all", "subscribers:get"))

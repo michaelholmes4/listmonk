@@ -24,7 +24,7 @@ export function stepIssues(s: Step, ctx: Context): Issue[] {
   switch (s.type) {
     case 'send_email':
       if (c.message_type !== 'marketing' && c.message_type !== 'transactional') bad('message_type', 'web.automations.required')
-      if (!pos(c.list_id)) bad('list_id', 'web.automations.email.topicRequired')
+      if (c.message_type === 'marketing' && !pos(c.list_id)) bad('list_id', 'web.automations.email.topicRequired')
       if (pos(c.campaign_id) === pos(c.template_id)) bad('content', 'web.automations.email.contentRequired')
       break
     case 'delay':
