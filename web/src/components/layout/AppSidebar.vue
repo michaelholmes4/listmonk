@@ -49,7 +49,18 @@ watch(
             </RouterLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
-        <SidebarMenuItem v-if="!space" class="group-data-[collapsible=icon]:hidden">
+        <SidebarMenuItem v-if="space">
+          <SidebarMenuButton as-child :tooltip="t('web.nav.back')">
+            <RouterLink :to="backTo" data-cy="nav-back">
+              <ArrowLeft />
+              <span>{{ t('web.nav.back') }}</span>
+            </RouterLink>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+      <!-- Its own menu so the header's gap separates it from the logo. -->
+      <SidebarMenu v-if="!space" class="group-data-[collapsible=icon]:hidden">
+        <SidebarMenuItem>
           <SidebarMenuButton
             variant="outline"
             class="text-muted-foreground"
@@ -59,14 +70,6 @@ watch(
             <Search />
             <span>{{ t('web.commands.search') }}</span>
             <Kbd class="ml-auto">{{ modKey }}K</Kbd>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-        <SidebarMenuItem v-if="space">
-          <SidebarMenuButton as-child :tooltip="t('web.nav.back')">
-            <RouterLink :to="backTo" data-cy="nav-back">
-              <ArrowLeft />
-              <span>{{ t('web.nav.back') }}</span>
-            </RouterLink>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
