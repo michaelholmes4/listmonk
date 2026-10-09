@@ -8,7 +8,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
 } from '@/components/ui/sidebar'
 import NavMain from './NavMain.vue'
 import NavUser from './NavUser.vue'
@@ -38,6 +37,5 @@ import NavUser from './NavUser.vue'
     <SidebarFooter>
       <NavUser />
     </SidebarFooter>
-    <SidebarRail />
   </Sidebar>
 </template>

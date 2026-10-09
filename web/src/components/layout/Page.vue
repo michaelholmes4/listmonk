@@ -79,7 +79,7 @@ const hasHelp = computed(() => !!slots.help)
     <div
       :class="
         cn(
-          'flex-1 px-4 pb-8 sm:px-6',
+          'flex-1 px-4 pt-1 pb-8 sm:px-6',
           hasHelp && 'xl:grid xl:grid-cols-[minmax(0,1fr)_16rem] xl:gap-12',
         )
       "
