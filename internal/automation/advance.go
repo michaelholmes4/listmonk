@@ -355,6 +355,24 @@ func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *
 		}
 		return done(ix.Next(n.ID, ""), map[string]any{"list_id": c.ListID, "mode": q}), nil
 
+	case NodeGoTo:
+		var c GoToConfig
+		if err := decodeConfig(n, &c); err != nil {
+			return outcome{}, err
+		}
+		if ix.Nodes[c.Target] == nil {
+			return outcome{}, permanent("step %s: goes to a step that no longer exists", n.ID)
+		}
+		limit := c.MaxRuns
+		if limit == 0 {
+			limit = defaultGoToRuns
+		}
+		// The run's visit to this step is how many times it has arrived here.
+		if enr.CurrentVisit > limit {
+			return outcome{exit: ExitLoopLimit, stepStatus: StepSkipped, result: map[string]string{"reason": "loop_limit"}}, nil
+		}
+		return done(c.Target, map[string]string{"to": c.Target}), nil
+
 	case NodeExit:
 		var c ExitConfig
 		_ = json.Unmarshal(n.Config, &c)

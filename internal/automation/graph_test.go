@@ -254,3 +254,131 @@ func TestWaitForEventValidation(t *testing.T) {
 		t.Fatalf("got %s", ms)
 	}
 }
+
+// loopGraph: root condition -> yes: wait -> mail; no: nudge -> go_to. The go_to's target is set per test.
+func goToGraph(target string, wait Node) *Graph {
+	g := &Graph{
+		Triggers: []Trigger{{ID: "t1", Type: TriggerManual}},
+		Root:     "check",
+		Nodes: []Node{
+			{ID: "check", Type: NodeCondition, Config: cfg(ConditionConfig{Rule: Rule{Type: RuleEvent, Name: "x", Operator: "occurred"}})},
+			wait,
+			{ID: "mail", Type: NodeUpdateAttribute, Config: cfg(UpdateAttributeConfig{Attribute: "a", Value: cfg(1)})},
+			{ID: "nudge", Type: NodeUpdateAttribute, Config: cfg(UpdateAttributeConfig{Attribute: "b", Value: cfg(1)})},
+			{ID: "back", Type: NodeGoTo, Config: cfg(GoToConfig{Target: target})},
+		},
+		Edges: []Edge{
+			{From: "check", To: "wait", Handle: HandleYes},
+			{From: "wait", To: "mail"},
+			{From: "check", To: "nudge", Handle: HandleNo},
+			{From: "nudge", To: "back"},
+		},
+	}
+	if wait.Type == NodeWaitForEvent {
+		g.Edges[1].Handle = HandleTimeout
+	}
+	return g
+}
+
+var (
+	delayNode  = Node{ID: "wait", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "1d"})}
+	untilNode  = Node{ID: "wait", Type: NodeWaitUntil, Config: cfg(WaitUntilConfig{Attribute: "when"})}
+	eventsNode = Node{ID: "wait", Type: NodeWaitForEvent, Config: cfg(WaitForEventConfig{Timeout: "1d", Events: []WaitEvent{{ID: "e1", Name: "x", Restart: true}}})}
+)
+
+func TestGoToJoinsASiblingPath(t *testing.T) {
+	if ps := goToGraph("mail", delayNode).Validate(ValidateOpts{}); len(ps) != 0 {
+		t.Fatalf("a join was rejected:\n%s", messages(ps))
+	}
+}
+
+func TestGoToBackToAWaitForEventIsFine(t *testing.T) {
+	if ps := goToGraph("wait", eventsNode).Validate(ValidateOpts{}); len(ps) != 0 {
+		t.Fatalf("going back to a wait for an event was rejected:\n%s", messages(ps))
+	}
+}
+
+func TestGoToBackToADelayIsFine(t *testing.T) {
+	if ps := goToGraph("wait", delayNode).Validate(ValidateOpts{}); len(ps) != 0 {
+		t.Fatalf("going back to a delay was rejected:\n%s", messages(ps))
+	}
+}
+
+func TestGoToLoopWithoutAPauseIsRejected(t *testing.T) {
+	// back -> wait(wait_until) -> mail is no loop; make one: mail's path ends in a go_to to wait.
+	g := goToGraph("wait", untilNode)
+	g.Nodes = append(g.Nodes, Node{ID: "again", Type: NodeGoTo, Config: cfg(GoToConfig{Target: "wait"})})
+	g.Edges = append(g.Edges, Edge{From: "mail", To: "again"})
+	ps := g.Validate(ValidateOpts{})
+	if !strings.Contains(messages(ps), "repeat instantly") || !strings.Contains(messages(ps), "again") {
+		t.Fatalf("a loop through a wait until should be rejected:\n%s", messages(ps))
+	}
+
+	// The same loop through a delay is fine.
+	g = goToGraph("wait", delayNode)
+	g.Nodes = append(g.Nodes, Node{ID: "again", Type: NodeGoTo, Config: cfg(GoToConfig{Target: "wait"})})
+	g.Edges = append(g.Edges, Edge{From: "mail", To: "again"})
+	if ps := g.Validate(ValidateOpts{}); len(ps) != 0 {
+		t.Fatalf("a loop through a delay was rejected:\n%s", messages(ps))
+	}
+}
+
+func TestTwoGoTosJumpingIntoEachOthersPathsAreRejected(t *testing.T) {
+	g := &Graph{
+		Triggers: []Trigger{{ID: "t1", Type: TriggerManual}},
+		Root:     "check",
+		Nodes: []Node{
+			{ID: "check", Type: NodeCondition, Config: cfg(ConditionConfig{Rule: Rule{Type: RuleEvent, Name: "x", Operator: "occurred"}})},
+			{ID: "a1", Type: NodeUpdateAttribute, Config: cfg(UpdateAttributeConfig{Attribute: "a", Value: cfg(1)})},
+			{ID: "b1", Type: NodeUpdateAttribute, Config: cfg(UpdateAttributeConfig{Attribute: "b", Value: cfg(1)})},
+			{ID: "ga", Type: NodeGoTo, Config: cfg(GoToConfig{Target: "b1"})},
+			{ID: "gb", Type: NodeGoTo, Config: cfg(GoToConfig{Target: "a1"})},
+		},
+		Edges: []Edge{
+			{From: "check", To: "a1", Handle: HandleYes}, {From: "a1", To: "ga"},
+			{From: "check", To: "b1", Handle: HandleNo}, {From: "b1", To: "gb"},
+		},
+	}
+	ps := g.Validate(ValidateOpts{})
+	m := messages(ps)
+	if !strings.Contains(m, "ga:") || !strings.Contains(m, "gb:") || !strings.Contains(m, "repeat instantly") {
+		t.Fatalf("expected both go tos to be blamed:\n%s", m)
+	}
+}
+
+func TestGoToConfigRules(t *testing.T) {
+	cases := map[string]struct {
+		cfg  GoToConfig
+		want string
+	}{
+		"no target":      {GoToConfig{}, "choose a step to go to"},
+		"missing target": {GoToConfig{Target: "nope"}, "doesn't exist"},
+		"itself":         {GoToConfig{Target: "back"}, "itself"},
+		"another go to":  {GoToConfig{Target: "other"}, "another go to"},
+		"too many":       {GoToConfig{Target: "mail", MaxRuns: 101}, "between 1 and 100"},
+		"negative":       {GoToConfig{Target: "mail", MaxRuns: -1}, "between 1 and 100"},
+	}
+	for name, c := range cases {
+		g := goToGraph("mail", delayNode)
+		g.Nodes[4].Config = cfg(c.cfg)
+		g.Nodes = append(g.Nodes, Node{ID: "other", Type: NodeGoTo, Config: cfg(GoToConfig{Target: "mail"})})
+		g.Edges = append(g.Edges, Edge{From: "mail", To: "other"})
+		if m := messages(g.Validate(ValidateOpts{})); !strings.Contains(m, c.want) {
+			t.Errorf("%s: want %q in:\n%s", name, c.want, m)
+		}
+	}
+	g := goToGraph("mail", delayNode)
+	g.Nodes[4].Config = cfg(GoToConfig{Target: "mail", MaxRuns: 100})
+	if ps := g.Validate(ValidateOpts{}); len(ps) != 0 {
+		t.Fatalf("max_runs 100 rejected:\n%s", messages(ps))
+	}
+}
+
+func TestGoToCannotHaveAnEdgeOut(t *testing.T) {
+	g := goToGraph("mail", delayNode)
+	g.Nodes = append(g.Nodes, Node{ID: "after", Type: NodeUpdateAttribute, Config: cfg(UpdateAttributeConfig{Attribute: "c", Value: cfg(1)})})
+	g.Edges = append(g.Edges, Edge{From: "back", To: "after"})
+	if m := messages(g.Validate(ValidateOpts{})); !strings.Contains(m, "nothing can follow it") {
+		t.Fatalf("a go to with an edge out was accepted:\n%s", m)
+	}
+}

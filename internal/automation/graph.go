@@ -212,6 +212,9 @@ func (g *Graph) Validate(opts ValidateOpts) []Problem {
 		if ix.Nodes[id] != nil && ix.Nodes[id].Type == NodeExit {
 			bad(id, "an exit step ends the automation; nothing can follow it")
 		}
+		if ix.Nodes[id] != nil && ix.Nodes[id].Type == NodeGoTo {
+			bad(id, "a go to step ends its path; nothing can follow it")
+		}
 	}
 
 	// Everything must hang off the root (this also rules out cycles, as every node has one parent).
@@ -239,6 +242,8 @@ func (g *Graph) Validate(opts ValidateOpts) []Problem {
 	for _, n := range g.Nodes {
 		out = append(out, validateNode(ix, n, opts)...)
 	}
+
+	out = append(out, instantLoops(ix)...)
 
 	sort.SliceStable(out, func(i, j int) bool { return out[i].NodeID < out[j].NodeID })
 	return out
@@ -337,6 +342,8 @@ func validateNode(ix *Index, n Node, opts ValidateOpts) []Problem {
 		if !decode(&c) {
 			break
 		}
+		// Ancestry follows the tree. A run that joined a path halfway may not have sent an earlier
+		// email on it; the rule then reads it as not opened or clicked, which is right.
 		env := Env{
 			CampaignOf: func(id string) (int, bool) {
 				// Only a step that has already run on the way here can be asked about.
@@ -375,6 +382,25 @@ func validateNode(ix *Index, n Node, opts ValidateOpts) []Problem {
 			if c.Status != "" && c.Status != "confirmed" && c.Status != "unconfirmed" {
 				bad("invalid subscription status")
 			}
+		}
+
+	case NodeGoTo:
+		var c GoToConfig
+		if !decode(&c) {
+			break
+		}
+		switch t := ix.Nodes[c.Target]; {
+		case c.Target == "":
+			bad("choose a step to go to")
+		case t == nil:
+			bad("goes to a step that doesn't exist")
+		case c.Target == n.ID:
+			bad("can't go to itself")
+		case t.Type == NodeGoTo:
+			bad("can't go to another go to step")
+		}
+		if c.MaxRuns < 0 || c.MaxRuns > maxGoToRunsCap {
+			bad("can repeat between 1 and %d times", maxGoToRunsCap)
 		}
 
 	case NodeExit:
@@ -459,4 +485,74 @@ func waitHandleOK(n *Node, handle string) bool {
 		}
 	}
 	return false
+}
+
+// instantLoops finds go_to steps that sit in a loop with no pause in it: the tree edges plus each
+// go_to's jump form a directed graph, and once the arcs out of delay and wait_for_event steps (which
+// always pause) are dropped, any cycle left would repeat instantly. A wait_until doesn't count: a
+// date already passed makes it finish at once.
+func instantLoops(ix *Index) []Problem {
+	next := map[string][]string{}
+	for _, e := range ix.Graph.Edges {
+		next[e.From] = append(next[e.From], e.To)
+	}
+	for _, n := range ix.Graph.Nodes {
+		if n.Type != NodeGoTo {
+			continue
+		}
+		var c GoToConfig
+		if json.Unmarshal(n.Config, &c) == nil && ix.Nodes[c.Target] != nil {
+			next[n.ID] = append(next[n.ID], c.Target)
+		}
+	}
+	for _, n := range ix.Graph.Nodes {
+		if n.Type == NodeDelay || n.Type == NodeWaitForEvent {
+			delete(next, n.ID)
+		}
+	}
+
+	const (
+		visiting = 1
+		finished = 2
+	)
+	state := map[string]int{}
+	var stack []string
+	bad := map[string]bool{}
+	var walk func(string)
+	walk = func(id string) {
+		state[id] = visiting
+		stack = append(stack, id)
+		for _, to := range next[id] {
+			switch state[to] {
+			case 0:
+				walk(to)
+			case visiting:
+				// The cycle is the stack from `to` onwards; blame the go_to steps in it.
+				i := len(stack) - 1
+				for stack[i] != to {
+					i--
+				}
+				for _, m := range stack[i:] {
+					if ix.Nodes[m].Type == NodeGoTo {
+						bad[m] = true
+					}
+				}
+			}
+		}
+		stack = stack[:len(stack)-1]
+		state[id] = finished
+	}
+	for _, n := range ix.Graph.Nodes {
+		if state[n.ID] == 0 {
+			walk(n.ID)
+		}
+	}
+
+	var out []Problem
+	for _, n := range ix.Graph.Nodes {
+		if bad[n.ID] {
+			out = append(out, Problem{n.ID, "this loop has no Delay or Wait for an event step, so it would repeat instantly"})
+		}
+	}
+	return out
 }

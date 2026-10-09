@@ -120,6 +120,7 @@ const (
 	NodeUpdateAttribute = "update_attribute"
 	NodeAddToList       = "add_to_list"
 	NodeRemoveFromList  = "remove_from_list"
+	NodeGoTo            = "go_to"
 	NodeExit            = "exit"
 )
 
@@ -146,7 +147,8 @@ type Edge struct {
 	Handle string `json:"handle,omitempty"`
 }
 
-// Graph is what a version holds: the triggers, the steps, and how they connect (a tree).
+// Graph is what a version holds: the triggers, the steps, and how they connect. The edges form a
+// tree; a go_to step adds jumps outside it, held in its config rather than as edges.
 type Graph struct {
 	Triggers []Trigger `json:"triggers"`
 	Nodes    []Node    `json:"nodes"`
@@ -159,6 +161,18 @@ type Graph struct {
 const (
 	MessageMarketing     = "marketing"
 	MessageTransactional = "transactional"
+)
+
+// GoToConfig configures a go_to node: the run continues at Target.
+type GoToConfig struct {
+	Target string `json:"target"`
+	// MaxRuns is how many times one run may pass through this step; 0 means defaultGoToRuns.
+	MaxRuns int `json:"max_runs,omitempty"`
+}
+
+const (
+	defaultGoToRuns = 25
+	maxGoToRunsCap  = 100
 )
 
 // SendEmailConfig configures a send_email node.
@@ -246,6 +260,7 @@ const (
 	ExitArchived     = "archived"
 	ExitPaused       = "paused"
 	ExitNode         = "exit_step"
+	ExitLoopLimit    = "loop_limit"
 )
 
 // Enrollment is one subscriber's run through one version.
