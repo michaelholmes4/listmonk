@@ -84,6 +84,11 @@ SELECT * FROM enrollments WHERE id = $1;
 -- name: automation-lock-enrollment
 SELECT * FROM enrollments WHERE id = $1 FOR UPDATE;
 
+-- name: automation-waiting-enrollments
+-- A subscriber's runs that are paused on a step, in automations that can still run.
+SELECT e.* FROM enrollments e JOIN automations a ON a.id = e.automation_id
+WHERE e.subscriber_id = $1 AND e.status = 'waiting' AND a.status IN ('active', 'paused');
+
 -- name: automation-update-enrollment
 UPDATE enrollments SET status = $2::enrollment_status, current_node_id = $3, next_run_at = $4, context = $5,
     exited_at = (CASE WHEN $2::enrollment_status IN ('completed', 'exited', 'failed') THEN NOW() ELSE NULL END),

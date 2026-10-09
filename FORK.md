@@ -56,6 +56,8 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
 - **Raw SQL conditions** need `subscribers:sql_query` to create or edit, run in a read-only transaction with a 5 s timeout.
 - **`POST /api/track`** merges `upsert_attribs` (top-level keys) into the subscriber *before* recording the event;
   retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
+- **Wait for an event.** `POST /api/track` events also reach runs waiting on a `wait_for_event` step (before triggers fire).
+  `.Event` in emails is the event that started the run, or the latest one that restarted a wait.
 - **Retention.** `DELETE /api/maintenance/events?before_date=` prunes events. Deleting a subscriber cascades to their events
   and enrollments.
 

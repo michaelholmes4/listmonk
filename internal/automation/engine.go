@@ -337,8 +337,10 @@ func (e *Engine) OnListJoined(ctx context.Context, subscriberID, listID int) err
 
 // OnEvent is called for every recorded event.
 func (e *Engine) OnEvent(ctx context.Context, subscriberID int, ev Event) error {
+	// Runs already waiting for this event first; the event that starts a run never counts for it.
+	derr := e.deliverEvent(ctx, subscriberID, ev)
 	raw, _ := json.Marshal(ev)
-	return e.fire(ctx, TriggerEvent, subscriberID, func(c TriggerConfig) bool { return c.Event == ev.Name }, EnrollContext{Event: raw})
+	return errors.Join(derr, e.fire(ctx, TriggerEvent, subscriberID, func(c TriggerConfig) bool { return c.Event == ev.Name }, EnrollContext{Event: raw}))
 }
 
 // OnAttributesChanged is called with a subscriber's attributes before and after an update.

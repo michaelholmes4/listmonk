@@ -665,3 +665,305 @@ func TestABrokenRuleFailsTheEnrollmentInsteadOfRetryingForever(t *testing.T) {
 		t.Fatal("a job was left to retry")
 	}
 }
+
+// --- wait_for_event -----------------------------------------------------------------------------
+
+// waitGraph: checkout_started starts it; the run waits `timeout` for order_completed (e1, with a path
+// to a transactional email when withPath) or checkout_started (e2, restarts); time's up sends `late`.
+func (h *harness) waitGraph(timeout string, withPath bool) (g *Graph, late, ok int) {
+	late, ok = h.campaign(), h.campaign()
+	g = &Graph{
+		Triggers: []Trigger{{ID: "t", Type: TriggerEvent, Config: cfg(TriggerConfig{Event: "checkout_started"})}},
+		Root:     "w",
+		Nodes: []Node{
+			{ID: "w", Type: NodeWaitForEvent, Config: cfg(WaitForEventConfig{Timeout: timeout, Events: []WaitEvent{
+				{ID: "e1", Name: "order_completed"},
+				{ID: "e2", Name: "checkout_started", Restart: true},
+			}})},
+			{ID: "late", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, late)},
+		},
+		Edges: []Edge{{From: "w", To: "late", Handle: HandleTimeout}},
+	}
+	if withPath {
+		g.Nodes = append(g.Nodes, Node{ID: "ok", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, ok)})
+		g.Edges = append(g.Edges, Edge{From: "w", To: "ok", Handle: "e1"})
+	}
+	return g, late, ok
+}
+
+var eventSeq int64
+
+// event is an event that happened at `at` (the harness clock, usually).
+func event(sub int, name string, at time.Time, props map[string]any) Event {
+	eventSeq++
+	return Event{ID: eventSeq, SubscriberID: sub, Name: name, Properties: cfg(props), OccurredAt: at}
+}
+
+func (h *harness) waitResult(enrollmentID int64, node string) waitResult {
+	h.t.Helper()
+	var st Step
+	h.must(h.db.Get(&st, `SELECT * FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2`, enrollmentID, node))
+	var r waitResult
+	h.must(json.Unmarshal(st.Result, &r))
+	return r
+}
+
+// start enrolls a new subscriber through the trigger event and runs the engine to the first wait.
+func (h *harness) startWaiting(auto int) (sub int, enr Enrollment) {
+	h.t.Helper()
+	sub = h.subscriber("a@example.com", "enabled", nil)
+	h.must(h.eng.OnEvent(context.Background(), sub, event(sub, "checkout_started", h.clock.Now(), map[string]any{"cart": "first"})))
+	h.drain()
+	enr = h.enrollment(auto, sub)
+	if enr.Status != EnrollmentWaiting || *enr.CurrentNode != "w" {
+		h.t.Fatalf("enrollment = %+v", enr)
+	}
+	return sub, enr
+}
+
+func TestWaitForEventTimesOut(t *testing.T) {
+	h := newHarness(t)
+	g, late, _ := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{})
+	start := h.clock.Now()
+	sub, enr := h.startWaiting(auto)
+
+	if r := h.waitResult(enr.ID, "w"); !r.Since.Equal(start) || !r.Until.Equal(start.Add(time.Hour)) {
+		t.Fatalf("result = %+v", r)
+	}
+	if enr.NextRunAt.Sub(start.Add(time.Hour)).Abs() > time.Second {
+		t.Fatalf("wakes at %v", enr.NextRunAt)
+	}
+
+	h.clock.Advance(59 * time.Minute)
+	h.drain()
+	if h.sender.count() != 0 {
+		t.Fatal("sent before the time was up")
+	}
+	h.clock.Advance(2 * time.Minute)
+	h.drain()
+	if h.sender.count() != 1 || h.sender.Sent[0].CampaignID != late || h.sender.Sent[0].SubscriberID != sub {
+		t.Fatalf("sent = %+v", h.sender.Sent)
+	}
+	enr = h.enrollment(auto, sub)
+	if enr.Status != EnrollmentCompleted || h.waitResult(enr.ID, "w").Branch != HandleTimeout || h.steps(enr.ID)["w"] != StepDone {
+		t.Fatalf("enrollment = %+v, steps = %v", enr, h.steps(enr.ID))
+	}
+}
+
+func TestWaitForEventTakesTheEventsPath(t *testing.T) {
+	h := newHarness(t)
+	g, _, ok := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{})
+	sub, enr := h.startWaiting(auto)
+	ctx := context.Background()
+
+	h.clock.Advance(10 * time.Minute)
+	ev := event(sub, "order_completed", h.clock.Now(), nil)
+	h.must(h.eng.OnEvent(ctx, sub, ev))
+	h.must(h.eng.OnEvent(ctx, sub, ev)) // delivering it twice changes nothing
+	h.drain()
+	if h.sender.count() != 1 || h.sender.Sent[0].CampaignID != ok {
+		t.Fatalf("sent = %+v", h.sender.Sent)
+	}
+	r := h.waitResult(enr.ID, "w")
+	if r.Branch != "e1" || r.Event != "order_completed" || r.EventID != ev.ID {
+		t.Fatalf("result = %+v", r)
+	}
+	if h.enrollment(auto, sub).Status != EnrollmentCompleted {
+		t.Fatal("did not complete")
+	}
+
+	// The time's up path never runs, however late.
+	h.clock.Advance(2 * time.Hour)
+	h.drain()
+	if h.sender.count() != 1 {
+		t.Fatalf("sent = %+v", h.sender.Sent)
+	}
+}
+
+func TestWaitForEventEmptyPathCompletes(t *testing.T) {
+	h := newHarness(t)
+	g, _, _ := h.waitGraph("1h", false)
+	auto := h.publish("abandoned", g, Settings{})
+	sub, _ := h.startWaiting(auto)
+
+	h.clock.Advance(time.Minute)
+	h.must(h.eng.OnEvent(context.Background(), sub, event(sub, "order_completed", h.clock.Now(), nil)))
+	h.drain()
+	enr := h.enrollment(auto, sub)
+	if enr.Status != EnrollmentCompleted || *enr.ExitReason != ExitCompleted || h.sender.count() != 0 {
+		t.Fatalf("enrollment = %+v, sent %d", enr, h.sender.count())
+	}
+}
+
+func TestRestartEventResetsTheWaitAndRefreshesTheEvent(t *testing.T) {
+	h := newHarness(t)
+	g, late, _ := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{})
+	sub, enr := h.startWaiting(auto) // 10:00
+	ctx := context.Background()
+
+	h.clock.Advance(40 * time.Minute)
+	at := h.clock.Now()
+	h.must(h.eng.OnEvent(ctx, sub, event(sub, "checkout_started", at, map[string]any{"cart": "second"})))
+	h.drain()
+	if h.enrollment(auto, sub).NextRunAt.Sub(at.Add(time.Hour)).Abs() > time.Second {
+		t.Fatalf("next run = %v", h.enrollment(auto, sub).NextRunAt)
+	}
+
+	h.clock.Advance(20 * time.Minute) // 11:00: the first wake-up does nothing
+	h.drain()
+	if h.sender.count() != 0 {
+		t.Fatal("the old timer fired")
+	}
+	h.clock.Advance(40 * time.Minute) // 11:40
+	h.drain()
+	if h.sender.count() != 1 || h.sender.Sent[0].CampaignID != late {
+		t.Fatalf("sent = %+v", h.sender.Sent)
+	}
+	var ev Event
+	h.must(json.Unmarshal(h.sender.Sent[0].Event, &ev))
+	var props map[string]string
+	h.must(json.Unmarshal(ev.Properties, &props))
+	if props["cart"] != "second" {
+		t.Fatalf("the email carries %v", props)
+	}
+	r := h.waitResult(enr.ID, "w")
+	if r.Restarts != 1 || r.RestartedAt == nil || r.Branch != HandleTimeout {
+		t.Fatalf("result = %+v", r)
+	}
+}
+
+func TestRepeatedRestarts(t *testing.T) {
+	h := newHarness(t)
+	g, _, _ := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{})
+	sub, enr := h.startWaiting(auto)
+
+	for range 4 {
+		h.clock.Advance(30 * time.Minute)
+		h.must(h.eng.OnEvent(context.Background(), sub, event(sub, "checkout_started", h.clock.Now(), nil)))
+		h.drain()
+	}
+	last := h.clock.Now()
+	if h.sender.count() != 0 {
+		t.Fatalf("sent early: %+v", h.sender.Sent)
+	}
+	if h.waitResult(enr.ID, "w").Restarts != 4 {
+		t.Fatalf("result = %+v", h.waitResult(enr.ID, "w"))
+	}
+	h.clock.Advance(59 * time.Minute)
+	h.drain()
+	if h.sender.count() != 0 {
+		t.Fatal("sent before the last restart's time limit")
+	}
+	h.clock.Advance(2 * time.Minute)
+	h.drain()
+	if h.sender.count() != 1 || h.clock.Now().Sub(last) < time.Hour {
+		t.Fatalf("sent %d", h.sender.count())
+	}
+}
+
+func TestEventsBeforeTheWaitDoNotCount(t *testing.T) {
+	h := newHarness(t)
+	g, _, _ := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{})
+	start := h.clock.Now()
+	sub, enr := h.startWaiting(auto)
+
+	// The event that started the run is a restart event of the step, but did not restart it.
+	if r := h.waitResult(enr.ID, "w"); r.Restarts != 0 {
+		t.Fatalf("the starting event restarted the wait: %+v", r)
+	}
+
+	// An old event that only now arrives does not count either.
+	h.clock.Advance(10 * time.Minute)
+	h.must(h.eng.OnEvent(context.Background(), sub, event(sub, "order_completed", start.Add(-time.Minute), nil)))
+	h.must(h.eng.OnEvent(context.Background(), sub, event(sub, "checkout_started", start.Add(-time.Minute), nil)))
+	h.drain()
+	r := h.waitResult(enr.ID, "w")
+	if r.Branch != "" || r.Restarts != 0 || !r.Until.Equal(start.Add(time.Hour)) || h.enrollment(auto, sub).Status != EnrollmentWaiting {
+		t.Fatalf("result = %+v", r)
+	}
+}
+
+func TestEventAfterTimeoutIsIgnored(t *testing.T) {
+	h := newHarness(t)
+	g, late, _ := h.waitGraph("1h", true)
+	// Keep the run alive after the time's up path so there is something to (wrongly) change.
+	g.Nodes = append(g.Nodes, Node{ID: "hold", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "1d"})})
+	g.Edges = []Edge{{From: "w", To: "late", Handle: HandleTimeout}, {From: "w", To: "ok", Handle: "e1"}, {From: "late", To: "hold"}}
+	auto := h.publish("abandoned", g, Settings{})
+	sub, enr := h.startWaiting(auto)
+
+	h.clock.Advance(61 * time.Minute)
+	h.drain()
+	h.must(h.eng.OnEvent(context.Background(), sub, event(sub, "order_completed", h.clock.Now(), nil)))
+	h.drain()
+	if h.sender.count() != 1 || h.sender.Sent[0].CampaignID != late {
+		t.Fatalf("sent = %+v", h.sender.Sent)
+	}
+	if r := h.waitResult(enr.ID, "w"); r.Branch != HandleTimeout {
+		t.Fatalf("result = %+v", r)
+	}
+	if got := h.enrollment(auto, sub); got.Status != EnrollmentWaiting || *got.CurrentNode != "hold" {
+		t.Fatalf("enrollment = %+v", got)
+	}
+}
+
+func TestWaitForEventWhilePaused(t *testing.T) {
+	h := newHarness(t)
+	g, _, ok := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{})
+	sub, enr := h.startWaiting(auto)
+	ctx := context.Background()
+
+	_, err := h.eng.Pause(ctx, auto)
+	h.must(err)
+	h.clock.Advance(10 * time.Minute)
+	h.must(h.eng.OnEvent(ctx, sub, event(sub, "order_completed", h.clock.Now(), nil)))
+	h.drain()
+	if r := h.waitResult(enr.ID, "w"); r.Branch != "e1" {
+		t.Fatalf("result = %+v", r)
+	}
+	if h.sender.count() != 0 || h.enrollment(auto, sub).Status != EnrollmentWaiting {
+		t.Fatal("it moved while paused")
+	}
+
+	_, err = h.eng.Resume(ctx, auto)
+	h.must(err)
+	h.drain()
+	if h.sender.count() != 1 || h.sender.Sent[0].CampaignID != ok || h.enrollment(auto, sub).Status != EnrollmentCompleted {
+		t.Fatalf("after resume: sent %+v", h.sender.Sent)
+	}
+}
+
+func TestWaitForEventUsesTheRunsVersion(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	g, _, ok := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{})
+	sub, enr := h.startWaiting(auto)
+
+	// v2 watches different events.
+	g2, _, _ := h.waitGraph("1h", true)
+	g2.Nodes[0].Config = cfg(WaitForEventConfig{Timeout: "1h", Events: []WaitEvent{{ID: "e1", Name: "payment_received"}}})
+	_, problems, err := h.store.SaveDraft(ctx, auto, g2, true)
+	h.must(err)
+	if len(problems) > 0 {
+		t.Fatal(messages(problems))
+	}
+	_, _, err = h.store.Publish(ctx, auto, true)
+	h.must(err)
+
+	h.must(h.eng.OnEvent(ctx, sub, event(sub, "payment_received", h.clock.Now(), nil)))
+	if r := h.waitResult(enr.ID, "w"); r.Branch != "" {
+		t.Fatalf("v2's event moved a v1 run: %+v", r)
+	}
+	h.must(h.eng.OnEvent(ctx, sub, event(sub, "order_completed", h.clock.Now(), nil)))
+	h.drain()
+	if h.sender.count() != 1 || h.sender.Sent[0].CampaignID != ok {
+		t.Fatalf("sent = %+v", h.sender.Sent)
+	}
+}

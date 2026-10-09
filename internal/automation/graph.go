@@ -180,12 +180,19 @@ func (g *Graph) Validate(opts ValidateOpts) []Problem {
 			outHandles[e.From] = map[string]int{}
 		}
 		outHandles[e.From][e.Handle]++
-		if from.Type == NodeCondition {
+		switch from.Type {
+		case NodeCondition:
 			if e.Handle != HandleYes && e.Handle != HandleNo {
 				bad(e.From, "a condition's connections must be yes or no")
 			}
-		} else if e.Handle != "" {
-			bad(e.From, "only conditions branch")
+		case NodeWaitForEvent:
+			if !waitHandleOK(from, e.Handle) {
+				bad(e.From, "a wait for an event connects only to its events' paths and its time's up path")
+			}
+		default:
+			if e.Handle != "" {
+				bad(e.From, "only conditions and waits for an event branch")
+			}
 		}
 	}
 	for id, c := range indeg {
@@ -296,6 +303,35 @@ func validateNode(ix *Index, n Node, opts ValidateOpts) []Problem {
 			}
 		}
 
+	case NodeWaitForEvent:
+		var c WaitForEventConfig
+		if !decode(&c) {
+			break
+		}
+		if d, err := ParseDuration(c.Timeout); err != nil || d <= 0 {
+			bad("needs a time limit like 30m, 2h or 3d")
+		}
+		if len(c.Events) < 1 || len(c.Events) > maxWaitEvents {
+			bad("needs between 1 and %d events to wait for", maxWaitEvents)
+		}
+		ids, names := map[string]bool{}, map[string]bool{}
+		for _, ev := range c.Events {
+			if !idRe.MatchString(ev.ID) || ev.ID == HandleTimeout || ids[ev.ID] {
+				bad("every event needs its own id")
+			}
+			ids[ev.ID] = true
+			name := strings.TrimSpace(ev.Name)
+			switch {
+			case name == "":
+				bad("every event needs a name")
+			case len(name) > maxEventName:
+				bad("event names are at most %d characters", maxEventName)
+			case names[name]:
+				bad("%q is watched for twice", name)
+			}
+			names[name] = true
+		}
+
 	case NodeCondition:
 		var c ConditionConfig
 		if !decode(&c) {
@@ -400,4 +436,27 @@ func (s Settings) Validate(opts ValidateOpts) []Problem {
 		}
 	}
 	return out
+}
+
+const (
+	maxWaitEvents = 10
+	maxEventName  = 200 // the /api/track name limit
+)
+
+// waitHandleOK reports whether handle is a valid path out of a wait_for_event: time's up, or one
+// of its events that has a path (not a restart).
+func waitHandleOK(n *Node, handle string) bool {
+	if handle == HandleTimeout {
+		return true
+	}
+	var c WaitForEventConfig
+	if json.Unmarshal(n.Config, &c) != nil {
+		return false
+	}
+	for _, ev := range c.Events {
+		if ev.ID == handle && !ev.Restart {
+			return true
+		}
+	}
+	return false
 }

@@ -71,7 +71,7 @@ func TestGraphProblems(t *testing.T) {
 		{"orphan", func(g *Graph) {
 			g.Nodes = append(g.Nodes, Node{ID: "lost", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "1h"})})
 		}, "not connected"},
-		{"branching delay", func(g *Graph) { g.Edges = append(g.Edges, Edge{From: "wait", To: "tag", Handle: HandleYes}) }, "only conditions branch"},
+		{"branching delay", func(g *Graph) { g.Edges = append(g.Edges, Edge{From: "wait", To: "tag", Handle: HandleYes}) }, "only conditions and waits for an event branch"},
 		{"condition without handle", func(g *Graph) { g.Edges[2].Handle = "" }, "must be yes or no"},
 		{"duplicate branch", func(g *Graph) { g.Edges = append(g.Edges, Edge{From: "check", To: "tag", Handle: HandleYes}) }, "more than one"},
 		{"bad delay", func(g *Graph) { g.Nodes[1].Config = cfg(DelayConfig{Duration: "soon"}) }, "duration"},
@@ -188,5 +188,69 @@ func TestParseDuration(t *testing.T) {
 		if _, err := ParseDuration(in); err == nil {
 			t.Errorf("%q was accepted", in)
 		}
+	}
+}
+
+func waitGraph(events []WaitEvent, timeout string, edges ...Edge) *Graph {
+	g := &Graph{
+		Triggers: []Trigger{{ID: "t1", Type: TriggerManual}},
+		Root:     "w",
+		Nodes:    []Node{{ID: "w", Type: NodeWaitForEvent, Config: cfg(WaitForEventConfig{Timeout: timeout, Events: events})}},
+	}
+	for _, e := range edges {
+		g.Nodes = append(g.Nodes, Node{ID: e.To, Type: NodeExit})
+		e.From = "w"
+		g.Edges = append(g.Edges, e)
+	}
+	return g
+}
+
+func TestWaitForEventValidation(t *testing.T) {
+	one := []WaitEvent{{ID: "e1", Name: "order_completed"}}
+	restart := []WaitEvent{{ID: "e1", Name: "order_completed"}, {ID: "e2", Name: "checkout_started", Restart: true}}
+	many := make([]WaitEvent, 11)
+	for i := range many {
+		many[i] = WaitEvent{ID: "e" + string(rune('a'+i)), Name: "n" + string(rune('a'+i))}
+	}
+
+	ok := waitGraph(restart, "1h", Edge{To: "x", Handle: "e1"}, Edge{To: "y", Handle: HandleTimeout})
+	if ps := ok.Validate(ValidateOpts{Publish: true}); len(ps) != 0 {
+		t.Fatalf("a valid wait was rejected:\n%s", messages(ps))
+	}
+
+	cases := []struct {
+		name string
+		g    *Graph
+		want string
+	}{
+		{"no time limit", waitGraph(one, ""), "time limit"},
+		{"zero time limit", waitGraph(one, "0m"), "time limit"},
+		{"bad time limit", waitGraph(one, "soon"), "time limit"},
+		{"no events", waitGraph(nil, "1h"), "between 1 and 10"},
+		{"too many events", waitGraph(many, "1h"), "between 1 and 10"},
+		{"bad event id", waitGraph([]WaitEvent{{ID: "a b", Name: "x"}}, "1h"), "own id"},
+		{"duplicate event id", waitGraph([]WaitEvent{{ID: "e1", Name: "a"}, {ID: "e1", Name: "b"}}, "1h"), "own id"},
+		{"event id timeout", waitGraph([]WaitEvent{{ID: "timeout", Name: "a"}}, "1h"), "own id"},
+		{"blank name", waitGraph([]WaitEvent{{ID: "e1", Name: "  "}}, "1h"), "needs a name"},
+		{"long name", waitGraph([]WaitEvent{{ID: "e1", Name: strings.Repeat("x", 201)}}, "1h"), "at most 200"},
+		{"duplicate name", waitGraph([]WaitEvent{{ID: "e1", Name: "a"}, {ID: "e2", Name: " a "}}, "1h"), "twice"},
+		{"restart event cannot have a path", waitGraph(restart, "1h", Edge{To: "x", Handle: "e2"}), "connects only to its events"},
+		{"unknown path", waitGraph(one, "1h", Edge{To: "x", Handle: "e9"}), "connects only to its events"},
+		{"no handle", waitGraph(one, "1h", Edge{To: "x"}), "connects only to its events"},
+		{"yes is not a path", waitGraph(one, "1h", Edge{To: "x", Handle: HandleYes}), "connects only to its events"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if ms := messages(c.g.Validate(ValidateOpts{})); !strings.Contains(ms, c.want) {
+				t.Fatalf("want %q in:\n%s", c.want, ms)
+			}
+		})
+	}
+
+	// Other steps still take no handle.
+	g := welcome()
+	g.Edges[0].Handle = HandleTimeout
+	if ms := messages(g.Validate(ValidateOpts{})); !strings.Contains(ms, "only conditions") {
+		t.Fatalf("got %s", ms)
 	}
 }

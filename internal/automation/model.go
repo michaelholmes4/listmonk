@@ -115,6 +115,7 @@ const (
 	NodeSendEmail       = "send_email"
 	NodeDelay           = "delay"
 	NodeWaitUntil       = "wait_until"
+	NodeWaitForEvent    = "wait_for_event"
 	NodeCondition       = "condition"
 	NodeUpdateAttribute = "update_attribute"
 	NodeAddToList       = "add_to_list"
@@ -128,6 +129,9 @@ const (
 	HandleNo  = "no"
 )
 
+// HandleTimeout is the path a wait_for_event takes when no event arrives in time.
+const HandleTimeout = "timeout"
+
 // Node is one step.
 type Node struct {
 	ID     string          `json:"id"`
@@ -135,7 +139,7 @@ type Node struct {
 	Config json.RawMessage `json:"config,omitempty"`
 }
 
-// Edge connects a node to the next one. Only conditions use Handle (yes/no).
+// Edge connects a node to the next one. Conditions (yes/no) and wait_for_event steps (an event id, or timeout) use Handle.
 type Edge struct {
 	From   string `json:"from"`
 	To     string `json:"to"`
@@ -180,6 +184,21 @@ type WaitUntilConfig struct {
 	At        *time.Time `json:"at,omitempty"`
 	Attribute string     `json:"attribute,omitempty"`
 	Offset    string     `json:"offset,omitempty"`
+}
+
+// WaitForEventConfig configures a wait_for_event node.
+type WaitForEventConfig struct {
+	// Timeout is the longest it waits: "30m", "1h", "3d".
+	Timeout string      `json:"timeout"`
+	Events  []WaitEvent `json:"events"`
+}
+
+// WaitEvent is one event a wait_for_event watches for. Its ID is the handle of its path.
+type WaitEvent struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Restart starts the wait again (with this event as the run's event data) instead of taking a path.
+	Restart bool `json:"restart,omitempty"`
 }
 
 // ConditionConfig configures a condition node.

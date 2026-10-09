@@ -244,6 +244,9 @@ func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *
 		}
 		return outcome{wait: &until, stepStatus: StepWaiting, result: map[string]any{"until": until}}, nil
 
+	case NodeWaitForEvent:
+		return e.runWaitForEvent(ctx, tx, enr, ix, n, now)
+
 	case NodeCondition:
 		var c ConditionConfig
 		if err := decodeConfig(n, &c); err != nil {
