@@ -2,6 +2,9 @@ import type { AutomationGraph } from '@/api/types'
 import { describe, expect, it } from 'vitest'
 import {
   allSteps,
+  branchHandles,
+  endsList,
+  isBranching,
   emailStepsBefore,
   emptyFlow,
   flowToGraph,
@@ -12,6 +15,7 @@ import {
   newId,
   newStep,
   removeStep,
+  syncBranches,
   type Flow,
   type Step,
 } from './model'
@@ -132,5 +136,72 @@ describe('editing', () => {
     expect(newStep(f, 'condition')).toMatchObject({ type: 'condition', branches: { yes: [], no: [] } })
     expect(newStep(f, 'delay').config).toEqual({ duration: '1d' })
     expect(newStep(f, 'send_email').config).toEqual({ message_type: 'marketing' })
+  })
+
+  it('builds a wait for an event with a path for its event and for time\'s up', () => {
+    const s = newStep(emptyFlow(), 'wait_for_event')
+    expect(s.config).toEqual({ timeout: '1h', events: [{ id: 'e1', name: '', restart: false }] })
+    expect(s.branches).toEqual({ e1: [], timeout: [] })
+  })
+})
+
+// abandoned cart: wait up to 1h { order_completed: [], checkout_started: restart, time's up: [reminder -> wait 1d -> wait again] }
+function cart(): Flow {
+  const events = [
+    { id: 'e1', name: 'order_completed' },
+    { id: 'e2', name: 'checkout_started', restart: true },
+    { id: 'e3', name: 'payment_failed' },
+  ]
+  return {
+    triggers: [{ id: 't1', type: 'event', config: { event: 'checkout_started' } }],
+    steps: [
+      {
+        id: 'w',
+        type: 'wait_for_event',
+        config: { timeout: '1h', events },
+        branches: {
+          e1: [],
+          e3: [delay('later')],
+          timeout: [mail('reminder'), { id: 'w2', type: 'wait_for_event', config: { timeout: '1d', events: [events[0]!] }, branches: { e1: [], timeout: [mail('last')] } }],
+        },
+      },
+    ],
+  }
+}
+
+describe('wait for an event', () => {
+  it('lists a path per event without restart, then time\'s up', () => {
+    const s = cart().steps[0]!
+    expect(branchHandles(s)).toEqual(['e1', 'e3', 'timeout'])
+    expect(endsList(s)).toBe(true)
+    expect(isBranching('wait_for_event')).toBe(true)
+  })
+
+  it('round-trips through the graph, with an empty path, a restart event and a time\'s up path', () => {
+    const f = cart()
+    const g = flowToGraph(f)
+    expect(g.edges).toContainEqual({ from: 'w', to: 'later', handle: 'e3' })
+    expect(g.edges).toContainEqual({ from: 'w', to: 'reminder', handle: 'timeout' })
+    expect(g.edges).toContainEqual({ from: 'reminder', to: 'w2' })
+    expect(g.edges!.filter((e) => e.from === 'w').map((e) => e.handle).sort()).toEqual(['e3', 'timeout'])
+    expect(graphToFlow(g)).toEqual(f)
+  })
+
+  it('finds steps on its paths', () => {
+    const f = cart()
+    expect([...allSteps(f.steps)].map((s) => s.id)).toEqual(['w', 'later', 'reminder', 'w2', 'last'])
+    expect(locate(f, 'last')?.list.map((s) => s.id)).toEqual(['last'])
+    expect(emailStepsBefore(f, 'last').map((s) => s.id)).toEqual(['reminder'])
+  })
+
+  it('adds and drops paths as the events change', () => {
+    const f = cart()
+    const w = f.steps[0]!
+    // e3 becomes a restart event, a new event appears.
+    w.config = { timeout: '1h', events: [{ id: 'e1', name: 'a' }, { id: 'e3', name: 'b', restart: true }, { id: 'e4', name: 'c' }] }
+    syncBranches(w)
+    expect(Object.keys(w.branches!).sort()).toEqual(['e1', 'e4', 'timeout'])
+    expect(w.branches!.timeout).toHaveLength(2)
+    expect(w.branches!.e4).toEqual([])
   })
 })

@@ -9,6 +9,7 @@ import ListStepForm from './forms/ListStepForm.vue'
 import SendEmailForm from './forms/SendEmailForm.vue'
 import TriggerForm from './forms/TriggerForm.vue'
 import UpdateAttributeForm from './forms/UpdateAttributeForm.vue'
+import WaitForEventForm from './forms/WaitForEventForm.vue'
 import WaitUntilForm from './forms/WaitUntilForm.vue'
 import { stepMeta, triggerMeta } from './labels'
 import type { Config, Flow, Step, Trigger } from './model'
@@ -88,6 +89,7 @@ const wide = computed(() => step.value?.type === 'send_email' || step.value?.typ
         <template v-else-if="step">
           <SendEmailForm v-if="step.type === 'send_email'" v-model="draft" :step-id="step.id" :errors="errors" :disabled="readonly" />
           <DelayForm v-else-if="step.type === 'delay'" v-model="draft" :errors="errors" :disabled="readonly" />
+          <WaitForEventForm v-else-if="step.type === 'wait_for_event'" v-model="draft" :branches="step.branches" :errors="errors" :disabled="readonly" />
           <WaitUntilForm v-else-if="step.type === 'wait_until'" v-model="draft" :errors="errors" :disabled="readonly" />
           <ConditionForm v-else-if="step.type === 'condition'" v-model="draft" :email-steps="emailSteps" :errors="errors" :disabled="readonly" />
           <UpdateAttributeForm v-else-if="step.type === 'update_attribute'" v-model="draft" :errors="errors" :disabled="readonly" />

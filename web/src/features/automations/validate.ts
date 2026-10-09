@@ -1,4 +1,4 @@
-import { branchHandles, emailStepsBefore, type Flow, type Step, type Trigger } from './model'
+import { branchHandles, emailStepsBefore, waitEvents, type Flow, type Step, type Trigger } from './model'
 import { isDuration, ruleIssues, type Rule } from './rule'
 
 /** A message about a step's settings; `key` is an i18n key, `field` names the input it is about. */
@@ -27,6 +27,19 @@ export function stepIssues(s: Step, ctx: Context): Issue[] {
       if (c.message_type === 'marketing' && !pos(c.list_id)) bad('list_id', 'web.automations.email.topicRequired')
       if (pos(c.campaign_id) === pos(c.template_id)) bad('content', 'web.automations.email.contentRequired')
       break
+    case 'wait_for_event': {
+      if (!isDuration(String(c.timeout ?? ''))) bad('timeout', 'web.automations.invalidDuration')
+      const events = waitEvents(c)
+      if (events.length < 1 || events.length > 10) bad('events', 'web.automations.waitForEvent.eventCount')
+      const seen = new Set<string>()
+      events.forEach((e, i) => {
+        const name = (e.name ?? '').trim()
+        if (!name) bad(`event.${i}`, 'web.automations.waitForEvent.nameRequired')
+        else if (seen.has(name)) bad(`event.${i}`, 'web.automations.waitForEvent.nameUnique')
+        seen.add(name)
+      })
+      break
+    }
     case 'delay':
       if (!isDuration(String(c.duration ?? ''))) bad('duration', 'web.automations.invalidDuration')
       break

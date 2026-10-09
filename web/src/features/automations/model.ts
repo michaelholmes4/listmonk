@@ -13,6 +13,7 @@ export const stepTypes = [
   'send_email',
   'delay',
   'wait_until',
+  'wait_for_event',
   'condition',
   'update_attribute',
   'add_to_list',
@@ -49,17 +50,36 @@ export type Branch = 'yes' | 'no'
 
 export const emptyFlow = (): Flow => ({ triggers: [], steps: [] })
 
+/** An event a wait for an event watches. A restart event starts the wait again and has no path. */
+export interface WaitEvent {
+  id: string
+  name: string
+  restart?: boolean
+}
+
+export const waitEvents = (c: Config): WaitEvent[] => (Array.isArray(c.events) ? (c.events as WaitEvent[]) : [])
+
 /** Steps whose continuation is several paths instead of one next step. */
-export const isBranching = (type: StepType) => type === 'condition'
+export const isBranching = (type: StepType) => type === 'condition' || type === 'wait_for_event'
 
 /** The paths out of a branching step, in display order. */
 export function branchHandles(s: Step): string[] {
   switch (s.type) {
     case 'condition':
       return ['yes', 'no']
+    case 'wait_for_event':
+      return [...waitEvents(s.config).filter((e) => !e.restart).map((e) => e.id), 'timeout']
     default:
       return []
   }
+}
+
+/** After a wait for an event's settings change: gives new paths an empty list and drops the lists of paths that are gone. */
+export function syncBranches(s: Step) {
+  if (!isBranching(s.type)) return
+  const handles = branchHandles(s)
+  const old = s.branches ?? {}
+  s.branches = Object.fromEntries(handles.map((h) => [h, old[h] ?? []]))
 }
 
 /** True when nothing can be added after this step in its list: a branching step continues in its paths, nothing follows an exit. */
@@ -73,6 +93,8 @@ export const defaultConfig = (type: StepType): Config => {
       return { duration: '1d' }
     case 'wait_until':
       return {}
+    case 'wait_for_event':
+      return { timeout: '1h', events: [{ id: 'e1', name: '', restart: false }] }
     case 'condition':
       return { rule: { op: 'and', rules: [{ type: 'attribute', path: '', operator: 'eq', value: '' }] } }
     case 'update_attribute':

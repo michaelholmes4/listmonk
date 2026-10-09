@@ -70,3 +70,26 @@ describe('trigger issues', () => {
     expect([...flowIssues(f, false).keys()].sort()).toEqual(['d', 't2'])
   })
 })
+
+describe('wait for an event', () => {
+  const wait = (config: Step['config']): Step => ({ id: 'w', type: 'wait_for_event', config })
+  const fields = (s: Step) => stepIssues(s, ctx(flow([s]))).map((i) => i.field)
+
+  it('is fine with a time limit and named events', () => {
+    expect(fields(newStep(flow([]), 'wait_for_event'))).toEqual(['event.0']) // the default has an empty name
+    expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: 'order_completed' }, { id: 'e2', name: 'checkout_started', restart: true }] }))).toEqual([])
+  })
+
+  it('needs a valid time limit', () => {
+    expect(fields(wait({ timeout: 'soon', events: [{ id: 'e1', name: 'x' }] }))).toEqual(['timeout'])
+    expect(fields(wait({ events: [{ id: 'e1', name: 'x' }] }))).toEqual(['timeout'])
+  })
+
+  it('needs 1 to 10 events with unique, non-empty names', () => {
+    expect(fields(wait({ timeout: '1h', events: [] }))).toEqual(['events'])
+    const eleven = Array.from({ length: 11 }, (_, i) => ({ id: `e${i}`, name: `n${i}` }))
+    expect(fields(wait({ timeout: '1h', events: eleven }))).toEqual(['events'])
+    expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: ' ' }] }))).toEqual(['event.0'])
+    expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: 'a' }, { id: 'e2', name: ' a' }] }))).toEqual(['event.1'])
+  })
+})

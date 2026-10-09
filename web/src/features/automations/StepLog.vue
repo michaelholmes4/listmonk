@@ -14,7 +14,12 @@ const detail = (s: AutomationStep): string => {
   const r = (s.result ?? {}) as Record<string, unknown>
   if (s.error) return s.error
   if (r.reason) return known(`web.automations.skipReason.${String(r.reason).replace(/ /g, '_')}`, String(r.reason))
+  // A wait for an event: its result has since/until, and a branch that is an event id or "timeout".
+  if (r.event) return t('web.automations.waitForEvent.log.continued', { event: String(r.event) })
+  if (r.branch === 'timeout') return t('web.automations.waitForEvent.log.timedOut')
+  if (r.until && r.since && Number(r.restarts) > 0) return t('web.automations.waitForEvent.log.restarted', { when: stamp(String(r.until)), n: Number(r.restarts) }, Number(r.restarts))
   if (r.branch) return t(`web.automations.branch.${String(r.branch)}`)
+
   if (r.note) return String(r.note)
   if (r.until) return t('web.automations.waitingUntil', { when: stamp(String(r.until)) })
   return ''

@@ -2,7 +2,7 @@
 import { useI18n } from 'vue-i18n'
 import AddStep from './AddStep.vue'
 
-import { branchHandles, endsList, isBranching, type Step } from './model'
+import { branchHandles, endsList, isBranching, waitEvents, type Step } from './model'
 import StepCard from './StepCard.vue'
 
 /**
@@ -12,7 +12,10 @@ import StepCard from './StepCard.vue'
 defineProps<{ steps: Step[] }>()
 const { t } = useI18n()
 
-const branchTitle = (_s: Step, h: string) => t(`web.automations.branch.${h}`)
+const branchTitle = (s: Step, h: string) => {
+  if (s.type === 'wait_for_event' && h !== 'timeout') return waitEvents(s.config).find((e) => e.id === h)?.name || t('web.automations.waitForEvent.unnamed')
+  return t(`web.automations.branch.${h}`)
+}
 </script>
 
 <template>
@@ -27,7 +30,7 @@ const branchTitle = (_s: Step, h: string) => t(`web.automations.branch.${h}`)
 
       <div v-if="isBranching(s.type)" class="w-full">
         <div class="mx-auto h-3 w-px bg-border" />
-        <div class="grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
+        <div class="grid grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-[repeat(auto-fit,minmax(16rem,1fr))]">
           <section v-for="h in branchHandles(s)" :key="h" class="rounded-lg border border-dashed p-3" :data-cy="`branch-${s.id}-${h}`">
             <h3 class="text-center text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               {{ branchTitle(s, h) }}

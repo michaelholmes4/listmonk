@@ -1,4 +1,4 @@
-import type { Config, Step, Trigger } from './model'
+import { waitEvents, type Config, type Step, type Trigger } from './model'
 
 type T = (key: string, params?: Record<string, unknown>) => string
 
@@ -49,6 +49,13 @@ export function stepSummary(t: T, s: Step, l: Lookups, c: Config = s.config): st
       const off = str(c.offset)
       if (c.attribute) return off ? `${str(c.attribute)} ${off.startsWith('-') ? '−' : '+'} ${duration(t, off.replace(/^-/, ''))}` : str(c.attribute)
       return c.at ? new Date(str(c.at)).toLocaleString() : ''
+    }
+    case 'wait_for_event': {
+      const names = waitEvents(c)
+        .filter((e) => str(e.name))
+        .map((e) => (e.restart ? `${e.name} (${t('web.automations.waitForEvent.restarts')})` : e.name))
+      if (!names.length) return ''
+      return [t('web.automations.waitForEvent.upTo', { time: duration(t, str(c.timeout)) }), names.join(', ')].join(' · ')
     }
     case 'condition':
       return ''

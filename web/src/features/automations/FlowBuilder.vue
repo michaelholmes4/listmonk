@@ -8,7 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAllLists } from '@/composables/queries/useLists'
 import { provideBuilder } from './context'
 import { triggerMeta } from './labels'
-import { insertStep, locate, moveStep, newId, newStep, removeStep, triggerTypes, type Config, type Flow, type StepType, type Trigger, type TriggerType } from './model'
+import { insertStep, locate, moveStep, newId, newStep, removeStep, syncBranches, triggerTypes, type Config, type Flow, type StepType, type Trigger, type TriggerType } from './model'
 import StepList from './StepList.vue'
 import StepSheet from './StepSheet.vue'
 import TriggerCard from './TriggerCard.vue'
@@ -64,8 +64,10 @@ function apply(id: string, config: Config) {
   const loc = locate(props.flow, id)
   const step = loc?.list[loc.index]
   const trigger = props.flow.triggers.find((x) => x.id === id)
-  if (step) step.config = config
-  else if (trigger) trigger.config = config
+  if (step) {
+    step.config = config
+    syncBranches(step)
+  } else if (trigger) trigger.config = config
   else return
   emit('change')
 }
