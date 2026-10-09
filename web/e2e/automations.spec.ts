@@ -39,6 +39,7 @@ test('build, save, publish and watch an automation', async ({ page, request }) =
     await page.locator('[data-cy=add-trigger-event]').click()
     const sheet = page.locator('[data-cy=step-sheet]')
     await sheet.getByLabel('Event name').fill(event)
+    await expect(page.locator('[data-cy=unsaved]')).toBeVisible()
     await closeSheet(page)
     await expect(page.locator('[data-cy^=trigger-t1]')).toContainText(event)
 
@@ -143,6 +144,7 @@ test('a transactional email step has no topic and saves its email without one', 
     await sheet.locator('[data-cy=create-email]').click()
     const editor = sheet.locator('[data-cy=email-editor]')
     await expect(editor).toBeVisible()
+    expect((await sheet.boundingBox())!.width).toBeGreaterThan(600)
     await editor.locator('#email-subject').fill(`Receipt ${stamp}`)
     await sheet.locator('[data-cy=save-email]').click()
     await expect(page.getByText('Email saved').first()).toBeVisible()

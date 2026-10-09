@@ -79,7 +79,7 @@ const wide = computed(() => step.value?.type === 'send_email' || step.value?.typ
 
 <template>
   <Sheet v-model:open="open">
-    <SheetContent :class="wide ? 'w-full overflow-y-auto sm:max-w-3xl' : 'w-full overflow-y-auto sm:max-w-lg'" data-cy="step-sheet">
+    <SheetContent :class="wide ? 'w-full overflow-y-auto data-[side=right]:sm:max-w-3xl' : 'w-full overflow-y-auto data-[side=right]:sm:max-w-lg'" data-cy="step-sheet">
       <SheetHeader>
         <SheetTitle>{{ meta ? t(meta.title) : '' }}</SheetTitle>
         <SheetDescription>{{ meta ? t(meta.help) : '' }}</SheetDescription>

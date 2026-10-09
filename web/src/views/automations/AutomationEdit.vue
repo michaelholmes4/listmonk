@@ -198,6 +198,9 @@ function onKey(e: KeyboardEvent) {
         </DropdownMenuContent>
       </DropdownMenu>
       <template v-if="!readonly">
+        <span v-if="dirty" class="flex items-center gap-1.5 text-xs text-muted-foreground" data-cy="unsaved">
+          <span class="size-1.5 rounded-full bg-warning" aria-hidden="true" />{{ t('web.common.unsaved') }}
+        </span>
         <Button variant="outline" size="sm" :disabled="!dirty || busy" data-cy="save-draft" @click="saveDraft">
           <Loader2 v-if="save.isPending.value" class="animate-spin" />{{ t('web.automations.saveDraft') }}
         </Button>
