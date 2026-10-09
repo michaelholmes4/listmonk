@@ -2758,7 +2758,7 @@ export interface components {
         AutomationNode: {
             id?: string;
             /** @enum {string} */
-            type?: "send_email" | "delay" | "wait_until" | "condition" | "update_attribute" | "add_to_list" | "remove_from_list" | "exit";
+            type?: "send_email" | "delay" | "wait_until" | "wait_for_event" | "condition" | "update_attribute" | "add_to_list" | "remove_from_list" | "exit";
             config?: {
                 [key: string]: unknown;
             };
@@ -2766,11 +2766,8 @@ export interface components {
         AutomationEdge: {
             from?: string;
             to?: string;
-            /**
-             * @description Only on a condition's outgoing edges.
-             * @enum {string}
-             */
-            handle?: "yes" | "no";
+            /** @description Only on branching steps: yes or no for a condition; an event id or timeout for a wait_for_event. */
+            handle?: string;
         };
         AutomationGraph: {
             triggers?: components["schemas"]["AutomationTrigger"][];

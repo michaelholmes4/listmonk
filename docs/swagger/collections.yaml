@@ -5663,14 +5663,14 @@ components:
       type: object
       properties:
         id: { type: string }
-        type: { type: string, enum: [send_email, delay, wait_until, condition, update_attribute, add_to_list, remove_from_list, exit] }
+        type: { type: string, enum: [send_email, delay, wait_until, wait_for_event, condition, update_attribute, add_to_list, remove_from_list, exit] }
         config: { type: object, additionalProperties: true }
     AutomationEdge:
       type: object
       properties:
         from: { type: string }
         to: { type: string }
-        handle: { type: string, enum: [yes, no], description: Only on a condition's outgoing edges. }
+        handle: { type: string, description: "Only on branching steps: yes or no for a condition; an event id or timeout for a wait_for_event." }
     AutomationGraph:
       type: object
       properties:
