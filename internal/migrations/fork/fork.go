@@ -45,6 +45,9 @@ var sqlMessageLog string
 //go:embed 007_step_visits.sql
 var sqlStepVisits string
 
+//go:embed 008_step_campaigns_cancelled.sql
+var sqlStepCampaignsCancelled string
+
 // All is every migration in order. Add new ones at the end with the next number.
 var All = []Migration{
 	{1, "automation tables", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlAutomations) }},
@@ -55,6 +58,7 @@ var All = []Migration{
 	{5, "event idempotency keys are per subscriber", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlEventIdem) }},
 	{6, "message log", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlMessageLog) }},
 	{7, "automation step visits", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlStepVisits) }},
+	{8, "automation step campaigns are cancelled", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlStepCampaignsCancelled) }},
 }
 
 func execTx(ctx context.Context, db *sqlx.DB, query string) error {

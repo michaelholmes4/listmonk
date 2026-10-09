@@ -87,6 +87,31 @@ func TestSchemaIsUsable(t *testing.T) {
 	}
 }
 
+func TestStepCampaignsBecomeCancelled(t *testing.T) {
+	db := testdb.New(t)
+	ctx := context.Background()
+	if err := Run(ctx, db, quiet); err != nil {
+		t.Fatal(err)
+	}
+	// Step campaigns made before migration 8 were drafts; an ordinary draft must stay one.
+	var step, regular int
+	if err := db.Get(&step, `INSERT INTO campaigns (uuid, name, subject, from_email, body, messenger, type, status) VALUES (gen_random_uuid(), 'step', 's', 'a@b.c', 'b', 'email', 'automation', 'draft') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Get(&regular, `INSERT INTO campaigns (uuid, name, subject, from_email, body, messenger, type, status) VALUES (gen_random_uuid(), 'r', 's', 'a@b.c', 'b', 'email', 'regular', 'draft') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	if err := All[8-1].Up(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[int]string{step: "cancelled", regular: "draft"} {
+		var got string
+		if err := db.Get(&got, `SELECT status::TEXT FROM campaigns WHERE id = $1`, id); err != nil || got != want {
+			t.Fatalf("campaign %d: status = %q (%v), want %q", id, got, err, want)
+		}
+	}
+}
+
 func TestDashboardCountsIgnoreAutomationCampaigns(t *testing.T) {
 	db := testdb.New(t)
 	ctx := context.Background()

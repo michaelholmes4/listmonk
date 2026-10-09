@@ -124,7 +124,7 @@ func (h *harness) subscribe(sub, list int, status string) {
 func (h *harness) campaign() int {
 	h.t.Helper()
 	var id int
-	h.must(h.db.Get(&id, `INSERT INTO campaigns (uuid, name, subject, from_email, body, messenger, type) VALUES (gen_random_uuid(), 'step', 's', 'a@b.c', 'b', 'email', 'automation') RETURNING id`))
+	h.must(h.db.Get(&id, `INSERT INTO campaigns (uuid, name, subject, from_email, body, messenger, type, status) VALUES (gen_random_uuid(), 'step', 's', 'a@b.c', 'b', 'email', 'automation', 'cancelled') RETURNING id`))
 	return id
 }
 

@@ -50,12 +50,13 @@ func TestStepCampaignsAreHiddenAndOnlyAutomationOnesCanBeUsed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var typ string
+	var typ, status string
 	var lists int
-	h.must(h.db.Get(&typ, `SELECT type::TEXT FROM campaigns WHERE id = $1`, id))
+	h.must(h.db.QueryRow(`SELECT type::TEXT, status::TEXT FROM campaigns WHERE id = $1`, id).Scan(&typ, &status))
 	h.must(h.db.Get(&lists, `SELECT COUNT(*) FROM campaign_lists WHERE campaign_id = $1 AND list_id = $2`, id, list))
-	if typ != "automation" || lists != 1 {
-		t.Fatalf("type=%s linked lists=%d", typ, lists)
+	// Cancelled, so stock listmonk can never start it at the topic list.
+	if typ != "automation" || status != "cancelled" || lists != 1 {
+		t.Fatalf("type=%s status=%s linked lists=%d", typ, status, lists)
 	}
 
 	// An ordinary campaign cannot be used as a step's content.

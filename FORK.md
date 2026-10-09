@@ -44,6 +44,9 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   unsubscribe link records an opt-out. Automation campaigns are filtered out of every upstream campaign query and of the
   manager's scan (`queries/campaigns.sql`); if a merge adds a new campaign query, check it excludes them.
   A step's campaign is shared by all versions of the automation: editing it changes what in-flight enrollments send.
+  Its status is always `cancelled` (migration 8 converted the old drafts), so that upstream's own handlers refuse to
+  start, schedule or edit it; the fork never reads that status (the step editor saves through `core.UpdateCampaign`,
+  and tracking, the browser view and unsubscribe don't check it). If a merge adds a status check to one of those, revisit this.
 - **Consent** (`internal/automation/consent.go`): blocklisted gets nothing; transactional is otherwise sent; marketing needs
   an enabled subscriber who has not unsubscribed from the topic (and has confirmed, on a double opt-in list). `POST /api/tx`
   keeps its upstream behaviour and does *not* check the blocklist: the two differ on purpose.
@@ -114,6 +117,20 @@ binary with `make pack-bin-only`, and `ghcr.io/<owner>/librelist:<tag>` (linux a
 The image is a drop-in for `listmonk/listmonk` in an existing compose file: change `image:`, back up with
 `pg_dump`, then run `./listmonk --upgrade --yes` (upstream migrations first, then the fork's). Try the upgrade on
 a restored copy of the production database first.
+
+## Rolling back to upstream
+The fork only adds to the schema, so stock listmonk (the same upstream version as the fork's base, or newer) runs
+on a librelist database: switch `image:` back. Stock listmonk ignores the fork's tables and its `settings` keys,
+accepts the extra `automation` campaign type, and can read the dashboard view as migration 4 rewrote it.
+What changes:
+- Automations stop: runs stay frozen where they are, and `POST /api/track` returns 404, so the site's calls to it
+  must fail softly.
+- The step campaigns show up in the campaign list (stock listmonk doesn't hide `type = 'automation'`). They are
+  `cancelled`, so they can't be started or edited; delete them when convenient with
+  `DELETE FROM campaigns WHERE type = 'automation';` (their message-log rows keep the message, without the campaign).
+- Returning to the fork later just works if its tables were kept, once the fork has merged whatever upstream
+  version stock listmonk upgraded the database to. If they were dropped, delete the `fork_migrations` setting too,
+  so `--upgrade` recreates them.
 
 `.github/workflows/librelist-ci.yml` lints, type-checks, tests and builds `web/` and vets the Go code on every
 push and pull request. The GoReleaser config and the workflows are syntax-checked only so far; the first tag is

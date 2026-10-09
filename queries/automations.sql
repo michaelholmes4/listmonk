@@ -216,9 +216,10 @@ DELETE FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2;
 SELECT optin::TEXT FROM lists WHERE id = $1;
 
 -- name: automation-insert-step-campaign
--- The hidden campaign behind an email step. Never picked up by the campaign manager.
+-- The hidden campaign behind an email step. Never picked up by the campaign manager. It is
+-- 'cancelled' so that stock listmonk (after a rollback) can't start or schedule it at its topic list.
 INSERT INTO campaigns (uuid, name, subject, from_email, body, content_type, messenger, template_id, type, headers, status)
-VALUES ($1, $2, $3, $4, $5, $6::content_type, $7, $8, 'automation', '[]', 'draft')
+VALUES ($1, $2, $3, $4, $5, $6::content_type, $7, $8, 'automation', '[]', 'cancelled')
 RETURNING id;
 
 -- name: automation-step-campaigns
