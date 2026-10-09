@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { deleteOldEvents } from '@/api/automations'
+import { useDeleteOldMessageLog } from '@/composables/queries/useMessageLog'
 import { analyticsExportURL, type AnalyticsType, type OrphanType } from '@/api/maintenance'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Page from '@/components/layout/Page.vue'
@@ -33,12 +34,13 @@ const subscriptionDate = ref(day(7))
 const analyticsType = ref<AnalyticsType>('all')
 const analyticsDate = ref(day(7))
 const eventsDate = ref(day(90))
+const messagesDate = ref(day(90))
 const exportType = ref<'views' | 'clicks'>('views')
 const exportDate = ref(day(30))
 const exportURL = computed(() => analyticsExportURL(exportType.value, instant(exportDate.value)))
 
 // Every destructive action goes through one confirmation.
-type Action = 'subscribers' | 'subscriptions' | 'analytics' | 'events'
+type Action = 'subscribers' | 'subscriptions' | 'analytics' | 'events' | 'messages'
 const pending = ref<Action | null>(null)
 const confirmOpen = computed({ get: () => !!pending.value, set: (o) => !o && (pending.value = null) })
 
@@ -46,8 +48,9 @@ const delSubscribers = useDeleteSubscribers()
 const delSubscriptions = useDeleteUnconfirmedSubscriptions()
 const delAnalytics = useDeleteAnalytics()
 const delEvents = useMutation({ mutationFn: (before: string) => deleteOldEvents(before) })
+const delMessages = useDeleteOldMessageLog()
 const busy = computed(
-  () => delSubscribers.isPending.value || delSubscriptions.isPending.value || delAnalytics.isPending.value || delEvents.isPending.value,
+  () => delSubscribers.isPending.value || delSubscriptions.isPending.value || delAnalytics.isPending.value || delEvents.isPending.value || delMessages.isPending.value,
 )
 
 const counted = (name: string) => (r: { count: number }) =>
@@ -67,6 +70,11 @@ function run() {
     case 'events':
       delEvents.mutate(instant(eventsDate.value), {
         onSuccess: (r) => (counted(t('web.maintenance.events'))({ count: r.deleted }), done()),
+      })
+      break
+    case 'messages':
+      delMessages.mutate(instant(messagesDate.value), {
+        onSuccess: (r) => (counted(t('web.messages.title'))({ count: r.deleted }), done()),
       })
       break
     case 'analytics':
@@ -176,6 +184,18 @@ function run() {
         <Button variant="destructive" :disabled="busy || !eventsDate" @click="pending = 'events'">{{ t('globals.buttons.delete') }}</Button>
       </div>
       <p class="text-xs text-muted-foreground">{{ t('web.maintenance.eventsHelp') }}</p>
+    </section>
+
+    <section class="space-y-4 rounded-lg border p-4" data-cy="gc-messages">
+      <h2 class="font-medium">{{ t('web.maintenance.messageLog') }}</h2>
+      <div class="flex flex-wrap items-end gap-4">
+        <div class="space-y-2">
+          <Label for="gc-messages-date">{{ t('maintenance.olderThan') }}</Label>
+          <Input id="gc-messages-date" v-model="messagesDate" type="date" class="w-44" />
+        </div>
+        <Button variant="destructive" :disabled="busy || !messagesDate" @click="pending = 'messages'">{{ t('globals.buttons.delete') }}</Button>
+      </div>
+      <p class="text-xs text-muted-foreground">{{ t('web.maintenance.messageLogHelp') }}</p>
     </section>
 
     <VacuumCard v-if="can('settings:manage')" />

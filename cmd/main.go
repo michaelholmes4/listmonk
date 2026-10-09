@@ -26,6 +26,7 @@ import (
 	"github.com/knadh/listmonk/internal/manager"
 	"github.com/knadh/listmonk/internal/media"
 	"github.com/knadh/listmonk/internal/messenger/email"
+	"github.com/knadh/listmonk/internal/msglog"
 	"github.com/knadh/listmonk/internal/subimporter"
 	"github.com/knadh/listmonk/models"
 	"github.com/knadh/paginator"
@@ -245,7 +246,7 @@ func main() {
 	}
 
 	// Initialize the global admin/sub e-mail notifier.
-	initNotifs(fs, i18n, emailMsgr, urlCfg, ko)
+	initNotifs(fs, i18n, logMessenger(emailMsgr, msglog.SourceNotification), urlCfg, ko) // librelist: message log
 
 	// Initialize and cache tx templates in memory.
 	initTxTemplates(mgr, core)
@@ -277,7 +278,7 @@ func main() {
 		core:       core,
 		manager:    mgr,
 		messengers: msgrs,
-		emailMsgr:  emailMsgr,
+		emailMsgr:  logMessenger(emailMsgr, msglog.SourceSystem), // librelist: message log
 		importer:   importer,
 		auth:       auth,
 		media:      media,
@@ -334,6 +335,9 @@ func main() {
 
 		// Close the campaign manager.
 		mgr.Close()
+
+		// librelist: write out the message log before the DB goes away.
+		closeMessageLog()
 
 		// Close the DB pool.
 		db.Close()

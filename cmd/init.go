@@ -612,7 +612,7 @@ func initCampaignManager(msgrs []manager.Messenger, q *models.Queries, u *UrlCon
 
 	// Attach all messengers to the campaign manager.
 	for _, m := range msgrs {
-		mgr.AddMessenger(m)
+		mgr.AddMessenger(wrapMessageLog(m)) // librelist: message log
 	}
 
 	return mgr
@@ -780,7 +780,7 @@ func initMediaStore(ko *koanf.Koanf) media.Store {
 }
 
 // initNotifs initializes the notifier with the system e-mail templates.
-func initNotifs(fs stuffbin.FileSystem, i *i18n.I18n, em *email.Emailer, u *UrlConfig, ko *koanf.Koanf) {
+func initNotifs(fs stuffbin.FileSystem, i *i18n.I18n, em notifs.Pusher, u *UrlConfig, ko *koanf.Koanf) {
 	tpls, err := stuffbin.ParseTemplatesGlob(initTplFuncs(i, u), fs, "/static/email-templates/*.html")
 	if err != nil {
 		lo.Fatalf("error parsing e-mail notif templates: %v", err)

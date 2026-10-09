@@ -64,3 +64,6 @@ export type AutomationStep = Schemas['AutomationStep']
 export type AutomationNodeStat = Schemas['AutomationNodeStat']
 export type AutomationEvent = Schemas['AutomationEvent']
 export type SubscriberAutomation = Schemas['SubscriberAutomation']
+
+export type MessageLogRow = Schemas['MessageLogRow']
+export type MessageLogEntry = Schemas['MessageLogEntry']

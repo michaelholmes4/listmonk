@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/textproto"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/knadh/listmonk/internal/automation"
 	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/internal/manager"
+	"github.com/knadh/listmonk/internal/msglog"
 	"github.com/knadh/listmonk/models"
 )
 
@@ -58,7 +61,7 @@ func (s *automationSender) SendEmail(_ context.Context, m automation.Message) er
 			}
 		}
 	}
-	auto := map[string]any{"Name": m.AutomationName, "UUID": m.AutomationUUID, "ID": m.AutomationID, "Step": m.NodeID}
+	auto := map[string]any{"Name": m.AutomationName, "UUID": m.AutomationUUID, "ID": m.AutomationID, "Step": m.NodeID, "Enrollment": m.EnrollmentID}
 
 	if m.CampaignID != 0 {
 		camp, err := s.campaign(m.CampaignID)
@@ -91,6 +94,11 @@ func (s *automationSender) SendEmail(_ context.Context, m automation.Message) er
 		Body:        tx.Body,
 	}
 	msg.Attachments = append(msg.Attachments, tpl.Attachments...)
+	// For the message log; the logging messenger removes these before sending.
+	msg.Headers = textproto.MIMEHeader{
+		msglog.HdrAutomation: {strconv.Itoa(m.AutomationID)},
+		msglog.HdrEnrollment: {strconv.FormatInt(m.EnrollmentID, 10)},
+	}
 	return s.mgr.PushMessage(msg)
 }
 

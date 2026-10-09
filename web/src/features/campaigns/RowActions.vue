@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BarChart3, Ban, Clock, Copy, Eye, MoreHorizontal, Pause, Pencil, Play, Rocket, Trash2 } from '@lucide/vue'
+import { BarChart3, Ban, Clock, Copy, Eye, MoreHorizontal, Pause, Pencil, Play, Rocket, Send, Trash2 } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import type { Campaign } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -61,6 +61,9 @@ const hasStatusAction = send && (canStart(c) || canSchedule(c) || canPause(c) ||
         <RouterLink :to="{ name: 'campaign-analytics', query: { id: c.id } }">
           <BarChart3 />{{ t('globals.terms.analytics') }}
         </RouterLink>
+      </DropdownMenuItem>
+      <DropdownMenuItem v-if="can('message_log:get')" as-child data-cy="row-sent-messages">
+        <RouterLink :to="{ name: 'messages', query: { campaign_id: c.id } }"><Send />{{ t('web.messages.viewSent') }}</RouterLink>
       </DropdownMenuItem>
       <template v-if="(send && canCancel(c)) || can('campaigns:manage')">
         <DropdownMenuSeparator />

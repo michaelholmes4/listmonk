@@ -66,6 +66,13 @@
         ]
     },
     {
+        "group": "message_log",
+        "permissions":
+        [
+            "message_log:get"
+        ]
+    },
+    {
         "group": "users",
         "permissions":
         [

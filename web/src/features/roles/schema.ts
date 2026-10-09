@@ -25,7 +25,7 @@ export type ListRoleForm = z.infer<ReturnType<typeof listRoleSchema>>
 
 /** A new role starts with the everyday permissions: nothing administrative, no raw SQL. */
 export function defaultPermissions(groups: PermissionGroup[]): string[] {
-  const skipGroups = ['admin', 'users']
+  const skipGroups = ['admin', 'users', 'message_log']
   return groups
     .filter((g) => !skipGroups.includes(g.group))
     .flatMap((g) => g.permissions)

@@ -2,7 +2,9 @@ package manager
 
 import (
 	"fmt"
+	"net/textproto"
 
+	"github.com/knadh/listmonk/internal/msglog"
 	"github.com/knadh/listmonk/models"
 )
 
@@ -35,4 +37,14 @@ func (m *Manager) NewAutomationMessage(c *models.Campaign, s models.Subscriber, 
 		return msg, err
 	}
 	return msg, nil
+}
+
+// forkLogHeaders adds the internal headers that tell the message log which automation and
+// enrollment a message belongs to. The log's messenger wrapper removes them before sending.
+func (msg *CampaignMessage) forkLogHeaders(h textproto.MIMEHeader) {
+	for key, hdr := range map[string]string{"ID": msglog.HdrAutomation, "Enrollment": msglog.HdrEnrollment} {
+		if v, ok := msg.Automation[key]; ok && v != nil && fmt.Sprint(v) != "0" {
+			h.Set(hdr, fmt.Sprint(v))
+		}
+	}
 }

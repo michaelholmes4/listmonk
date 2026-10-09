@@ -105,6 +105,22 @@ export const router = createRouter({
       },
     },
     {
+      path: '/messages',
+      name: 'messages',
+      component: () => import('@/views/messages/MessageList.vue'),
+      meta: { title: 'web.messages.title', perms: ['message_log:get'] },
+    },
+    {
+      path: '/messages/:id(\\d+)',
+      name: 'message',
+      component: () => import('@/views/messages/MessageView.vue'),
+      meta: {
+        title: 'web.messages.one',
+        parents: [{ title: 'web.messages.title', to: { name: 'messages' } }],
+        perms: ['message_log:get'],
+      },
+    },
+    {
       path: '/campaigns/media',
       name: 'media',
       component: () => import('@/views/media/MediaList.vue'),

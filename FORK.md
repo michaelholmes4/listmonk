@@ -8,12 +8,13 @@ git fetch upstream
 git merge upstream/master        # or a release tag
 ```
 Known conflict hotspots (the only upstream files we edit):
-- `cmd/handlers.go` (routes; `/app` redirect), `cmd/init.go` (wiring; the UI is mapped to `/admin` from `web/dist`), `cmd/upgrade.go` (fork-migration call)
+- `cmd/handlers.go` (routes; `/app` redirect), `cmd/init.go` (wiring; the UI is mapped to `/admin` from `web/dist`; the message log wraps each messenger in `initCampaignManager`, and `initNotifs` takes a `notifs.Pusher`), `cmd/upgrade.go` (fork-migration call)
 - `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list and the dashboard counts)
 - `internal/core/core.go`, `subscribers.go`, `subscriptions.go` (automation trigger hooks: `Hooks.OnSubscriptionsConfirmed`
   / `OnAttribsChanged`, and one `forkBegin`/`forkEnd` pair around each mutation; the logic is in `fork_hooks.go`)
-- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`)
-- `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `eng.Stop` in the shutdown closure)
+- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to)
+- `internal/notifs/notifs.go` (a 1-line `Pusher` interface in place of `*email.Emailer`, so notifications can go through the message log)
+- `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `eng.Stop` in the shutdown closure; `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
 - `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`)
@@ -33,7 +34,7 @@ subscriber pages are untouched. Post-login `next` still defaults to `/admin` unt
 
 Everything else we add lives in new files: `web/`, `internal/automation/`,
 `internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/automation_sender.go`,
-`cmd/track.go`, `cmd/web.go`, `static/public/static/librelist-auth.css`.
+`cmd/track.go`, `cmd/web.go`, `cmd/message_log.go`, `internal/msglog/`, `static/public/static/librelist-auth.css`.
 
 ## Automation: things to know
 - **Engine.** River (poll-only, one job kind) drives `internal/automation`; one DB transaction per node. Email steps are
@@ -57,6 +58,27 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
 - **Retention.** `DELETE /api/maintenance/events?before_date=` prunes events. Deleting a subscriber cascades to their events
   and enrollments.
+
+## Message log
+Every email handed to a messenger is recorded in `librelist_messages` (migration 6) with the messenger's real answer
+(`sent` = the SMTP server accepted it, `failed` + the error otherwise). It is a decorator, `msglog.Wrap`, around each
+messenger, so no send site is edited. There is one wrapper per kind of sender, and it supplies the source of messages that
+do not say (a campaign says so itself): the campaign manager (campaigns, `/api/tx`, automations), notifications (admin
+mails and opt-in confirmations), and system mail (password resets, data exports).
+- **Content.** Kept, as the exact email, for transactional, automation and notification mail. *Not* kept for campaign
+  mail (it would be one copy per recipient): the row stores campaign + subscriber, and `GET /api/message-log/:id/preview`
+  re-renders it, with a dummy campaign UUID so that looking never counts as an open or click. System mail is recorded
+  without a body because it carries credentials (a reset link). The stored copy has the tracking pixel stripped on preview.
+- **Writes are asynchronous** (`msglog.Writer`: queue, batches of 500 or 1 s). A full queue drops entries (counted in the
+  log) rather than slowing a send; a clean shutdown drains it (`closeMessageLog()`).
+- **Erasure.** Deleting a subscriber deletes their rows (FK cascade); an entry whose subscriber vanished before the
+  flush is dropped, not kept anonymously. A deleted campaign leaves its rows, without the campaign.
+- **Retention.** 90 days by default; `librelist.message_log_retention_days` (0 = forever), pruned daily by the writer, or
+  by hand with `DELETE /api/maintenance/message-log?before_date=`.
+- **Internal headers.** The automation sender and `manager.forkLogHeaders` pass `X-Librelist-Log-Automation` /
+  `-Enrollment` to the wrapper, which removes them before the messenger sees the message.
+- **Merging upstream:** if a merge adds a new `Messenger.Push` call site, decide which wrapper it should go through.
+  `message_log:get` is deliberately not part of a new role's default permissions: the log shows every subscriber's mail.
 
 ## Migrations
 Fork migrations are a separate sequence in `internal/migrations/fork/`, tracked under the

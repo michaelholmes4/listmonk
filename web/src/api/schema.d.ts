@@ -1436,6 +1436,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/message-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description lists the emails handed to a messenger (campaigns, automations, transactional and system mail), newest first, with whether each was accepted. Needs the `message_log:get` permission. */
+        get: operations["queryMessageLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/message-log/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        /** @description one logged message with its headers and attachments (the content is served by `/preview`) */
+        get: operations["getMessageLogEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/message-log/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        /** @description the HTML of a logged message: the exact email when it was kept, otherwise the campaign's email re-rendered for that subscriber (viewing it never counts as an open). */
+        get: operations["previewMessageLogEntry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/maintenance/message-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description deletes logged messages older than `before_date` */
+        delete: operations["deleteOldMessageLog"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/lists": {
         parameters: {
             query?: never;
@@ -2781,6 +2853,51 @@ export interface components {
             occurred_at?: string;
             /** Format: date-time */
             created_at?: string;
+        };
+        MessageLogRow: {
+            id?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** @enum {string} */
+            source?: "campaign" | "automation" | "tx" | "notification" | "system";
+            messenger?: string;
+            /**
+             * @description 'sent' means the messenger accepted it
+             * @enum {string}
+             */
+            status?: "sent" | "failed";
+            error?: string;
+            subscriber_id?: number | null;
+            campaign_id?: number | null;
+            campaign_name?: string;
+            automation_id?: number | null;
+            automation_name?: string;
+            enrollment_id?: number | null;
+            from?: string;
+            to?: string[];
+            subject?: string;
+            message_id?: string;
+            content_type?: string;
+            has_body?: boolean;
+            bounced?: boolean;
+            opened?: boolean;
+            clicked?: boolean;
+        };
+        MessageLogEntry: components["schemas"]["MessageLogRow"] & {
+            alt_body?: string | null;
+            headers?: {
+                [key: string]: string[];
+            };
+            attachments?: {
+                name?: string;
+                size?: number;
+                inline?: boolean;
+            }[];
+            /**
+             * @description whether the exact email was kept, is rebuilt when viewed, or is not available
+             * @enum {string}
+             */
+            content?: "stored" | "rerender" | "none";
         };
         List: {
             id?: number;
@@ -6198,6 +6315,118 @@ export interface operations {
         };
     };
     deleteOldEvents: {
+        parameters: {
+            query: {
+                before_date: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            deleted?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    queryMessageLog: {
+        parameters: {
+            query?: {
+                /** @description matches the recipient or the subject */
+                query?: string;
+                status?: "sent" | "failed" | "bounced";
+                source?: "campaign" | "automation" | "tx" | "notification" | "system";
+                subscriber_id?: number;
+                campaign_id?: number;
+                automation_id?: number;
+                since?: string;
+                until?: string;
+                order?: "asc" | "desc";
+                page?: number;
+                per_page?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of messages */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            results?: components["schemas"]["MessageLogRow"][];
+                            total?: number;
+                            per_page?: number;
+                            page?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getMessageLogEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The message */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["MessageLogEntry"];
+                    };
+                };
+            };
+        };
+    };
+    previewMessageLogEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The email */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+        };
+    };
+    deleteOldMessageLog: {
         parameters: {
             query: {
                 before_date: string;

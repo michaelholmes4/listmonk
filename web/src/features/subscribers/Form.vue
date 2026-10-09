@@ -33,6 +33,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import ListPicker from '@/features/lists/ListPicker.vue'
 import SubscriberActivity from './SubscriberActivity.vue'
+import SubscriberMessages from './SubscriberMessages.vue'
 import SubscriberAutomations from './SubscriberAutomations.vue'
 import { subscriberStatusVariant as statusVariant } from './columns'
 import { emptySubscriber, parseAttribs, subscriberSchema, toForm } from './schema'
@@ -125,6 +126,7 @@ const when = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
       </TabsTrigger>
       <TabsTrigger value="activity">{{ t('subscribers.activity') }}</TabsTrigger>
       <TabsTrigger v-if="can('automations:get')" value="automations">{{ t('web.automations.title') }}</TabsTrigger>
+      <TabsTrigger v-if="can('message_log:get')" value="messages">{{ t('web.messages.tab') }}</TabsTrigger>
     </TabsList>
 
     <!-- Profile: the only editable part, saved with the header's Save. -->
@@ -290,6 +292,10 @@ const when = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
 
     <TabsContent v-if="can('automations:get')" value="automations">
       <SubscriberAutomations v-if="subscriberId !== undefined && tab === 'automations'" :subscriber-id="subscriberId" />
+    </TabsContent>
+
+    <TabsContent v-if="can('message_log:get')" value="messages">
+      <SubscriberMessages v-if="subscriberId !== undefined && tab === 'messages'" :subscriber-id="subscriberId" />
     </TabsContent>
   </Tabs>
 

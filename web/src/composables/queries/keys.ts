@@ -18,6 +18,12 @@ export const keys = {
   },
   import: { status: ['import', 'status'] as const, logs: ['import', 'logs'] as const },
   bounces: { all: ['bounces'] as const, page: (q: unknown) => ['bounces', 'page', q] as const },
+  messageLog: {
+    all: ['message-log'] as const,
+    page: (q: unknown) => ['message-log', 'page', q] as const,
+    detail: (id: number) => ['message-log', 'detail', id] as const,
+    preview: (id: number) => ['message-log', 'preview', id] as const,
+  },
   templates: { all: ['templates'] as const, detail: (id: number) => ['templates', 'detail', id] as const },
   media: { all: ['media'] as const, page: (q: unknown) => ['media', 'page', q] as const },
   campaigns: {

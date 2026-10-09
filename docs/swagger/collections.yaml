@@ -3149,6 +3149,85 @@ paths:
             application/json:
               schema: { type: object, properties: { data: { type: object, properties: { deleted: { type: integer } } } } }
 
+  /message-log:
+    get:
+      tags: [Message log]
+      description: >-
+        lists the emails handed to a messenger (campaigns, automations, transactional and system mail), newest
+        first, with whether each was accepted. Needs the `message_log:get` permission.
+      operationId: queryMessageLog
+      parameters:
+        - { in: query, name: query, schema: { type: string }, description: matches the recipient or the subject }
+        - { in: query, name: status, schema: { type: string, enum: [sent, failed, bounced] } }
+        - { in: query, name: source, schema: { type: string, enum: [campaign, automation, tx, notification, system] } }
+        - { in: query, name: subscriber_id, schema: { type: integer } }
+        - { in: query, name: campaign_id, schema: { type: integer } }
+        - { in: query, name: automation_id, schema: { type: integer } }
+        - { in: query, name: since, schema: { type: string, format: date-time } }
+        - { in: query, name: until, schema: { type: string, format: date-time } }
+        - { in: query, name: order, schema: { type: string, enum: [asc, desc] } }
+        - { in: query, name: page, schema: { type: integer } }
+        - { in: query, name: per_page, schema: { type: string } }
+      responses:
+        "200":
+          description: A page of messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      results: { type: array, items: { $ref: "#/components/schemas/MessageLogRow" } }
+                      total: { type: integer }
+                      per_page: { type: integer }
+                      page: { type: integer }
+
+  "/message-log/{id}":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Message log]
+      description: one logged message with its headers and attachments (the content is served by `/preview`)
+      operationId: getMessageLogEntry
+      responses:
+        "200":
+          description: The message
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/MessageLogEntry" } } }
+
+  "/message-log/{id}/preview":
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: integer } }
+    get:
+      tags: [Message log]
+      description: >-
+        the HTML of a logged message: the exact email when it was kept, otherwise the campaign's email re-rendered
+        for that subscriber (viewing it never counts as an open).
+      operationId: previewMessageLogEntry
+      responses:
+        "200":
+          description: The email
+          content:
+            text/html:
+              schema: { type: string }
+
+  /maintenance/message-log:
+    delete:
+      tags: [Maintenance]
+      description: deletes logged messages older than `before_date`
+      operationId: deleteOldMessageLog
+      parameters:
+        - { in: query, name: before_date, required: true, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: How many were deleted
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { type: object, properties: { deleted: { type: integer } } } } }
+
   "/public/lists":
     get:
       description: returns the list of public lists with minimal fields
@@ -5671,6 +5750,49 @@ components:
         properties: { type: object, additionalProperties: true }
         occurred_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }
+    MessageLogRow:
+      type: object
+      properties:
+        id: { type: integer }
+        created_at: { type: string, format: date-time }
+        source: { type: string, enum: [campaign, automation, tx, notification, system] }
+        messenger: { type: string }
+        status: { type: string, enum: [sent, failed], description: "'sent' means the messenger accepted it" }
+        error: { type: string }
+        subscriber_id: { type: integer, nullable: true }
+        campaign_id: { type: integer, nullable: true }
+        campaign_name: { type: string }
+        automation_id: { type: integer, nullable: true }
+        automation_name: { type: string }
+        enrollment_id: { type: integer, nullable: true }
+        from: { type: string }
+        to: { type: array, items: { type: string } }
+        subject: { type: string }
+        message_id: { type: string }
+        content_type: { type: string }
+        has_body: { type: boolean }
+        bounced: { type: boolean }
+        opened: { type: boolean }
+        clicked: { type: boolean }
+    MessageLogEntry:
+      allOf:
+        - $ref: "#/components/schemas/MessageLogRow"
+        - type: object
+          properties:
+            alt_body: { type: string, nullable: true }
+            headers: { type: object, additionalProperties: { type: array, items: { type: string } } }
+            attachments:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  size: { type: integer }
+                  inline: { type: boolean }
+            content:
+              type: string
+              enum: [stored, rerender, none]
+              description: whether the exact email was kept, is rebuilt when viewed, or is not available
     List:
       type: object
       properties:

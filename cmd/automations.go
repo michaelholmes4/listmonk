@@ -475,6 +475,8 @@ func initAutomationRoutes(g *echo.Group, a *App) {
 
 	g.POST("/api/track", pm(a.TrackEvent, "track:send"))
 	g.DELETE("/api/maintenance/events", pm(a.DeleteOldEvents, "settings:maintain"))
+
+	initMessageLogRoutes(g, a)
 }
 
 // DeleteOldEvents is the maintenance action that removes tracked events older than `before_date`.

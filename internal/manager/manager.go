@@ -542,6 +542,9 @@ func (m *Manager) worker() {
 				}
 			}
 
+			// librelist fork: tell the message log which automation this is (see fork.go).
+			msg.forkLogHeaders(h)
+
 			// Set the headers.
 			out.Headers = h
 

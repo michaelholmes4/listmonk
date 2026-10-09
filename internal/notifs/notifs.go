@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/knadh/listmonk/internal/messenger/email"
 	"github.com/knadh/listmonk/models"
 )
 
@@ -25,6 +24,9 @@ const (
 )
 
 type FuncPush func(msg models.Message) error
+
+// Pusher sends a message: the e-mail messenger, or a wrapper of it (librelist logs sent messages).
+type Pusher interface{ Push(models.Message) error }
 type FuncNotif func(toEmails []string, subject, tplName string, data any, headers textproto.MIMEHeader) error
 type FuncNotifSystem func(subject, tplName string, data any, headers textproto.MIMEHeader) error
 
@@ -35,7 +37,7 @@ type Opt struct {
 }
 
 type Notifs struct {
-	em *email.Emailer
+	em Pusher
 	lo *log.Logger
 
 	opt Opt
@@ -49,7 +51,7 @@ var (
 )
 
 // Initialize returns a new Notifs instance.
-func Initialize(opt Opt, tpls *template.Template, em *email.Emailer, lo *log.Logger) {
+func Initialize(opt Opt, tpls *template.Template, em Pusher, lo *log.Logger) {
 	if no != nil {
 		lo.Fatal("notifs already initialized")
 	}
