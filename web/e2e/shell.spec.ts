@@ -57,6 +57,9 @@ test('the sidebar entry stays highlighted on detail and create pages', async ({ 
   await page.goto('/admin/lists/new')
   await expect(page.locator('[data-cy=nav-lists]')).toHaveAttribute('data-active', 'true')
   await expect(page.locator('[data-cy=nav-campaigns]')).not.toHaveAttribute('data-active', 'true')
+  // An automation's email has a page of its own, under Automations.
+  await page.goto('/admin/automations/1/emails/s1')
+  await expect(page.locator('[data-cy=nav-automations]')).toHaveAttribute('data-active', 'true')
 })
 
 test('secondary pages are tabs under one header that stays put', async ({ page }) => {

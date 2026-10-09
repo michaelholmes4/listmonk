@@ -1,28 +1,23 @@
 <script setup lang="ts">
 import { Loader2 } from '@lucide/vue'
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { toast } from 'vue-sonner'
+import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { useCampaign } from '@/composables/queries/useCampaigns'
-import { useCreateStepEmail, useUpdateStepEmail } from '@/composables/queries/useAutomations'
+import { useCreateStepEmail } from '@/composables/queries/useAutomations'
 import { useTemplates } from '@/composables/queries/useTemplates'
-import ContentEditor from '@/features/campaigns/ContentEditor.vue'
-import type { ContentType } from '@/features/campaigns/schema'
-import { toForm, toRequest } from '@/features/campaigns/schema'
+import { useBuilder } from '../context'
+import EmailContentCard from '../EmailContentCard.vue'
 import ListSelect from '../ListSelect.vue'
 import type { Config } from '../model'
 
 /**
- * An email step: marketing (with its topic) or transactional (no topic: consent does not depend on
- * one), and either its own content (a hidden campaign edited with the ordinary campaign editor) or a
- * transactional template.
- * The content is saved with its own button: it is a campaign, not part of the automation's draft.
+ * An email step's own settings: marketing (with its topic) or transactional (no topic: consent does
+ * not depend on one), and either its own content or a transactional template. The content of its
+ * own email (a hidden campaign) is written on a page of its own; here it is shown as a card.
  */
 const props = defineProps<{ stepId: string; errors: Record<string, string>; disabled?: boolean }>()
 const config = defineModel<Config>({ required: true })
@@ -50,56 +45,23 @@ function setMode(m: string) {
   else patch({ template_id: undefined })
 }
 
-// --- Own content ---------------------------------------------------------------------------------------
+// --- Own content: written on its own page --------------------------------------------------------------
+const router = useRouter()
+const route = useRoute()
+const b = useBuilder()
 const create = useCreateStepEmail()
-function createEmail() {
-  create.mutate(
-    { name: `Automation email ${props.stepId}`, list_id: num(config.value.list_id), content_type: 'richtext', body: '' },
-    { onSuccess: (id) => patch({ campaign_id: id, template_id: undefined }) },
-  )
+const emailPage = computed(() => ({ name: 'automation-email', params: { id: route.params.id, step: props.stepId } }))
+
+/**
+ * Creates the step's campaign and opens its page. The step is saved first, so the campaign's id is in
+ * the saved flow before anyone can leave: cancelling the panel can't orphan the campaign.
+ */
+async function writeEmail() {
+  b.commit(props.stepId, {}) // the panel's edits, topic included
+  const id = await create.mutateAsync({ name: `Automation email ${props.stepId}`, list_id: num(config.value.list_id), content_type: 'richtext', body: '' })
+  b.commit(props.stepId, { campaign_id: id, template_id: undefined })
+  if (await b.flush()) await router.push(emailPage.value)
 }
-
-const { data: campaign, isPending: loading } = useCampaign(campaignId)
-const subject = ref('')
-const fromEmail = ref('')
-const contentType = ref<ContentType>('richtext')
-const body = ref('')
-const bodySource = ref<string | null>(null)
-const templateId = ref<number | null>(null)
-const loadedFor = ref<number>()
-
-watch(
-  campaign,
-  (c) => {
-    // Load once per campaign: refetches must not overwrite what is being typed.
-    if (!c || loadedFor.value === c.id) return
-    const f = toForm(c)
-    subject.value = f.subject
-    fromEmail.value = f.fromEmail
-    contentType.value = f.contentType
-    body.value = f.body
-    bodySource.value = f.bodySource
-    templateId.value = f.templateId
-    loadedFor.value = c.id
-  },
-  { immediate: true },
-)
-
-const update = useUpdateStepEmail()
-const dirty = computed(() => {
-  const c = campaign.value
-  if (!c) return false
-  const f = toForm(c)
-  return subject.value !== f.subject || fromEmail.value !== f.fromEmail || contentType.value !== f.contentType || body.value !== f.body || templateId.value !== f.templateId
-})
-function saveEmail() {
-  const c = campaign.value!
-  const f = { ...toForm(c), subject: subject.value, fromEmail: fromEmail.value, contentType: contentType.value, body: body.value, bodySource: bodySource.value, templateId: templateId.value }
-  // The list is the step's topic, which the automation's draft sets.
-  const { lists: _lists, ...req } = toRequest(f)
-  update.mutate({ id: c.id!, body: req }, { onSuccess: () => toast.success(t('web.automations.email.saved')) })
-}
-defineExpose({ dirty })
 </script>
 
 <template>
@@ -153,40 +115,10 @@ defineExpose({ dirty })
 
     <!-- Own content -->
     <template v-else>
-      <div v-if="!campaignId">
-        <Button type="button" :disabled="disabled || create.isPending.value" data-cy="create-email" @click="createEmail">
-          <Loader2 v-if="create.isPending.value" class="animate-spin" />{{ t('web.automations.email.write') }}
-        </Button>
-      </div>
-      <div v-else-if="loading" class="space-y-3"><Skeleton class="h-9 w-full" /><Skeleton class="h-64 w-full" /></div>
-      <div v-else-if="campaign" class="space-y-4" data-cy="email-editor">
-        <div class="grid gap-4 sm:grid-cols-2">
-          <div class="space-y-2">
-            <Label for="email-subject">{{ t('campaigns.subject') }}</Label>
-            <Input id="email-subject" v-model="subject" maxlength="5000" :disabled="disabled" />
-          </div>
-          <div class="space-y-2">
-            <Label for="email-from">{{ t('campaigns.fromAddress') }}</Label>
-            <Input id="email-from" v-model="fromEmail" maxlength="200" :disabled="disabled" />
-          </div>
-        </div>
-        <ContentEditor
-          v-model:content-type="contentType"
-          v-model:body="body"
-          v-model:body-source="bodySource"
-          v-model:template-id="templateId"
-          :campaign-id="campaign.id!"
-          :title="subject"
-          :disabled="disabled"
-          @save="saveEmail"
-        />
-        <div class="flex items-center gap-3">
-          <Button type="button" :disabled="disabled || update.isPending.value || !dirty" data-cy="save-email" @click="saveEmail">
-            <Loader2 v-if="update.isPending.value" class="animate-spin" />{{ t('web.automations.email.save') }}
-          </Button>
-          <p class="text-xs text-muted-foreground">{{ t('web.automations.email.sharedNote') }}</p>
-        </div>
-      </div>
+      <Button v-if="!campaignId" type="button" :disabled="disabled || create.isPending.value" data-cy="create-email" @click="writeEmail">
+        <Loader2 v-if="create.isPending.value" class="animate-spin" />{{ t('web.automations.email.write') }}
+      </Button>
+      <EmailContentCard v-else :campaign-id="campaignId" :to="emailPage" :disabled="disabled" />
     </template>
   </div>
 </template>

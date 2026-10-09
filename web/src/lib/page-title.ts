@@ -1,4 +1,5 @@
 import { onScopeDispose, ref, toValue, watchEffect, type MaybeRefOrGetter } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 
 /** The document title from index.html, e.g. "listmonk". Page titles are prefixed to it. */
 export const baseTitle = document.title
@@ -18,5 +19,17 @@ export function usePageTitle(title: MaybeRefOrGetter<string | undefined | null>)
   })
   onScopeDispose(() => {
     dynamicTitle.value = null
+  })
+}
+
+/** A breadcrumb between the route's static parents and the page itself, named after an object (the automation an email belongs to). */
+export const dynamicParent = ref<{ title: string; to: RouteLocationRaw } | null>(null)
+
+export function usePageParent(parent: MaybeRefOrGetter<{ title: string; to: RouteLocationRaw } | undefined | null>) {
+  watchEffect(() => {
+    dynamicParent.value = toValue(parent) ?? null
+  })
+  onScopeDispose(() => {
+    dynamicParent.value = null
   })
 }

@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { dynamicTitle } from '@/lib/page-title'
+import { dynamicParent, dynamicTitle } from '@/lib/page-title'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -42,6 +42,14 @@ const refresh = () => qc.invalidateQueries({ type: 'active' })
           <BreadcrumbItem class="hidden md:block">
             <BreadcrumbLink as-child>
               <RouterLink :to="p.to">{{ t(p.title) }}</RouterLink>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator class="hidden md:block" />
+        </template>
+        <template v-if="dynamicParent">
+          <BreadcrumbItem class="hidden md:block">
+            <BreadcrumbLink as-child>
+              <RouterLink :to="dynamicParent.to" data-cy="crumb-parent">{{ dynamicParent.title }}</RouterLink>
             </BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator class="hidden md:block" />

@@ -61,6 +61,19 @@ export function useStepPanel(flow: Flow, onChange: () => void) {
     onChange()
   }
 
+  /** Saves the copy's edits, then sets `patch` on the settings in both (an undefined value removes the key). */
+  function commit(patch: Config) {
+    save()
+    const s = subject.value
+    if (!s) return
+    const next = { ...s.config, ...patch }
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k]
+    s.config = next
+    if (step.value) syncBranches(step.value)
+    draft.value = clone(next)
+    onChange()
+  }
+
   function edit(c: Config) {
     draft.value = c
   }
@@ -80,5 +93,5 @@ export function useStepPanel(flow: Flow, onChange: () => void) {
     }
   }
 
-  return { target, draft, edit, subject, step, trigger, dirty, touched, leaving, request, go, save, cancel, resolve }
+  return { target, draft, edit, commit, subject, step, trigger, dirty, touched, leaving, request, go, save, cancel, resolve }
 }

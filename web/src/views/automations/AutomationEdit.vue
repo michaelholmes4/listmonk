@@ -251,6 +251,7 @@ function onKey(e: KeyboardEvent) {
           :stats="stats"
           :problems="problems"
           :saving="saver.status.value === 'saving'"
+          :flush="saver.flush"
           @change="saver.request()"
         >
           <template #notices>

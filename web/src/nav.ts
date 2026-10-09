@@ -183,7 +183,7 @@ export const navigation: NavSection[] = [
         icon: Workflow,
         perms: ['automations:get'],
         to: { name: 'automations' },
-        match: ['automation'],
+        match: ['automation', 'automation-email'],
       },
       {
         key: 'templates',

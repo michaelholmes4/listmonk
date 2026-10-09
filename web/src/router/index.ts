@@ -69,6 +69,16 @@ export const router = createRouter({
       },
     },
     {
+      path: '/automations/:id(\\d+)/emails/:step',
+      name: 'automation-email',
+      component: () => import('@/views/automations/AutomationEmail.vue'),
+      meta: {
+        title: 'web.automations.email.crumb',
+        parents: [{ title: 'web.automations.title', to: { name: 'automations' } }],
+        perms: ['automations:get'],
+      },
+    },
+    {
       path: '/campaigns',
       name: 'campaigns',
       component: () => import('@/views/campaigns/CampaignList.vue'),

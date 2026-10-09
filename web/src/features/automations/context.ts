@@ -1,6 +1,6 @@
 import { inject, provide, type Ref } from 'vue'
 import type { AutomationNodeStat } from '@/api/types'
-import type { StepType } from './model'
+import type { Config, StepType } from './model'
 import type { Step } from './model'
 import type { Issue } from './validate'
 import type { Lookups } from './summary'
@@ -21,6 +21,10 @@ export interface BuilderContext {
   highlight: Ref<string | null>
   /** The step or trigger open in the panel. */
   selected: Ref<string | null>
+  /** Writes `patch` into the open step's saved settings (after its own edits), and saves the draft. */
+  commit: (id: string, patch: Config) => void
+  /** Resolves when the draft is saved; false if that failed. */
+  flush: () => Promise<boolean>
   add: (list: Step[], index: number, type: StepType) => void
   open: (id: string) => void
   remove: (id: string) => void

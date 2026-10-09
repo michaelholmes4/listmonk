@@ -36,6 +36,8 @@ const props = defineProps<{
   problems?: Map<string, string[]>
   /** A draft save is in flight. */
   saving?: boolean
+  /** Resolves when the draft is saved; false if that failed. */
+  flush: () => Promise<boolean>
 }>()
 const emit = defineEmits<{ change: [] }>()
 const { t } = useI18n()
@@ -69,6 +71,8 @@ provideBuilder({
   jumps: computed(() => jumpsInto(props.flow)),
   highlight,
   selected,
+  commit: (id, patch) => (panel.target.value?.id === id ? panel.commit(patch) : undefined),
+  flush: () => props.flush(),
   add(list, index, type: StepType) {
     const s = newStep(props.flow, type)
     if (!insertStep(list, index, s)) return

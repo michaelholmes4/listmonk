@@ -10,14 +10,12 @@ const props = defineProps<{ flow: Flow; panel: ReturnType<typeof useStepPanel>; 
 const emit = defineEmits<{ close: []; remove: [] }>()
 
 const open = computed({ get: () => !!props.panel.subject.value, set: (o) => !o && emit('close') })
-// An email's editor still lives in the panel and needs the room.
-const wide = computed(() => props.panel.step.value?.type === 'send_email' || props.panel.step.value?.type === 'condition')
 </script>
 
 <template>
   <Sheet v-model:open="open">
     <SheetContent
-      :class="wide ? 'w-full gap-0 data-[side=right]:sm:max-w-3xl' : 'w-full gap-0 data-[side=right]:sm:max-w-lg'"
+      class="w-full gap-0 data-[side=right]:sm:max-w-lg"
       :show-close-button="false"
       data-cy="step-sheet"
     >

@@ -19,13 +19,15 @@ export const useAutomation = (id: MaybeRefOrGetter<number | undefined>) =>
     enabled: () => toValue(id) !== undefined,
   })
 
-/** The draft is edited locally and saved explicitly, so it is fetched once and never refetched under the editor. */
+/** The draft is edited locally and saved as it changes, so it is fetched when a page opens and never refetched under the editor. */
 export const useAutomationDraft = (id: MaybeRefOrGetter<number | undefined>) =>
   useQuery({
     queryKey: () => keys.automations.draft(toValue(id)!),
     queryFn: () => api.getDraft(toValue(id)!),
     enabled: () => toValue(id) !== undefined,
     staleTime: Infinity,
+    // A copy kept from an earlier visit may predate saves made since (the email page opens right after one).
+    refetchOnMount: 'always',
     gcTime: 0,
   })
 

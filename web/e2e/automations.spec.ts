@@ -148,12 +148,17 @@ test('a transactional email step has no topic and saves its email without one', 
     await sheet.locator('#mt-tx').click()
     await expect(sheet.locator('#email-topic')).toHaveCount(0)
 
+    // Write email saves the step, creates the email and opens its page.
     await sheet.locator('[data-cy=create-email]').click()
-    const editor = sheet.locator('[data-cy=email-editor]')
-    await expect(editor).toBeVisible()
-    await editor.locator('#email-subject').fill(`Receipt ${stamp}`)
-    await sheet.locator('[data-cy=save-email]').click()
+    await expect(page).toHaveURL(new RegExp(`/automations/${a.id}/emails/s1`))
+    await page.locator('#email-subject').fill(`Receipt ${stamp}`)
+    await page.locator('[data-cy=btn-save]').click()
     await expect(page.getByText('Email saved').first()).toBeVisible()
+
+    // Back to the flow: the same step is open, and its content card shows the subject.
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page).toHaveURL(/step=s1/)
+    await expect(page.locator('[data-cy=email-card-subject]')).toHaveText(`Receipt ${stamp}`)
     await closeSheet(page)
     await expect(page.locator('[data-cy=step-s1]')).toContainText('Transactional')
 
@@ -194,14 +199,16 @@ test('an email step: write the email in the step, publish, and it is sent', asyn
     await sheet.locator('#email-topic').click()
     await page.getByRole('option', { name: list.name }).click()
     await sheet.locator('[data-cy=create-email]').click()
-    const editor = sheet.locator('[data-cy=email-editor]')
-    await expect(editor).toBeVisible()
-    await editor.locator('#email-subject').fill('Hello from {{ .Event.Name }}')
+    await expect(page).toHaveURL(new RegExp(`/automations/${a.id}/emails/s1`))
+    await page.locator('#email-subject').fill('Hello from {{ .Event.Name }}')
     const frame = page.frameLocator('iframe.tox-edit-area__iframe')
     await frame.locator('body').click()
     await page.keyboard.type('Welcome aboard')
-    await sheet.locator('[data-cy=save-email]').click()
+    await expect(page.locator('[data-cy=unsaved]')).toBeVisible()
+    await page.locator('[data-cy=btn-save]').click()
     await expect(page.getByText('Email saved').first()).toBeVisible()
+    await expect(page.locator('[data-cy=unsaved]')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Cancel' }).click()
     await closeSheet(page)
     await expect(page.locator('[data-cy=step-s1]')).toContainText('Marketing')
 
@@ -469,4 +476,85 @@ test.describe('on a narrow screen the panel is a sheet', () => {
       await request.delete(`/api/automations/${id}`)
     }
   })
+})
+
+// --- The email page ------------------------------------------------------------------------------------------------
+
+async function emailAutomation(request: APIRequestContext, publish: boolean) {
+  const stamp = Date.now()
+  const a = (await (await request.post('/api/automations', { data: { name: `E2E email page ${stamp}`, settings: {} } })).json()).data
+  const campaignId = (
+    await (await request.post('/api/automations/emails', { data: { name: `Automation email s1 ${stamp}`, content_type: 'richtext', body: '<p>Hi</p>' } })).json()
+  ).data.campaign_id
+  await request.put(`/api/automations/${a.id}/draft`, {
+    data: {
+      triggers: [{ id: 't1', type: 'event', config: { event: `e2e_page_${stamp}` } }],
+      nodes: [{ id: 's1', type: 'send_email', config: { message_type: 'transactional', campaign_id: campaignId } }],
+      edges: [],
+      root: 's1',
+    },
+  })
+  if (publish) await request.post(`/api/automations/${a.id}/publish`, { data: {} })
+  return { id: a.id as number, campaignId: campaignId as number }
+}
+async function dropAutomation(request: APIRequestContext, id: number) {
+  await request.post(`/api/automations/${id}/archive`)
+  await request.delete(`/api/automations/${id}`)
+}
+
+test('the email page of a draft saves plainly; leaving with edits asks', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const { id } = await emailAutomation(request, false)
+  try {
+    await page.goto(`/admin/automations/${id}/emails/s1`)
+    await expect(page.locator('[data-cy=btn-save]')).toHaveText(/^\s*Save\s*$/)
+    await expect(page.locator('[data-cy=live-email-note]')).toHaveCount(0)
+    await page.locator('#email-subject').fill('Changed')
+    await expect(page.locator('[data-cy=unsaved]')).toBeVisible()
+
+    // Leaving through the breadcrumb asks first; keeping the edits stays here.
+    await page.locator('header').getByRole('link', { name: 'Automations', exact: true }).click()
+    await expect(page.getByRole('alertdialog')).toBeVisible()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click()
+    await expect(page).toHaveURL(/emails\/s1/)
+
+    await page.locator('[data-cy=btn-save]').click()
+    await expect(page.getByText('Email saved').first()).toBeVisible()
+  } finally {
+    await dropAutomation(request, id)
+  }
+})
+
+test('saving the email of a live automation says what it does, and asks', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const { id, campaignId } = await emailAutomation(request, true)
+  try {
+    await page.goto(`/admin/automations/${id}/emails/s1`)
+    await expect(page.locator('[data-cy=live-email-note]')).toContainText("You don't need to publish")
+    await page.locator('#email-subject').fill('Live change')
+    const save = page.locator('[data-cy=btn-save]')
+    await expect(save).toContainText('Save to live email')
+    await save.click()
+    const dialog = page.getByRole('alertdialog')
+    await expect(dialog).toContainText('in the automation now')
+    await dialog.getByRole('button', { name: 'Save to live email' }).click()
+    await expect(page.getByText('Email saved').first()).toBeVisible()
+    const camp = (await (await request.get(`/api/campaigns/${campaignId}`)).json()).data
+    expect(camp.subject).toBe('Live change')
+  } finally {
+    await dropAutomation(request, id)
+  }
+})
+
+test('the email page of a step that has no email says so', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const { id } = await emailAutomation(request, false)
+  try {
+    await page.goto(`/admin/automations/${id}/emails/s9`)
+    await expect(page.locator('[data-cy=empty-state]')).toContainText('No email here')
+    await page.locator('[data-cy=back-to-flow]').click()
+    await expect(page).toHaveURL(new RegExp(`/automations/${id}$`))
+  } finally {
+    await dropAutomation(request, id)
+  }
 })
