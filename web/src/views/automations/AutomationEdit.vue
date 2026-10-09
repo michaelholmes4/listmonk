@@ -225,7 +225,7 @@ function onKey(e: KeyboardEvent) {
       </template>
     </template>
 
-    <Alert v-if="general.length" variant="destructive" data-cy="problems">
+    <Alert v-if="general.length && tab !== 'flow'" variant="destructive" data-cy="problems">
       <AlertDescription>
         <p v-for="m in general" :key="m">{{ m }}</p>
       </AlertDescription>
@@ -255,6 +255,12 @@ function onKey(e: KeyboardEvent) {
           @change="saver.request()"
         >
           <template #notices>
+            <!-- Inside the builder, so nothing sits above the docked step panel and pushes it down. -->
+            <Alert v-if="general.length" variant="destructive" data-cy="problems">
+              <AlertDescription>
+                <p v-for="m in general" :key="m">{{ m }}</p>
+              </AlertDescription>
+            </Alert>
             <Alert v-if="live && status !== 'archived'" class="mb-4">
               <AlertDescription>{{ t('web.automations.liveNote') }}</AlertDescription>
             </Alert>
