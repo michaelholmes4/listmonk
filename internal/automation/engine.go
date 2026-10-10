@@ -34,7 +34,8 @@ type Message struct {
 	Event json.RawMessage
 }
 
-// Sender delivers a Message. Returning an error means it was NOT queued, so the step is retried.
+// Sender delivers a Message, returning once the messenger has it. Returning an error means it was
+// NOT handed over and never will be, so the step is retried.
 type Sender interface {
 	SendEmail(ctx context.Context, m Message) error
 }
@@ -104,7 +105,10 @@ type advanceWorker struct {
 	e *Engine
 }
 
-const maxAttempts = 8
+const (
+	maxAttempts = 8
+	jobTimeout  = 2 * time.Minute
+)
 
 func (w *advanceWorker) Work(ctx context.Context, job *river.Job[AdvanceArgs]) error {
 	err := w.e.Advance(ctx, job.Args.EnrollmentID)
@@ -210,7 +214,7 @@ func New(cfg Config) (*Engine, error) {
 		PollOnly:          true, // database/sql has no LISTEN
 		FetchPollInterval: cfg.PollInterval,
 		MaxAttempts:       maxAttempts,
-		JobTimeout:        2 * time.Minute,
+		JobTimeout:        jobTimeout,
 	})
 	if err != nil {
 		return nil, err
@@ -234,6 +238,15 @@ func (e *Engine) Stop(ctx context.Context) error {
 		return nil
 	}
 	return e.river.Stop(ctx)
+}
+
+// StopAndCancel cancels in-flight jobs and stops. An email step still waiting for the queue gives
+// up and is sent again later; one already being handed to the messenger is let finish.
+func (e *Engine) StopAndCancel(ctx context.Context) error {
+	if !e.started {
+		return nil
+	}
+	return e.river.StopAndCancel(ctx)
 }
 
 // enqueue schedules a wake-up inside the caller's transaction, so the state change and the job

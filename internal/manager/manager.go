@@ -117,6 +117,7 @@ type CampaignMessage struct {
 	// librelist fork: set for automation email steps (see fork.go).
 	Event      map[string]any
 	Automation map[string]any
+	delivery   *delivery
 
 	from     string
 	to       string
@@ -505,6 +506,11 @@ func (m *Manager) worker() {
 				continue
 			}
 
+			// librelist fork: an automation email its sender stopped waiting for (see fork.go).
+			if !msg.forkClaim() {
+				continue
+			}
+
 			// Pause on hitting the message rate.
 			if numMsg >= m.cfg.MessageRate {
 				time.Sleep(time.Second)
@@ -553,6 +559,7 @@ func (m *Manager) worker() {
 			if err != nil {
 				m.log.Printf("error sending message in campaign %s: subscriber %d: %v", msg.Campaign.Name, msg.Subscriber.ID, err)
 			}
+			msg.forkSent() // librelist fork
 
 			// Increment the send rate or the error counter if there was an error.
 			if msg.pipe != nil {

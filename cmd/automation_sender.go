@@ -17,7 +17,10 @@ import (
 )
 
 // librelist fork: automationSender turns an automation's email step into a message on the same
-// queue (and so the same messengers, rate limits and tracking) that campaigns and /api/tx use.
+// queue (and so the same messengers, rate limits and tracking) that campaigns use; a
+// transactional-template step goes straight to the messenger, as /api/tx is not rate limited either.
+// SendEmail returns once the messenger has the email, so a step is never marked done for an email
+// still waiting in memory, where a restart would lose it.
 type automationSender struct {
 	core *core.Core
 	mgr  *manager.Manager
@@ -30,6 +33,11 @@ type automationSender struct {
 	cache map[int]cachedCampaign
 }
 
+// deliveryWait is how long a step waits for a campaign worker to take its email. The queue it shares
+// with campaigns holds about two seconds of sending, so this only runs out when sending has stopped
+// (a shutdown); the email is then withdrawn and the step sends it again later.
+const deliveryWait = 30 * time.Second
+
 type cachedCampaign struct {
 	camp    *models.Campaign
 	updated time.Time
@@ -41,7 +49,7 @@ func newAutomationSender(co *core.Core, mgr *manager.Manager, from string) *auto
 }
 
 // SendEmail implements automation.Sender.
-func (s *automationSender) SendEmail(_ context.Context, m automation.Message) error {
+func (s *automationSender) SendEmail(ctx context.Context, m automation.Message) error {
 	sub, err := s.core.GetSubscriber(m.SubscriberID, "", "")
 	if err != nil {
 		return fmt.Errorf("subscriber %d: %w", m.SubscriberID, err)
@@ -74,7 +82,7 @@ func (s *automationSender) SendEmail(_ context.Context, m automation.Message) er
 		if err != nil {
 			return fmt.Errorf("rendering step %s: %w", m.NodeID, err)
 		}
-		return s.mgr.PushCampaignMessage(msg)
+		return s.mgr.SendAutomationMessage(ctx, msg, deliveryWait)
 	}
 
 	// A transactional template.
@@ -102,7 +110,7 @@ func (s *automationSender) SendEmail(_ context.Context, m automation.Message) er
 		msglog.HdrAutomation: {strconv.Itoa(m.AutomationID)},
 		msglog.HdrEnrollment: {strconv.FormatInt(m.EnrollmentID, 10)},
 	}
-	return s.mgr.PushMessage(msg)
+	return s.mgr.SendMessageNow(msg)
 }
 
 // campaign returns the compiled hidden campaign behind an email step.

@@ -33,16 +33,20 @@ type logged struct {
 	w     *Writer
 	// source is what a message with no campaign counts as.
 	source string
+	// keepContent stores the body of `source` messages.
+	keepContent bool
 }
 
 // Wrap returns a Messenger that records every message it is asked to push, and the outcome. A
 // message with a campaign is logged as "campaign" (or "automation" for an automation's hidden
-// campaign); any other message is logged as `source`.
+// campaign); any other message is logged as `source`. Automation mail always keeps its body and
+// campaign mail never does (the preview re-renders it); other mail keeps it only with keepContent,
+// as it may carry credentials (a reset link, a login code).
 //
 // Closing the wrapper closes the messenger and the Writer, which any other wrappers sharing it
 // can still call safely: entries pushed after that are not logged.
-func Wrap(m Messenger, w *Writer, source string) Messenger {
-	return &logged{inner: m, w: w, source: source}
+func Wrap(m Messenger, w *Writer, source string, keepContent bool) Messenger {
+	return &logged{inner: m, w: w, source: source, keepContent: keepContent}
 }
 
 func (l *logged) Name() string { return l.inner.Name() }
@@ -98,8 +102,8 @@ func (l *logged) entry(m *models.Message) Entry {
 		}
 	case e.AutomationID != 0:
 		e.Source = SourceAutomation
-	case l.source == SourceSystem:
-		keepBody = false
+	default:
+		keepBody = l.keepContent
 	}
 	if keepBody {
 		body := string(m.Body)

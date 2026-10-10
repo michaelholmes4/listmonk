@@ -328,10 +328,8 @@ func main() {
 		defer cancel()
 		srv.Shutdown(ctx)
 
-		// librelist: let in-flight automation jobs finish before the DB goes away.
-		stopCtx, stopCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		eng.Stop(stopCtx)
-		stopCancel()
+		// librelist: stop automations before the DB goes away (see stopAutomations).
+		stopAutomations(eng)
 
 		// Close the campaign manager.
 		mgr.Close()

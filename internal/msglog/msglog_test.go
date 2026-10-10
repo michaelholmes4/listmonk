@@ -55,9 +55,13 @@ func (f *fakeMessenger) Push(m models.Message) error {
 }
 
 func wrapped(f *fakeMessenger, source string) (Messenger, *memSink, *Writer) {
+	return wrappedKeeping(f, source, source != SourceSystem)
+}
+
+func wrappedKeeping(f *fakeMessenger, source string, keepContent bool) (Messenger, *memSink, *Writer) {
 	s := &memSink{}
 	w := newWriter(s, quiet, 0)
-	return Wrap(f, w, source), s, w
+	return Wrap(f, w, source, keepContent), s, w
 }
 
 func TestWrapClassifiesAndKeepsContentOnlyWhereItShould(t *testing.T) {
@@ -66,23 +70,29 @@ func TestWrapClassifiesAndKeepsContentOnlyWhereItShould(t *testing.T) {
 	hidden := &models.Campaign{Type: "automation"}
 	hidden.ID = 8
 
+	auto := textproto.MIMEHeader{}
+	auto.Set(HdrAutomation, "3")
+
 	tests := []struct {
 		name     string
 		source   string
+		keep     bool
 		msg      models.Message
 		want     string
 		wantBody bool
 	}{
-		{"campaign mail keeps no body", SourceTx, models.Message{Campaign: campaign, Body: []byte("hi")}, SourceCampaign, false},
-		{"automation campaign keeps its body", SourceTx, models.Message{Campaign: hidden, Body: []byte("hi")}, SourceAutomation, true},
-		{"tx", SourceTx, models.Message{Body: []byte("hi")}, SourceTx, true},
-		{"notification", SourceNotification, models.Message{Body: []byte("hi")}, SourceNotification, true},
-		{"system mail keeps no body", SourceSystem, models.Message{Body: []byte("reset link")}, SourceSystem, false},
+		{"campaign mail keeps no body", SourceTx, true, models.Message{Campaign: campaign, Body: []byte("hi")}, SourceCampaign, false},
+		{"automation campaign keeps its body", SourceTx, false, models.Message{Campaign: hidden, Body: []byte("hi")}, SourceAutomation, true},
+		{"automation template keeps its body", SourceTx, false, models.Message{Body: []byte("hi"), Headers: auto}, SourceAutomation, true},
+		{"tx keeps no body by default", SourceTx, false, models.Message{Body: []byte("reset link")}, SourceTx, false},
+		{"tx keeps its body when asked", SourceTx, true, models.Message{Body: []byte("hi")}, SourceTx, true},
+		{"notification", SourceNotification, true, models.Message{Body: []byte("hi")}, SourceNotification, true},
+		{"system mail keeps no body", SourceSystem, false, models.Message{Body: []byte("reset link")}, SourceSystem, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &fakeMessenger{name: "email"}
-			m, s, w := wrapped(f, tt.source)
+			m, s, w := wrappedKeeping(f, tt.source, tt.keep)
 			tt.msg.To = []string{"a@example.com"}
 			if err := m.Push(tt.msg); err != nil {
 				t.Fatal(err)

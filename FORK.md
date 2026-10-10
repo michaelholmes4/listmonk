@@ -8,13 +8,13 @@ git fetch upstream
 git merge upstream/master        # or a release tag
 ```
 Known conflict hotspots (the only upstream files we edit):
-- `cmd/handlers.go` (routes; `/app` redirect), `cmd/init.go` (wiring; the UI is mapped to `/admin` from `web/dist`; the message log wraps each messenger in `initCampaignManager`, and `initNotifs` takes a `notifs.Pusher`), `cmd/upgrade.go` (fork-migration call)
+- `cmd/handlers.go` (routes; `/app` redirect), `cmd/init.go` (wiring; the UI is mapped to `/admin` from `web/dist`; the message log wraps each messenger in `initCampaignManager`, and `initNotifs` takes a `notifs.Pusher`), `cmd/upgrade.go` and `cmd/install.go` (fork-migration call; on install it runs before the queries are prepared)
 - `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list, the dashboard counts and both deletes)
 - `internal/core/core.go`, `subscribers.go`, `subscriptions.go` (automation trigger hooks: `Hooks.OnSubscriptionsConfirmed`
   / `OnAttribsChanged`, and one `forkBegin`/`forkEnd` pair around each mutation; the logic is in `fork_hooks.go`)
-- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to; `&& !msg.forkTransactional()` on the List-Unsubscribe condition leaves the header off transactional automation emails)
+- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to; a `delivery` field and two worker lines, `if !msg.forkClaim() { continue }` before the push and `msg.forkSent()` after it, let an automation step wait until its email reaches the messenger (and withdraw it if no worker takes it); `&& !msg.forkTransactional()` on the List-Unsubscribe condition leaves the header off transactional automation emails)
 - `internal/notifs/notifs.go` (a 1-line `Pusher` interface in place of `*email.Emailer`, so notifications can go through the message log)
-- `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `eng.Stop` in the shutdown closure; `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
+- `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `stopAutomations(eng)` in the shutdown closure (it must fit the 3 s before `awaitReload` forces the reload); `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
 - `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`, one `<script>` for `librelist-auth.js`)
@@ -38,9 +38,13 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
 
 ## Automation: things to know
 - **Engine.** River (poll-only; jobs: advance a run, act on a recorded event) drives `internal/automation`; one DB transaction per node. Email steps are
-  at-most-once per attempt (guard + `sending` row, send, finish); handing the message to the sender is retried if the queue refuses it, and the last failed
-  attempt marks the enrollment `failed`. Once listmonk accepts the message, the automation never retries it: a later SMTP
-  rejection shows in the message log, not in the step (which is `done` once the message is queued).
+  at-most-once (guard + `sending` row, send, finish). While the email is with the sender the run is leased: its `next_run_at`
+  moves `sendLease` ahead, so any other wake-up leaves it alone, and a wake-up queued for the lease's end picks up a run whose
+  process died mid-send (it carries on without sending). The sender returns once the messenger has the email: a campaign-content
+  step waits for a campaign worker to take it (`manager.SendAutomationMessage`), a template step pushes directly
+  (`manager.SendMessageNow`), so nothing is marked sent while it only sits in memory. An email not handed over (no worker took it
+  in time, e.g. at shutdown) is withdrawn and retried; the last failed attempt marks the enrollment `failed`. Once the messenger
+  has it, the automation never retries it: an SMTP rejection shows in the message log, not in the step.
 - **Email content** is a hidden campaign (`campaigns.type = 'automation'`) per step, linked to the step's topic list so the
   unsubscribe link records an opt-out. Automation campaigns are filtered out of every upstream campaign query and of the
   manager's scan (`queries/campaigns.sql`); if a merge adds a new campaign query, check it excludes them.
@@ -81,7 +85,8 @@ Every email handed to a messenger is recorded in `librelist_messages` (migration
 messenger, so no send site is edited. There is one wrapper per kind of sender, and it supplies the source of messages that
 do not say (a campaign says so itself): the campaign manager (campaigns, `/api/tx`, automations), notifications (admin
 mails and opt-in confirmations), and system mail (password resets, data exports).
-- **Content.** Kept, as the exact email, for transactional, automation and notification mail. *Not* kept for campaign
+- **Content.** Kept, as the exact email, for automation and notification mail. *Not* kept for `/api/tx` mail by default,
+  since other apps send password resets and login codes through it; `librelist.message_log_tx_content = true` keeps it. *Not* kept for campaign
   mail (it would be one copy per recipient): the row stores campaign + subscriber, and `GET /api/message-log/:id/preview`
   re-renders it, with a dummy campaign UUID so that looking never counts as an open or click. System mail is recorded
   without a body because it carries credentials (a reset link). Both previews (`msglog.PreviewHTML`) strip the tracking pixel and

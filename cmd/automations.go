@@ -24,6 +24,24 @@ import (
 // librelist fork: marketing automation. The engine lives in internal/automation; this file wires
 // it to the app (startup, trigger hooks) and exposes the admin API.
 
+// stopAutomations stops the engine at shutdown, while the campaign manager is still sending. A
+// reload is forced 3 seconds after it starts (awaitReload), after up to 1 second for the HTTP
+// server, and the message log and the DB must still close in that time: running jobs get a
+// second to finish, then are cancelled (an email still waiting for the queue is withdrawn, to be
+// sent after the restart).
+func stopAutomations(eng *automation.Engine) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if eng.Stop(ctx) == nil {
+		return
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if err := eng.StopAndCancel(ctx); err != nil {
+		lo.Printf("automation: jobs still running at shutdown: %v", err)
+	}
+}
+
 // initAutomation creates the engine and connects it to the core's trigger hooks. Workers only run
 // when the instance processes campaigns (not in passive mode), since they send through the manager.
 func initAutomation(fs stuffbin.FileSystem, db *sqlx.DB, co *core.Core, mgr *manager.Manager, lo *log.Logger, ko *koanf.Koanf) *automation.Engine {

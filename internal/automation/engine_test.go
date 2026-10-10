@@ -416,6 +416,67 @@ func TestSendIsNeverDoubled(t *testing.T) {
 		}
 	})
 
+	t.Run("a wake-up during a send leaves the step to that send", func(t *testing.T) {
+		h := newHarness(t)
+		ctx := context.Background()
+		list := h.list("l", "single")
+		auto := h.publish("c", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, h.campaign())}}}, Settings{})
+		sub := h.subscriber("a@example.com", "enabled", nil)
+		h.subscribe(sub, list, "confirmed")
+		h.must(h.eng.OnListJoined(ctx, sub, list))
+		var id int64
+		h.must(h.db.Get(&id, `SELECT id FROM enrollments WHERE automation_id = $1`, auto))
+
+		// A second job wakes the run while its email is with the sender, and then the send fails.
+		h.sender.Err = errors.New("queue is full")
+		var during map[string]string
+		h.sender.Before = func(Message) {
+			h.sender.Before = nil
+			h.must(h.eng.Advance(ctx, id))
+			during = h.steps(id)
+		}
+		if err := h.eng.Advance(ctx, id); err == nil {
+			t.Fatal("the failure was swallowed")
+		}
+		if during["m"] != StepSending {
+			t.Fatalf("the second wake-up took the step over: %v", during)
+		}
+		// So the failed email is still sent by the retry.
+		h.sender.Err = nil
+		h.must(h.eng.Advance(ctx, id))
+		if h.sender.count() != 1 || h.enrollment(auto, sub).Status != EnrollmentCompleted {
+			t.Fatalf("sent %d, status %s", h.sender.count(), h.enrollment(auto, sub).Status)
+		}
+	})
+
+	t.Run("a run that died mid-send carries on when its lease ends", func(t *testing.T) {
+		h := newHarness(t)
+		ctx := context.Background()
+		list := h.list("l", "single")
+		auto := h.publish("c", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, h.campaign())}}}, Settings{})
+		sub := h.subscriber("a@example.com", "enabled", nil)
+		h.subscribe(sub, list, "confirmed")
+		h.must(h.eng.OnListJoined(ctx, sub, list))
+		var id int64
+		h.must(h.db.Get(&id, `SELECT id FROM enrollments WHERE automation_id = $1`, auto))
+
+		h.sender.Before = func(Message) { panic("killed") }
+		func() {
+			defer func() { _ = recover() }()
+			_ = h.eng.Advance(ctx, id)
+		}()
+		h.sender.Before = nil
+		h.drain()
+		if h.steps(id)["m"] != StepSending {
+			t.Fatal("the run moved on before its lease ended")
+		}
+		h.clock.Advance(sendLease)
+		h.drain()
+		if h.sender.count() != 0 || h.steps(id)["m"] != StepDone || h.enrollment(auto, sub).Status != EnrollmentCompleted {
+			t.Fatalf("sent %d, step %s, status %s", h.sender.count(), h.steps(id)["m"], h.enrollment(auto, sub).Status)
+		}
+	})
+
 	t.Run("concurrent workers send once", func(t *testing.T) {
 		h := newHarness(t)
 		ctx := context.Background()
@@ -1159,7 +1220,9 @@ func TestAnEventJobStartsRunsOnceEvenIfItRunsTwice(t *testing.T) {
 	if runs != 1 || h.sender.count() != 1 {
 		t.Fatalf("runs=%d sent=%d", runs, h.sender.count())
 	}
-	if _, created, _ := h.eng.RecordEvent(ctx, sub, "signed_up", nil, "k", h.clock.Now()); created || h.pendingJobs() != 0 {
+	// (The send's lease wake-up is still pending.)
+	before := h.pendingJobs()
+	if _, created, _ := h.eng.RecordEvent(ctx, sub, "signed_up", nil, "k", h.clock.Now()); created || h.pendingJobs() != before {
 		t.Fatal("a repeated idempotency key queued another job")
 	}
 }

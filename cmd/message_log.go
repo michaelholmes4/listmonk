@@ -21,9 +21,23 @@ import (
 //	logMessenger(m, msglog.SourceTx)           the campaign manager: campaigns, /api/tx, automations
 //	logMessenger(m, msglog.SourceNotification) admin notifications and opt-in confirmations
 //	logMessenger(m, msglog.SourceSystem)       password resets, data exports: recorded without content
+//
+// /api/tx mail is recorded without content too, unless `librelist.message_log_tx_content` is set:
+// other apps send their password resets and login codes through it. Automation mail is always kept.
 
 // defaultMessageLogDays is how long entries are kept unless `librelist.message_log_retention_days` says otherwise.
 const defaultMessageLogDays = 90
+
+// logKeepsContent reports whether the body of a source's messages is stored.
+func logKeepsContent(source string) bool {
+	switch source {
+	case msglog.SourceNotification:
+		return true
+	case msglog.SourceTx:
+		return ko.Bool("librelist.message_log_tx_content")
+	}
+	return false
+}
 
 var msgLog struct {
 	once   sync.Once
@@ -51,7 +65,7 @@ func wrapMessageLog(m manager.Messenger) manager.Messenger {
 // logMessenger wraps m so that what it sends is logged.
 func logMessenger(m manager.Messenger, source string) manager.Messenger {
 	_, w := messageLog()
-	return msglog.Wrap(m, w, source)
+	return msglog.Wrap(m, w, source, logKeepsContent(source))
 }
 
 // closeMessageLog writes out what is queued. Call it before the database is closed.
