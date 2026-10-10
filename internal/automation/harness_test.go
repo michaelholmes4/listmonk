@@ -153,17 +153,25 @@ func (h *harness) drain() int {
 		now := h.clock.Now()
 		var jobs []struct {
 			ID   int64           `db:"id"`
+			Kind string          `db:"kind"`
 			Args json.RawMessage `db:"args"`
 		}
-		h.must(h.db.Select(&jobs, `SELECT id, args FROM river_job WHERE state IN ('available', 'scheduled') AND scheduled_at <= $1 ORDER BY id`, now))
+		h.must(h.db.Select(&jobs, `SELECT id, kind, args FROM river_job WHERE state IN ('available', 'scheduled') AND scheduled_at <= $1 ORDER BY id`, now))
 		if len(jobs) == 0 {
 			return n
 		}
 		for _, j := range jobs {
-			var a AdvanceArgs
-			h.must(json.Unmarshal(j.Args, &a))
 			h.must(h.db.QueryRow(`DELETE FROM river_job WHERE id = $1 RETURNING id`, j.ID).Scan(new(int64)))
-			h.must(h.eng.Advance(context.Background(), a.EnrollmentID))
+			switch j.Kind {
+			case EventArgs{}.Kind():
+				var a EventArgs
+				h.must(json.Unmarshal(j.Args, &a))
+				h.must(h.eng.processEvent(context.Background(), a.EventID))
+			default:
+				var a AdvanceArgs
+				h.must(json.Unmarshal(j.Args, &a))
+				h.must(h.eng.Advance(context.Background(), a.EnrollmentID))
+			}
 			n++
 		}
 	}

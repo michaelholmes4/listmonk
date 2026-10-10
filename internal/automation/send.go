@@ -114,9 +114,18 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 		return false, err
 	}
 	o := outcome{next: ix.Next(n.ID, ""), stepStatus: StepDone, result: map[string]any{"message_type": c.MessageType}}
-	if cur.Status != EnrollmentActive && cur.Status != EnrollmentWaiting {
-		// Archived or failed meanwhile: just record that the message went.
-		if err := e.recordStep(ctx, tx2, enr.ID, n.ID, StepDone, o.result, ""); err != nil {
+	curNode := ix.Graph.Root
+	if cur.CurrentNode != nil && *cur.CurrentNode != "" {
+		curNode = *cur.CurrentNode
+	}
+	live := cur.Status == EnrollmentActive || cur.Status == EnrollmentWaiting
+	if !live || curNode != n.ID || cur.CurrentVisit != enr.CurrentVisit {
+		// Archived or failed meanwhile, or another wake-up of the same run found this step under way
+		// and carried on: just record that the message went. Moving the run here would take it back
+		// to the step after this one, and a wait it has already started there would count as over.
+		raw, _ := json.Marshal(o.result)
+		if _, err := tx2.ExecContext(ctx, `UPDATE enrollment_steps SET status = $4, finished_at = NOW(), result = $5
+			WHERE enrollment_id = $1 AND node_id = $2 AND visit = $3`, enr.ID, n.ID, enr.CurrentVisit, StepDone, raw); err != nil {
 			return false, err
 		}
 		return false, tx2.Commit()

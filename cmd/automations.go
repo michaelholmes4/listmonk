@@ -76,8 +76,13 @@ func initAutomation(fs stuffbin.FileSystem, db *sqlx.DB, co *core.Core, mgr *man
 // autoErr maps the engine's errors to HTTP ones. Validation problems are returned in full, as
 // `data.problems`, so the builder can mark every step at fault.
 func (a *App) autoErr(c echo.Context, err error) error {
-	var inv *automation.InvalidError
+	var (
+		inv *automation.InvalidError
+		he  *echo.HTTPError
+	)
 	switch {
+	case errors.As(err, &he):
+		return he
 	case errors.As(err, &inv):
 		return c.JSON(http.StatusBadRequest, map[string]any{
 			"message": inv.Error(),
@@ -99,6 +104,27 @@ func (a *App) autoErr(c echo.Context, err error) error {
 func allowSQL(c echo.Context) bool {
 	u := auth.GetUser(c)
 	return u.HasPerm(auth.PermSubscribersSqlQuery)
+}
+
+// automationPerms refuses an automation that would let the user do more than listmonk lets them do
+// directly: act on lists (trigger on them, email them, add or remove people) they may not manage,
+// look at lists they may not see, or send transactional email, which ignores opt-outs, without the
+// tx:send permission that POST /api/tx needs.
+func (a *App) automationPerms(c echo.Context) func(*automation.Graph) error {
+	u := auth.GetUser(c)
+	return func(g *automation.Graph) error {
+		acts, reads := g.ListRefs()
+		if err := u.HasListPerm(auth.PermTypeManage, acts...); err != nil {
+			return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "a list this automation uses"))
+		}
+		if err := u.HasListPerm(auth.PermTypeGet, reads...); err != nil {
+			return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "a list this automation's conditions look at"))
+		}
+		if g.HasTransactional() && !u.HasPerm(auth.PermTxSend) {
+			return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "transactional emails (tx:send)"))
+		}
+		return nil
+	}
 }
 
 // --- Automations ----------------------------------------------------------------------------------
@@ -165,6 +191,13 @@ func (a *App) UpdateAutomation(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return err
 	}
+	// The goal looks at lists like a condition does.
+	if req.Settings.Goal != nil {
+		u := auth.GetUser(c)
+		if err := u.HasListPerm(auth.PermTypeGet, req.Settings.Goal.ListRefs()...); err != nil {
+			return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "a list the goal looks at"))
+		}
+	}
 	au, err := a.automation.Store().Update(c.Request().Context(), getID(c), req.Name, req.Settings, allowSQL(c))
 	if err != nil {
 		return a.autoErr(c, err)
@@ -215,7 +248,7 @@ func (a *App) PublishAutomation(c echo.Context) error {
 	_ = c.Bind(&req)
 
 	ctx := c.Request().Context()
-	au, v, err := a.automation.Store().Publish(ctx, getID(c), allowSQL(c))
+	au, v, err := a.automation.Store().Publish(ctx, getID(c), allowSQL(c), a.automationPerms(c))
 	if err != nil {
 		return a.autoErr(c, err)
 	}
@@ -294,6 +327,10 @@ func (a *App) EnrollInAutomation(c echo.Context) error {
 	if len(req.SubscriberIDs) == 0 || len(req.SubscriberIDs) > 1000 {
 		return echo.NewHTTPError(http.StatusBadRequest, a.i18n.Ts("globals.messages.invalidFields", "name", "subscriber_ids (1 to 1000)"))
 	}
+	// Only people the user may see, as everywhere else subscribers are picked by ID.
+	if err := a.hasSubPerm(auth.GetUser(c), req.SubscriberIDs); err != nil {
+		return err
+	}
 	n, err := a.automation.EnrollManually(c.Request().Context(), getID(c), req.SubscriberIDs)
 	if err != nil {
 		return a.autoErr(c, err)
@@ -339,18 +376,11 @@ func (a *App) GetEnrollmentSteps(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid ID")
 	}
 	// The enrollment must belong to the automation in the URL.
-	rows, _, err := a.automation.Store().Enrollments(c.Request().Context(), getID(c), nil, "", 1, 0)
+	enr, err := a.automation.Store().Enrollment(c.Request().Context(), eid)
 	if err != nil {
 		return a.autoErr(c, err)
 	}
-	found := false
-	for _, r := range rows {
-		if r.ID == eid {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if enr.AutomationID != getID(c) {
 		return a.autoErr(c, automation.ErrNotFound)
 	}
 	steps, err := a.automation.Store().Steps(c.Request().Context(), eid)

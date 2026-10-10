@@ -119,6 +119,60 @@ func (w *advanceWorker) Work(ctx context.Context, job *river.Job[AdvanceArgs]) e
 	return err
 }
 
+// EventArgs is the job that acts on a recorded event: it hands it to the runs waiting for it and
+// starts the automations it triggers. Recording the event and queueing this job happen together, and
+// the job retries, so a passing failure can't lose what an event should have done.
+type EventArgs struct {
+	EventID int64 `json:"event_id"`
+}
+
+// Kind names the job type.
+func (EventArgs) Kind() string { return "automation.event" }
+
+type eventWorker struct {
+	river.WorkerDefaults[EventArgs]
+	e *Engine
+}
+
+func (w *eventWorker) Work(ctx context.Context, job *river.Job[EventArgs]) error {
+	err := w.e.processEvent(ctx, job.Args.EventID)
+	if err != nil {
+		w.e.log.Printf("automation: event %d (attempt %d of %d): %v", job.Args.EventID, job.Attempt, job.MaxAttempts, err)
+	}
+	return err
+}
+
+// processEvent runs an event's job. Running it again does no harm: a wait it already ended stays
+// ended, and an automation it already started is not started again for it.
+func (e *Engine) processEvent(ctx context.Context, id int64) error {
+	ev, err := e.store.Event(ctx, id)
+	if errors.Is(err, ErrNotFound) {
+		return nil // pruned, or the subscriber was deleted
+	}
+	if err != nil {
+		return err
+	}
+	return e.OnEvent(ctx, ev.SubscriberID, *ev)
+}
+
+// RecordEvent stores an event and, in the same transaction, the job that acts on it. It reports false
+// (and no event) when the idempotency key was used before.
+func (e *Engine) RecordEvent(ctx context.Context, subscriberID int, name string, properties json.RawMessage, key string, at time.Time) (*Event, bool, error) {
+	tx, err := e.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback()
+	ev, created, err := e.store.recordEvent(ctx, tx, subscriberID, name, properties, key, at)
+	if err != nil || !created {
+		return ev, created, err
+	}
+	if _, err := e.river.InsertTx(ctx, tx.Tx, EventArgs{EventID: ev.ID}, nil); err != nil {
+		return nil, false, err
+	}
+	return ev, true, tx.Commit()
+}
+
 // New builds an engine. Call Start to begin processing jobs.
 func New(cfg Config) (*Engine, error) {
 	if cfg.Clock == nil {
@@ -146,6 +200,7 @@ func New(cfg Config) (*Engine, error) {
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &advanceWorker{e: e})
+	river.AddWorker(workers, &eventWorker{e: e})
 	rc, err := river.NewClient(riverdatabasesql.New(cfg.DB.DB), &river.Config{
 		Queues:            map[string]river.QueueConfig{river.QueueDefault: {MaxWorkers: cfg.Workers}},
 		Workers:           workers,
@@ -255,6 +310,22 @@ func (e *Engine) enroll(ctx context.Context, a *Automation, subscriberID int, ec
 	}
 	if sub.Status == "blocklisted" {
 		return false, nil
+	}
+
+	// An event's job can run more than once (it retries); the event starts a run only once.
+	if len(ec.Event) > 0 {
+		var ev struct {
+			ID int64 `json:"id"`
+		}
+		if json.Unmarshal(ec.Event, &ev) == nil && ev.ID > 0 {
+			var done bool
+			if err := tx.GetContext(ctx, &done, e.q.get("enrolled-by-event"), a.ID, subscriberID, ev.ID); err != nil {
+				return false, err
+			}
+			if done {
+				return false, nil
+			}
+		}
 	}
 
 	var hist struct {
@@ -451,10 +522,28 @@ func (e *Engine) Resume(ctx context.Context, id int) (*Automation, error) {
 	if err := tx.SelectContext(ctx, &live, `SELECT * FROM enrollments WHERE automation_id = $1 AND status IN ('active', 'waiting')`, id); err != nil {
 		return nil, err
 	}
+	// A run whose wake-up hadn't come yet when it was paused still has its job: a second one, due at
+	// the same moment, would advance it twice at once. (A later job, such as a wait's time limit after
+	// an event already ended the wait, doesn't count.)
+	var queued []struct {
+		ID int64     `db:"id"`
+		At time.Time `db:"at"`
+	}
+	if err := tx.SelectContext(ctx, &queued, `SELECT (args->>'enrollment_id')::BIGINT AS id, MIN(scheduled_at) AS at FROM river_job
+		WHERE kind = $1 AND state IN ('available', 'scheduled', 'retryable') GROUP BY 1`, AdvanceArgs{}.Kind()); err != nil {
+		return nil, err
+	}
+	nextJob := make(map[int64]time.Time, len(queued))
+	for _, j := range queued {
+		nextJob[j.ID] = j.At
+	}
 	for _, enr := range live {
 		at := e.clock.Now()
 		if enr.NextRunAt != nil && enr.NextRunAt.After(at) {
 			at = *enr.NextRunAt
+		}
+		if j, ok := nextJob[enr.ID]; ok && !j.After(at) {
+			continue
 		}
 		if err := e.enqueue(ctx, tx, enr.ID, at); err != nil {
 			return nil, err

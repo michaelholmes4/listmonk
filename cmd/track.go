@@ -110,17 +110,15 @@ func (a *App) TrackEvent(c echo.Context) error {
 		}
 	}
 
-	ctx := c.Request().Context()
-	ev, created, err := a.automation.Store().RecordEvent(ctx, sub.ID, req.Name, props, key, at)
+	// The event and the job that acts on it (waiting runs, triggers) are saved together; the job runs
+	// in the background and retries, so what the event starts never depends on this request.
+	ev, created, err := a.automation.RecordEvent(c.Request().Context(), sub.ID, req.Name, props, key, at)
 	if err != nil {
 		return a.autoErr(c, err)
 	}
 	if !created {
 		// The same Idempotency-Key was seen before: nothing more to do.
 		return c.JSON(http.StatusOK, okResp{map[string]any{"subscriber_id": sub.ID, "duplicate": true}})
-	}
-	if err := a.automation.OnEvent(ctx, sub.ID, *ev); err != nil {
-		return a.autoErr(c, err)
 	}
 	return c.JSON(http.StatusOK, okResp{map[string]any{"subscriber_id": sub.ID, "event_id": ev.ID, "duplicate": false}})
 }

@@ -9,7 +9,7 @@ git merge upstream/master        # or a release tag
 ```
 Known conflict hotspots (the only upstream files we edit):
 - `cmd/handlers.go` (routes; `/app` redirect), `cmd/init.go` (wiring; the UI is mapped to `/admin` from `web/dist`; the message log wraps each messenger in `initCampaignManager`, and `initNotifs` takes a `notifs.Pusher`), `cmd/upgrade.go` (fork-migration call)
-- `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list and the dashboard counts)
+- `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list, the dashboard counts and both deletes)
 - `internal/core/core.go`, `subscribers.go`, `subscriptions.go` (automation trigger hooks: `Hooks.OnSubscriptionsConfirmed`
   / `OnAttribsChanged`, and one `forkBegin`/`forkEnd` pair around each mutation; the logic is in `fork_hooks.go`)
 - `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to; `&& !msg.forkTransactional()` on the List-Unsubscribe condition leaves the header off transactional automation emails)
@@ -37,13 +37,15 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
 `cmd/track.go`, `cmd/web.go`, `cmd/message_log.go`, `internal/msglog/`, `static/public/static/librelist-auth.css`, `librelist-auth.js`.
 
 ## Automation: things to know
-- **Engine.** River (poll-only, one job kind) drives `internal/automation`; one DB transaction per node. Email steps are
-  at-most-once per attempt (guard + `sending` row, send, finish); a failed send is retried, and the last failed
-  attempt marks the enrollment `failed`.
+- **Engine.** River (poll-only; jobs: advance a run, act on a recorded event) drives `internal/automation`; one DB transaction per node. Email steps are
+  at-most-once per attempt (guard + `sending` row, send, finish); handing the message to the sender is retried if the queue refuses it, and the last failed
+  attempt marks the enrollment `failed`. Once listmonk accepts the message, the automation never retries it: a later SMTP
+  rejection shows in the message log, not in the step (which is `done` once the message is queued).
 - **Email content** is a hidden campaign (`campaigns.type = 'automation'`) per step, linked to the step's topic list so the
   unsubscribe link records an opt-out. Automation campaigns are filtered out of every upstream campaign query and of the
   manager's scan (`queries/campaigns.sql`); if a merge adds a new campaign query, check it excludes them.
   A step's campaign is shared by all versions of the automation: editing it changes what in-flight enrollments send.
+  Its unsubscribe list is set when the automation is **published**, not on draft save; if a step changes topic (or marketing/transactional) while another version still sends that campaign, the step gets a copy, so each version's unsubscribe link matches the list its consent check uses.
   Its status is always `cancelled` (migration 8 converted the old drafts), so that upstream's own handlers refuse to
   start, schedule or edit it; the fork never reads that status (the step editor saves through `core.UpdateCampaign`,
   and tracking, the browser view and unsubscribe don't check it). If a merge adds a status check to one of those, revisit this.
@@ -57,7 +59,7 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
 - **Opened / clicked conditions** only work when `privacy.individual_tracking` is on (otherwise views and clicks carry no
   subscriber). The builder should say so.
 - **Raw SQL conditions** need `subscribers:sql_query` to create or edit, run in a read-only transaction with a 5 s timeout.
-- **`POST /api/track`** merges `upsert_attribs` (top-level keys) into the subscriber *before* recording the event;
+- **`POST /api/track`** records the event and queues a job to act on it (waiting runs, triggers) in one transaction, so a passing failure cannot lose what the event starts. It merges `upsert_attribs` (top-level keys) into the subscriber *before* recording the event;
   retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
 - **Wait for an event.** `POST /api/track` events also reach runs waiting on a `wait_for_event` step (before triggers fire).
   `.Event` in emails is the event that started the run, or the latest one that restarted a wait.

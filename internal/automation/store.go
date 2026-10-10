@@ -245,7 +245,7 @@ func (s *Store) SaveDraft(ctx context.Context, automationID int, graph *Graph, a
 		graph.Edges = []Edge{}
 	}
 	problems := graph.Validate(ValidateOpts{AllowSQL: allowSQL})
-	if err := s.syncStepCampaigns(ctx, graph); err != nil {
+	if err := s.checkStepCampaigns(ctx, graph); err != nil {
 		return nil, nil, err
 	}
 
@@ -265,8 +265,9 @@ func (s *Store) SaveDraft(ctx context.Context, automationID int, graph *Graph, a
 }
 
 // Publish freezes the draft, makes it the version new enrollments use, and points the triggers
-// at it. A paused automation stays paused; a draft becomes active.
-func (s *Store) Publish(ctx context.Context, automationID int, allowSQL bool) (*Automation, *Version, error) {
+// at it. A paused automation stays paused; a draft becomes active. Each of checks (the caller's
+// permission checks) sees the graph that is about to go live, and can refuse it.
+func (s *Store) Publish(ctx context.Context, automationID int, allowSQL bool, checks ...func(*Graph) error) (*Automation, *Version, error) {
 	a, err := s.Get(ctx, automationID)
 	if err != nil {
 		return nil, nil, err
@@ -277,6 +278,17 @@ func (s *Store) Publish(ctx context.Context, automationID int, allowSQL bool) (*
 	draft, err := s.Draft(ctx, automationID)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback()
+
+	// The draft is locked from here on, so what is checked is what goes live (a save in between waits).
+	if err := tx.GetContext(ctx, draft, s.q.get("lock-draft"), draft.ID); err != nil {
+		return nil, nil, notFound(err)
 	}
 	g, err := ParseGraph(draft.Graph)
 	if err != nil {
@@ -290,12 +302,25 @@ func (s *Store) Publish(ctx context.Context, automationID int, allowSQL bool) (*
 	if len(problems) > 0 {
 		return nil, nil, &InvalidError{problems}
 	}
+	for _, check := range checks {
+		if err := check(g); err != nil {
+			return nil, nil, err
+		}
+	}
 
-	tx, err := s.db.BeginTxx(ctx, nil)
+	changed, err := s.linkStepCampaigns(ctx, tx, draft.ID, g)
 	if err != nil {
 		return nil, nil, err
 	}
-	defer tx.Rollback()
+	if changed {
+		raw, err := json.Marshal(g)
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, err := tx.ExecContext(ctx, s.q.get("update-draft"), draft.ID, raw); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	var v Version
 	if err := tx.GetContext(ctx, &v, s.q.get("publish-version"), draft.ID); err != nil {
@@ -392,12 +417,11 @@ func (s *Store) CreateStepCampaign(ctx context.Context, p StepCampaign) (int, er
 	return id, tx.Commit()
 }
 
-// syncStepCampaigns checks that every email step points at a hidden automation campaign (never an
-// ordinary campaign, which it could otherwise hijack) and links each to its topic list (marketing
-// emails only).
-func (s *Store) syncStepCampaigns(ctx context.Context, g *Graph) error {
+// checkStepCampaigns checks that every email step points at a hidden automation campaign (never an
+// ordinary campaign, which it could otherwise hijack). It changes nothing: a draft is not live, and
+// the campaigns it points at may be sending for a published version (see linkStepCampaigns).
+func (s *Store) checkStepCampaigns(ctx context.Context, g *Graph) error {
 	var ids []int
-	topic := map[int]int{}
 	for _, n := range g.Nodes {
 		if n.Type != NodeSendEmail {
 			continue
@@ -407,13 +431,6 @@ func (s *Store) syncStepCampaigns(ctx context.Context, g *Graph) error {
 			continue
 		}
 		ids = append(ids, c.CampaignID)
-		// A transactional email has no topic: its unsubscribe link would take people off a list
-		// that never stopped it.
-		if c.MessageType == MessageMarketing {
-			topic[c.CampaignID] = c.ListID
-		} else {
-			topic[c.CampaignID] = 0
-		}
 	}
 	if len(ids) == 0 {
 		return nil
@@ -437,23 +454,87 @@ func (s *Store) syncStepCampaigns(ctx context.Context, g *Graph) error {
 	if len(problems) > 0 {
 		return &InvalidError{problems}
 	}
+	return nil
+}
 
-	tx, err := s.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for camp, list := range topic {
-		if _, err := tx.ExecContext(ctx, s.q.get("clear-campaign-lists"), camp); err != nil {
-			return err
+// linkStepCampaigns, on publish, links each email step's campaign to the step's topic list (none for
+// a transactional email), which is the list its unsubscribe link takes people off. That must stay the
+// list consent is checked against for every run that sends it. So when the topic changed and the
+// campaign is still sending for another version (the live one, or one with runs in it), the step gets
+// a copy of the campaign instead, and the other version keeps the original. It rewrites the steps of g
+// that got a copy and reports whether there were any.
+func (s *Store) linkStepCampaigns(ctx context.Context, tx *sqlx.Tx, draftID int, g *Graph) (bool, error) {
+	changed := false
+	topicOf := map[int]int{} // campaign -> the topic linked in this publish
+	for i := range g.Nodes {
+		n := &g.Nodes[i]
+		if n.Type != NodeSendEmail {
+			continue
 		}
-		if list > 0 {
-			if _, err := tx.ExecContext(ctx, s.q.get("set-campaign-list"), camp, list); err != nil {
-				return err
+		var c SendEmailConfig
+		if json.Unmarshal(n.Config, &c) != nil || c.CampaignID == 0 {
+			continue
+		}
+		topic := 0
+		if c.MessageType == MessageMarketing {
+			topic = c.ListID
+		}
+
+		// Two steps of this graph sharing a campaign with different topics: the second gets a copy.
+		t, seen := topicOf[c.CampaignID]
+		if seen && t == topic {
+			continue
+		}
+		if !seen {
+			var linked []int
+			if err := tx.SelectContext(ctx, &linked, s.q.get("campaign-lists"), c.CampaignID); err != nil {
+				return false, err
+			}
+			if (topic == 0 && len(linked) == 0) || (topic > 0 && len(linked) == 1 && linked[0] == topic) {
+				topicOf[c.CampaignID] = topic
+				continue
 			}
 		}
+
+		copyIt := seen
+		if !copyIt {
+			if err := tx.GetContext(ctx, &copyIt, s.q.get("step-campaign-in-use"), c.CampaignID, draftID); err != nil {
+				return false, err
+			}
+		}
+		id := c.CampaignID
+		if copyIt {
+			if err := tx.GetContext(ctx, &id, s.q.get("copy-step-campaign"), c.CampaignID, uuid.NewString()); err != nil {
+				return false, err
+			}
+			if _, err := tx.ExecContext(ctx, s.q.get("copy-campaign-media"), c.CampaignID, id); err != nil {
+				return false, err
+			}
+			// Only campaign_id changes; anything else the builder keeps in the step's options stays.
+			var cfg map[string]json.RawMessage
+			if err := json.Unmarshal(n.Config, &cfg); err != nil {
+				return false, err
+			}
+			cfg["campaign_id"], _ = json.Marshal(id)
+			raw, err := json.Marshal(cfg)
+			if err != nil {
+				return false, err
+			}
+			n.Config = raw
+			changed = true
+		}
+
+		if _, err := tx.ExecContext(ctx, s.q.get("clear-campaign-lists"), id); err != nil {
+			return false, err
+		}
+		if topic > 0 {
+			if _, err := tx.ExecContext(ctx, s.q.get("set-campaign-list"), id, topic); err != nil {
+				return false, err
+			}
+		}
+		topicOf[id] = topic
 	}
-	return tx.Commit()
+	return changed, nil
 }
 
 // EnrollmentRow is an enrollment as listed, with who it is.
@@ -487,6 +568,15 @@ func (s *Store) Enrollments(ctx context.Context, automationID int, statuses []En
 		total = rows[0].Total
 	}
 	return rows, total, nil
+}
+
+// Enrollment returns one enrollment.
+func (s *Store) Enrollment(ctx context.Context, id int64) (*Enrollment, error) {
+	var e Enrollment
+	if err := s.db.GetContext(ctx, &e, s.q.get("get-enrollment"), id); err != nil {
+		return nil, notFound(err)
+	}
+	return &e, nil
 }
 
 // Steps returns what an enrollment has run, in order.
@@ -535,6 +625,19 @@ func (s *Store) SubscriberEnrollments(ctx context.Context, subscriberID int) ([]
 // RecordEvent stores an event. It reports false (and no event) when the idempotency key was used
 // before, which is how a retried request is told apart from a new one.
 func (s *Store) RecordEvent(ctx context.Context, subscriberID int, name string, properties json.RawMessage, key string, at time.Time) (*Event, bool, error) {
+	return s.recordEvent(ctx, s.db, subscriberID, name, properties, key, at)
+}
+
+// Event returns one recorded event.
+func (s *Store) Event(ctx context.Context, id int64) (*Event, error) {
+	var ev Event
+	if err := s.db.GetContext(ctx, &ev, s.q.get("get-event"), id); err != nil {
+		return nil, notFound(err)
+	}
+	return &ev, nil
+}
+
+func (s *Store) recordEvent(ctx context.Context, db sqlx.QueryerContext, subscriberID int, name string, properties json.RawMessage, key string, at time.Time) (*Event, bool, error) {
 	if len(properties) == 0 {
 		properties = json.RawMessage(`{}`)
 	}
@@ -543,7 +646,7 @@ func (s *Store) RecordEvent(ctx context.Context, subscriberID int, name string, 
 		k = key
 	}
 	var ev Event
-	if err := s.db.GetContext(ctx, &ev, s.q.get("insert-event"), subscriberID, name, []byte(properties), k, at); err != nil {
+	if err := sqlx.GetContext(ctx, db, &ev, s.q.get("insert-event"), subscriberID, name, []byte(properties), k, at); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, false, nil
 		}

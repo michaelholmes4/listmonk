@@ -51,6 +51,9 @@ SELECT * FROM automation_versions WHERE automation_id = $1 AND published_at IS N
 -- name: automation-list-versions
 SELECT * FROM automation_versions WHERE automation_id = $1 ORDER BY version DESC;
 
+-- name: automation-lock-draft
+SELECT * FROM automation_versions WHERE id = $1 AND published_at IS NULL FOR UPDATE;
+
 -- name: automation-update-draft
 UPDATE automation_versions SET graph = $2 WHERE id = $1 AND published_at IS NULL RETURNING *;
 
@@ -174,6 +177,13 @@ VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (subscriber_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING *;
 
+-- name: automation-get-event
+SELECT * FROM subscriber_events WHERE id = $1;
+
+-- name: automation-enrolled-by-event
+-- Whether this event already started a run of this automation (its job may run more than once).
+SELECT EXISTS (SELECT 1 FROM enrollments WHERE automation_id = $1 AND subscriber_id = $2 AND context->'event'->>'id' = $3::TEXT);
+
 -- name: automation-list-events
 SELECT *, COUNT(*) OVER () AS total FROM subscriber_events
 WHERE subscriber_id = $1 ORDER BY occurred_at DESC, id DESC OFFSET $2 LIMIT (CASE WHEN $3 < 1 THEN NULL ELSE $3 END);
@@ -231,6 +241,33 @@ RETURNING id;
 -- name: automation-step-campaigns
 -- Which of these IDs are hidden automation campaigns (an email step may only point at one).
 SELECT id FROM campaigns WHERE id = ANY($1::INT[]) AND type = 'automation';
+
+-- name: automation-campaign-lists
+SELECT list_id FROM campaign_lists WHERE campaign_id = $1 AND list_id IS NOT NULL ORDER BY list_id;
+
+-- name: automation-step-campaign-in-use
+-- Whether a step campaign still sends for a version other than $2 (the one being published): a version
+-- that is some automation's live one, or that people are still going through.
+SELECT EXISTS (
+    SELECT 1 FROM automation_versions v
+    CROSS JOIN LATERAL JSONB_ARRAY_ELEMENTS(COALESCE(v.graph->'nodes', '[]'::JSONB)) n
+    WHERE v.id <> $2 AND v.published_at IS NOT NULL
+      AND n->>'type' = 'send_email' AND n->'config'->>'campaign_id' = $1::TEXT
+      AND (EXISTS (SELECT 1 FROM automations a WHERE a.current_version_id = v.id)
+           OR EXISTS (SELECT 1 FROM enrollments e WHERE e.version_id = v.id AND e.status IN ('active', 'waiting')))
+);
+
+-- name: automation-copy-step-campaign
+-- A copy of a step campaign's content, for a version whose step changed its topic. Lists are set by the caller.
+INSERT INTO campaigns (uuid, name, subject, from_email, body, body_source, altbody, content_type, headers, attribs,
+    tags, type, messenger, template_id, status, archive_meta)
+SELECT $2, name, subject, from_email, body, body_source, altbody, content_type, headers, attribs,
+    tags, type, messenger, template_id, status, archive_meta
+FROM campaigns WHERE id = $1 AND type = 'automation'
+RETURNING id;
+
+-- name: automation-copy-campaign-media
+INSERT INTO campaign_media (campaign_id, media_id, filename) SELECT $2, media_id, filename FROM campaign_media WHERE campaign_id = $1;
 
 -- name: automation-clear-campaign-lists
 DELETE FROM campaign_lists WHERE campaign_id = $1;

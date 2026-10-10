@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { PublishError } from '@/api/automations'
-import type { AutomationProblem } from '@/api/types'
+import type { AutomationProblem, AutomationVersion } from '@/api/types'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Page from '@/components/layout/Page.vue'
 import RecordTab from '@/components/layout/RecordTab.vue'
@@ -32,7 +32,7 @@ import { usePermission } from '@/composables/usePermission'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
 import EnrollmentsPanel from '@/features/automations/EnrollmentsPanel.vue'
 import FlowBuilder from '@/features/automations/FlowBuilder.vue'
-import { emptyFlow, flowToGraph, graphToFlow, type Flow } from '@/features/automations/model'
+import { allSteps, emptyFlow, flowToGraph, graphToFlow, type Flow } from '@/features/automations/model'
 import PublishDialog from '@/features/automations/PublishDialog.vue'
 import SettingsPanel from '@/features/automations/SettingsPanel.vue'
 import { automationVariant, canArchive, canPause, canResume, isLive } from '@/features/automations/status'
@@ -115,12 +115,24 @@ const savedAt = computed(() => saver.savedAt.value?.toLocaleTimeString([], { hou
 
 const publishOpen = ref(false)
 const hasListTrigger = computed(() => flow.triggers.some((x) => x.type === 'list_joined'))
+
+/** Publishing gives an email whose topic changed a copy of its content (the runs of the version it
+ * replaces keep the original, with its unsubscribe link), so the working copy takes the published ids. */
+function adoptPublishedEmails(graph: AutomationVersion['graph']) {
+  const published = new Map([...allSteps(graphToFlow(graph).steps)].map((s) => [s.id, s.config.campaign_id]))
+  for (const s of allSteps(flow.steps)) {
+    const cid = published.get(s.id)
+    if (s.type === 'send_email' && cid && s.config.campaign_id !== cid) s.config.campaign_id = cid
+  }
+}
+
 async function doPublish(enrollExisting: boolean) {
   if (!(await saver.flush())) return
   publish.mutate(
     { id: id.value, enrollExisting },
     {
-      onSuccess: () => {
+      onSuccess: (r) => {
+        adoptPublishedEmails(r.version.graph)
         publishOpen.value = false
         toast.success(t('web.automations.published'))
       },

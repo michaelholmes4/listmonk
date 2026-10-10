@@ -412,6 +412,61 @@ func validateNode(ix *Index, n Node, opts ValidateOpts) []Problem {
 	return out
 }
 
+// ListRefs returns, for permission checks, the lists the graph acts on (its triggers, its emails'
+// topics, the lists its steps add people to or remove them from) and the lists its conditions only
+// look at.
+func (g *Graph) ListRefs() (acts, reads []int) {
+	for _, t := range g.Triggers {
+		var c TriggerConfig
+		if t.Type == TriggerListJoined && json.Unmarshal(t.Config, &c) == nil && c.ListID > 0 {
+			acts = append(acts, c.ListID)
+		}
+	}
+	for _, n := range g.Nodes {
+		switch n.Type {
+		case NodeSendEmail:
+			var c SendEmailConfig
+			if json.Unmarshal(n.Config, &c) == nil && c.MessageType == MessageMarketing && c.ListID > 0 {
+				acts = append(acts, c.ListID)
+			}
+		case NodeAddToList, NodeRemoveFromList:
+			var c ListConfig
+			if json.Unmarshal(n.Config, &c) == nil && c.ListID > 0 {
+				acts = append(acts, c.ListID)
+			}
+		case NodeCondition:
+			var c ConditionConfig
+			if json.Unmarshal(n.Config, &c) == nil {
+				reads = append(reads, c.Rule.ListRefs()...)
+			}
+		}
+	}
+	return acts, reads
+}
+
+// ListRefs returns the lists a rule looks at.
+func (r Rule) ListRefs() []int {
+	var out []int
+	if r.Type == RuleList && r.ListID > 0 {
+		out = append(out, r.ListID)
+	}
+	for _, c := range r.Rules {
+		out = append(out, c.ListRefs()...)
+	}
+	return out
+}
+
+// HasTransactional reports whether the graph sends a transactional email (one that ignores opt-outs).
+func (g *Graph) HasTransactional() bool {
+	for _, n := range g.Nodes {
+		var c SendEmailConfig
+		if n.Type == NodeSendEmail && json.Unmarshal(n.Config, &c) == nil && c.MessageType == MessageTransactional {
+			return true
+		}
+	}
+	return false
+}
+
 // ParseSettings decodes stored automation settings, applying defaults.
 func ParseSettings(raw json.RawMessage) (Settings, error) {
 	var s Settings

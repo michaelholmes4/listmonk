@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 )
@@ -70,28 +71,96 @@ func TestStepCampaignsAreHiddenAndOnlyAutomationOnesCanBeUsed(t *testing.T) {
 		t.Fatal("an ordinary campaign was accepted as an email step")
 	}
 
-	// A good step links its campaign to the step's topic, even when the topic changed.
+	// Saving a draft doesn't touch the campaign's list; publishing links it to the step's topic.
 	other := h.list("other", "single")
 	g = &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, other, id)}}}
 	if _, problems, err := h.store.SaveDraft(ctx, a.ID, g, false); err != nil || len(problems) > 0 {
 		t.Fatalf("save: %v %v", problems, err)
 	}
-	var linked []int
-	h.must(h.db.Select(&linked, `SELECT list_id FROM campaign_lists WHERE campaign_id = $1`, id))
-	if len(linked) != 1 || linked[0] != other {
-		t.Fatalf("campaign lists = %v, want [%d]", linked, other)
+	if got := h.campaignLists(id); len(got) != 1 || got[0] != list {
+		t.Fatalf("after saving the draft: campaign lists = %v, want [%d]", got, list)
+	}
+	_, v, err := h.store.Publish(ctx, a.ID, false)
+	h.must(err)
+	// Nothing else sends this campaign, so it is relinked in place rather than copied.
+	if c := h.stepCampaign(v, "m"); c != id {
+		t.Fatalf("published step campaign = %d, want %d", c, id)
+	}
+	if got := h.campaignLists(id); len(got) != 1 || got[0] != other {
+		t.Fatalf("campaign lists = %v, want [%d]", got, other)
+	}
+}
+
+func TestChangingALiveEmailsTopicKeepsItsUnsubscribeLink(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	newsletter, updates := h.list("newsletter", "single"), h.list("updates", "single")
+	camp := h.campaign()
+	_, err := h.db.Exec(`INSERT INTO campaign_lists (campaign_id, list_id, list_name) VALUES ($1, $2, 'newsletter')`, camp, newsletter)
+	h.must(err)
+	g := &Graph{Triggers: listTrigger(newsletter), Root: "d", Nodes: []Node{
+		{ID: "d", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "1d"})},
+		{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, newsletter, camp)},
+	}, Edges: []Edge{{From: "d", To: "m"}}}
+	auto := h.publish("live", g, Settings{})
+
+	// The draft moves the email to another topic.
+	g.Nodes[1].Config = mail(MessageMarketing, updates, camp)
+	_, _, err = h.store.SaveDraft(ctx, auto, g, false)
+	h.must(err)
+	if got := h.campaignLists(camp); len(got) != 1 || got[0] != newsletter {
+		t.Fatalf("a draft save changed the live email's list: %v", got)
 	}
 
-	// A transactional step has no topic: its campaign is unlinked, whatever list_id says.
-	g = &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageTransactional, other, id)}}}
-	if _, problems, err := h.store.SaveDraft(ctx, a.ID, g, false); err != nil || len(problems) > 0 {
-		t.Fatalf("save: %v %v", problems, err)
+	// Publishing gives the new version a copy on the new topic; the live email keeps its own.
+	_, v, err := h.store.Publish(ctx, auto, false)
+	h.must(err)
+	cp := h.stepCampaign(v, "m")
+	if cp == camp || cp == 0 {
+		t.Fatalf("published step campaign = %d, want a copy of %d", cp, camp)
 	}
-	linked = nil
-	h.must(h.db.Select(&linked, `SELECT list_id FROM campaign_lists WHERE campaign_id = $1`, id))
-	if len(linked) != 0 {
-		t.Fatalf("transactional campaign lists = %v, want none", linked)
+	if got := h.campaignLists(camp); len(got) != 1 || got[0] != newsletter {
+		t.Fatalf("original email lists = %v, want [%d]", got, newsletter)
 	}
+	if got := h.campaignLists(cp); len(got) != 1 || got[0] != updates {
+		t.Fatalf("copy lists = %v, want [%d]", got, updates)
+	}
+	var typ, subject string
+	h.must(h.db.QueryRow(`SELECT type::TEXT, subject FROM campaigns WHERE id = $1`, cp).Scan(&typ, &subject))
+	if typ != "automation" || subject != "s" {
+		t.Fatalf("copy: type=%s subject=%q", typ, subject)
+	}
+	// The next draft starts from the published graph, so it edits the copy.
+	d, err := h.store.Draft(ctx, auto)
+	h.must(err)
+	if c := h.stepCampaign(d, "m"); c != cp {
+		t.Fatalf("next draft's step campaign = %d, want %d", c, cp)
+	}
+
+	// Becoming transactional takes the topic off (again on a copy: the current version still uses it).
+	g.Nodes[1].Config = mail(MessageTransactional, 0, cp)
+	_, _, err = h.store.SaveDraft(ctx, auto, g, false)
+	h.must(err)
+	_, v, err = h.store.Publish(ctx, auto, false)
+	h.must(err)
+	if tx := h.stepCampaign(v, "m"); tx == cp || len(h.campaignLists(tx)) != 0 || len(h.campaignLists(cp)) != 1 {
+		t.Fatalf("transactional copy %d lists %v; previous %d lists %v", tx, h.campaignLists(tx), cp, h.campaignLists(cp))
+	}
+}
+
+func (h *harness) campaignLists(id int) []int {
+	h.t.Helper()
+	var out []int
+	h.must(h.db.Select(&out, `SELECT list_id FROM campaign_lists WHERE campaign_id = $1 ORDER BY list_id`, id))
+	return out
+}
+
+func (h *harness) stepCampaign(v *Version, node string) int {
+	h.t.Helper()
+	g, err := ParseGraph(v.Graph)
+	h.must(err)
+	c, _ := NewIndex(g).CampaignOf(node)
+	return c
 }
 
 func TestStepCampaignsDoNotShowInCampaignQueries(t *testing.T) {
@@ -135,5 +204,37 @@ func TestEnrollmentListingAndPaging(t *testing.T) {
 	stats, err := h.store.NodeStats(ctx, auto)
 	if err != nil || len(stats) != 1 || stats[0].NodeID != "d" || stats[0].Waiting != 3 {
 		t.Fatalf("stats: %+v %v", stats, err)
+	}
+}
+
+func TestPublishChecksSeeTheGraphAndCanRefuseIt(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	trig, topic, add, looked := h.list("trigger", "single"), h.list("topic", "single"), h.list("add", "single"), h.list("looked", "single")
+	g := &Graph{Triggers: listTrigger(trig), Root: "c", Nodes: []Node{
+		{ID: "c", Type: NodeCondition, Config: cfg(ConditionConfig{Rule: Rule{Op: "or", Rules: []Rule{{Type: RuleList, ListID: looked, Operator: "is_member"}}}})},
+		{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, topic, h.campaign())},
+		{ID: "a", Type: NodeAddToList, Config: cfg(ListConfig{ListID: add})},
+		{ID: "t", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, h.campaign())},
+	}, Edges: []Edge{{From: "c", To: "m", Handle: HandleYes}, {From: "c", To: "t", Handle: HandleNo}, {From: "m", To: "a"}}}
+
+	acts, reads := g.ListRefs()
+	if fmt.Sprint(acts) != fmt.Sprint([]int{trig, topic, add}) || fmt.Sprint(reads) != fmt.Sprint([]int{looked}) || !g.HasTransactional() {
+		t.Fatalf("acts=%v reads=%v transactional=%v", acts, reads, g.HasTransactional())
+	}
+
+	a, err := h.store.Create(ctx, "perms", Settings{})
+	h.must(err)
+	_, problems, err := h.store.SaveDraft(ctx, a.ID, g, false)
+	h.must(err)
+	if len(problems) > 0 {
+		t.Fatal(messages(problems))
+	}
+	refused := errors.New("refused")
+	if _, _, err := h.store.Publish(ctx, a.ID, false, func(*Graph) error { return refused }); !errors.Is(err, refused) {
+		t.Fatalf("publish: %v", err)
+	}
+	if got, _ := h.store.Get(ctx, a.ID); got.Status != StatusDraft || got.CurrentVersionID != nil {
+		t.Fatalf("a refused publish went live: %+v", got)
 	}
 }

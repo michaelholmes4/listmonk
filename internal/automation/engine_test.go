@@ -459,6 +459,81 @@ func TestPauseResumeArchive(t *testing.T) {
 	}
 }
 
+// delayEmailDelayEmail is Delay 1h → e1 → Delay 3d → e2, the shape where a run advanced twice at
+// once used to skip the second delay.
+func (h *harness) delayEmailDelayEmail(list int) *Graph {
+	return &Graph{Triggers: listTrigger(list), Root: "d1", Nodes: []Node{
+		{ID: "d1", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "1h"})},
+		{ID: "e1", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, h.campaign())},
+		{ID: "d2", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "3d"})},
+		{ID: "e2", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, h.campaign())},
+	}, Edges: []Edge{{From: "d1", To: "e1"}, {From: "e1", To: "d2"}, {From: "d2", To: "e2"}}}
+}
+
+func TestResumeDoesNotDuplicateAWaitingRunsJob(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	list := h.list("l", "single")
+	auto := h.publish("p", h.delayEmailDelayEmail(list), Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, list, "confirmed")
+	h.must(h.eng.OnListJoined(ctx, sub, list))
+	h.drain()
+	if n := h.pendingJobs(); n != 1 {
+		t.Fatalf("waiting on the delay: %d jobs", n)
+	}
+
+	// Its wake-up hasn't come yet, so it still has its job: resuming must not add a second.
+	_, err := h.eng.Pause(ctx, auto)
+	h.must(err)
+	_, err = h.eng.Resume(ctx, auto)
+	h.must(err)
+	if n := h.pendingJobs(); n != 1 {
+		t.Fatalf("after pause and resume: %d jobs", n)
+	}
+}
+
+func TestADuplicateWakeUpDuringASendKeepsTheNextDelay(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	list := h.list("l", "single")
+	auto := h.publish("p", h.delayEmailDelayEmail(list), Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, list, "confirmed")
+	h.must(h.eng.OnListJoined(ctx, sub, list))
+	h.drain()
+	enr := h.enrollment(auto, sub)
+
+	// A second wake-up of the run arrives while the first is handing e1 to the sender.
+	h.clock.Advance(time.Hour)
+	once := false
+	h.sender.Before = func(Message) {
+		if !once {
+			once = true
+			h.must(h.eng.Advance(ctx, enr.ID))
+		}
+	}
+	h.must(h.eng.Advance(ctx, enr.ID))
+
+	if n := h.sender.count(); n != 1 {
+		t.Fatalf("sent %d messages; e2 must wait 3 days", n)
+	}
+	got := h.enrollment(auto, sub)
+	if got.Status != EnrollmentWaiting || got.CurrentNode == nil || *got.CurrentNode != "d2" ||
+		!got.NextRunAt.Equal(h.clock.Now().Add(3*24*time.Hour)) {
+		t.Fatalf("enrollment = %+v", got)
+	}
+	if st := h.steps(enr.ID); st["e1"] != StepDone || st["d2"] != StepWaiting {
+		t.Fatalf("steps = %v", st)
+	}
+
+	h.clock.Advance(3 * 24 * time.Hour)
+	h.drain()
+	if n := h.sender.count(); n != 2 || h.enrollment(auto, sub).Status != EnrollmentCompleted {
+		t.Fatalf("after the delay: sent %d, %s", n, h.enrollment(auto, sub).Status)
+	}
+}
+
 func TestGoalEndsAnEnrollmentAfterAPause(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
@@ -965,5 +1040,39 @@ func TestWaitForEventUsesTheRunsVersion(t *testing.T) {
 	h.drain()
 	if h.sender.count() != 1 || h.sender.Sent[0].CampaignID != ok {
 		t.Fatalf("sent = %+v", h.sender.Sent)
+	}
+}
+
+func TestAnEventJobStartsRunsOnceEvenIfItRunsTwice(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	auto := h.publish("e", &Graph{
+		Triggers: []Trigger{{ID: "t", Type: TriggerEvent, Config: cfg(TriggerConfig{Event: "signed_up"})}},
+		Root:     "m",
+		Nodes:    []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, h.campaign())}},
+	}, Settings{Reentry: Reentry{Mode: "always"}})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+
+	ev, created, err := h.eng.RecordEvent(ctx, sub, "signed_up", nil, "k", h.clock.Now())
+	if err != nil || !created {
+		t.Fatalf("record: %v %v", created, err)
+	}
+	// Recording queued the job (stamped with the database clock, so let the fake one pass it).
+	if n := h.pendingJobs(); n != 1 {
+		t.Fatalf("%d jobs", n)
+	}
+	h.clock.Advance(time.Minute)
+	h.drain()
+	// A retry of the same job (e.g. it failed after enrolling) must not start a second run.
+	h.must(h.eng.processEvent(ctx, ev.ID))
+	h.drain()
+
+	var runs int
+	h.must(h.db.Get(&runs, `SELECT COUNT(*) FROM enrollments WHERE automation_id = $1`, auto))
+	if runs != 1 || h.sender.count() != 1 {
+		t.Fatalf("runs=%d sent=%d", runs, h.sender.count())
+	}
+	if _, created, _ := h.eng.RecordEvent(ctx, sub, "signed_up", nil, "k", h.clock.Now()); created || h.pendingJobs() != 0 {
+		t.Fatal("a repeated idempotency key queued another job")
 	}
 }
