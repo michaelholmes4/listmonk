@@ -41,6 +41,12 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 		return false, err
 	}
 
+	// A transactional template carries no unsubscribe link or List-Unsubscribe header. Saving refuses
+	// this; versions published before that check get here.
+	if c.MessageType == MessageMarketing && c.TemplateID > 0 {
+		return false, permanent("step %s: a marketing email needs its own content, with an unsubscribe link, not a transactional template", n.ID)
+	}
+
 	// Outside the send window: wait for it to open.
 	if open := NextSendTime(now, s.SendWindow, locationFor(sub.attribs(), s.Timezone)); open.After(now) {
 		o := outcome{wait: &open, noStep: true}
@@ -61,16 +67,6 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 		}
 		return false, tx.Commit()
 	}
-	if d.NeedsSubscription {
-		var res struct {
-			Previous string `db:"previous"`
-			Current  string `db:"current"`
-		}
-		if err := tx.GetContext(ctx, &res, e.q.get("subscribe"), sub.ID, c.ListID, "confirmed"); err != nil {
-			return false, err
-		}
-	}
-
 	if _, err := tx.ExecContext(ctx, e.q.get("insert-step"), enr.ID, n.ID, StepSending); err != nil {
 		return false, err
 	}

@@ -281,6 +281,8 @@ func validateNode(ix *Index, n Node, opts ValidateOpts) []Problem {
 		}
 		if (c.CampaignID > 0) == (c.TemplateID > 0) {
 			bad("needs either its own content or a transactional template, not both or neither")
+		} else if c.MessageType == MessageMarketing && c.TemplateID > 0 {
+			bad("a marketing email needs its own content: a transactional template has no unsubscribe link")
 		}
 
 	case NodeDelay:

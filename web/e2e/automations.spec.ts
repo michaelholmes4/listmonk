@@ -224,6 +224,9 @@ test('an email step: write the email in the step, publish, and it is sent', asyn
     expect(camp.body).toContain('Welcome aboard')
     expect(camp.type).toBe('automation')
 
+    // A marketing email only goes to people on its topic list.
+    const sub = await request.post('/api/subscribers', { data: { email, name: `Mailstep ${stamp}`, status: 'enabled', lists: [list.id], preconfirm_subscriptions: true } })
+    expect(sub.ok()).toBeTruthy()
     expect((await request.post('/api/track', { data: { subscriber: { email }, name: event } })).ok()).toBeTruthy()
     await page.getByRole('tab', { name: 'Activity' }).click()
     const row = page.locator('[data-cy=enrollments]').getByRole('row', { name: new RegExp(email) })

@@ -39,7 +39,7 @@ func initAutomation(fs stuffbin.FileSystem, db *sqlx.DB, co *core.Core, mgr *man
 	eng, err := automation.New(automation.Config{
 		DB:      db,
 		Queries: q,
-		Sender:  newAutomationSender(co, mgr),
+		Sender:  newAutomationSender(co, mgr, ko.String("app.from_email")),
 		Log:     lo,
 		Workers: 4,
 	})

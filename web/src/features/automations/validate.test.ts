@@ -9,11 +9,16 @@ describe('step issues', () => {
   it('needs a topic and content for an email', () => {
     const s = newStep(flow([]), 'send_email')
     expect(stepIssues(s, ctx(flow([s]))).map((i) => i.field)).toEqual(['list_id', 'content'])
+    // Marketing can't use a template, so the message doesn't offer one.
+    expect(stepIssues(s, ctx(flow([s])))[1].key).toBe('web.automations.email.writeRequired')
     s.config = { message_type: 'marketing', list_id: 3, campaign_id: 9 }
     expect(stepIssues(s, ctx(flow([s])))).toEqual([])
     // Both a campaign and a template is as wrong as neither.
     s.config = { message_type: 'transactional', list_id: 3, campaign_id: 9, template_id: 2 }
     expect(stepIssues(s, ctx(flow([s]))).map((i) => i.field)).toEqual(['content'])
+    // A transactional template has no unsubscribe link.
+    s.config = { message_type: 'marketing', list_id: 3, template_id: 2 }
+    expect(stepIssues(s, ctx(flow([s])))).toEqual([{ field: 'content', key: 'web.automations.email.marketingTemplate' }])
   })
 
   it('needs no topic for a transactional email', () => {

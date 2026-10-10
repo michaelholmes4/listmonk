@@ -50,7 +50,10 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   start, schedule or edit it; the fork never reads that status (the step editor saves through `core.UpdateCampaign`,
   and tracking, the browser view and unsubscribe don't check it). If a merge adds a status check to one of those, revisit this.
 - **Consent** (`internal/automation/consent.go`): blocklisted gets nothing; transactional is otherwise sent; marketing needs
-  an enabled subscriber who has not unsubscribed from the topic (and has confirmed, on a double opt-in list). `POST /api/tx`
+  an enabled subscriber with a live subscription to the topic (confirmed, or unconfirmed on a single opt-in list). No
+  subscription means no send, never an implicit subscribe: listmonk deletes the row on removal, so "never joined" and
+  "was removed" look the same. A marketing step can't use a transactional template (no unsubscribe link). An Add to list
+  step never undoes an `unsubscribed` status or downgrades a confirmed one. `POST /api/tx`
   keeps its upstream behaviour and does *not* check the blocklist: the two differ on purpose.
 - **Triggers** fire from core hooks after the mutation commits, in the background. "Joined a list" means a *live*
   subscription: confirmed, or unconfirmed on a single opt-in list. The by-query bulk subscription endpoints

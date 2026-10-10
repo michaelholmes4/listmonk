@@ -192,7 +192,10 @@ SELECT * FROM subscriber_events WHERE id = $1;
 
 -- name: automation-enrolled-by-event
 -- Whether this event already started a run of this automation (its job may run more than once).
-SELECT EXISTS (SELECT 1 FROM enrollments WHERE automation_id = $1 AND subscriber_id = $2 AND context->'event'->>'id' = $3::TEXT);
+-- `trigger_event_id` never changes; `event` is replaced when a wait_for_event restarts, so it only
+-- identifies the starting event for runs from before `trigger_event_id` was recorded.
+SELECT EXISTS (SELECT 1 FROM enrollments WHERE automation_id = $1 AND subscriber_id = $2
+    AND (context->>'trigger_event_id' = $3::TEXT OR (context->>'trigger_event_id' IS NULL AND context->'event'->>'id' = $3::TEXT)));
 
 -- name: automation-list-events
 SELECT *, COUNT(*) OVER () AS total FROM subscriber_events
@@ -222,12 +225,17 @@ LEFT JOIN subscriber_lists sl ON sl.subscriber_id = s.id AND sl.list_id = $2
 WHERE s.id = $1;
 
 -- name: automation-subscribe
--- Add (or re-activate) a subscription. Returns the previous status so callers can tell a new join.
+-- Add a subscription. Returns the previous status so callers can tell a new join.
+-- An existing subscription only ever goes from unconfirmed to confirmed: an opt-out
+-- ('unsubscribed') is never undone, and a confirmed subscription is never downgraded.
 WITH prev AS (
     SELECT status::TEXT AS status FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2
 ), up AS (
     INSERT INTO subscriber_lists (subscriber_id, list_id, status) VALUES ($1, $2, $3::subscription_status)
-    ON CONFLICT (subscriber_id, list_id) DO UPDATE SET status = EXCLUDED.status, updated_at = NOW()
+    ON CONFLICT (subscriber_id, list_id) DO UPDATE SET
+        status = (CASE WHEN subscriber_lists.status = 'unconfirmed' AND EXCLUDED.status = 'confirmed'
+            THEN 'confirmed' ELSE subscriber_lists.status END),
+        updated_at = NOW()
     RETURNING status::TEXT
 )
 SELECT COALESCE((SELECT status FROM prev), '') AS previous, (SELECT status FROM up) AS current;

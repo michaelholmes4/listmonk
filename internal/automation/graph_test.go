@@ -85,6 +85,9 @@ func TestGraphProblems(t *testing.T) {
 		{"email with both content", func(g *Graph) {
 			g.Nodes[0].Config = cfg(SendEmailConfig{MessageType: MessageTransactional, CampaignID: 1, TemplateID: 2})
 		}, "either its own content or a transactional template"},
+		{"marketing with a transactional template", func(g *Graph) {
+			g.Nodes[0].Config = cfg(SendEmailConfig{MessageType: MessageMarketing, ListID: 1, TemplateID: 2})
+		}, "no unsubscribe link"},
 		{"unknown message type", func(g *Graph) { g.Nodes[0].Config = cfg(SendEmailConfig{MessageType: "spam", CampaignID: 1}) }, "marketing or transactional"},
 		{"condition asks about a step that has not run", func(g *Graph) {
 			g.Nodes[2].Config = cfg(ConditionConfig{Rule: Rule{Type: RuleStep, NodeID: "nudge", Operator: "opened"}})

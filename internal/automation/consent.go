@@ -19,26 +19,24 @@ const (
 	ReasonUnsubscribed Reason = "unsubscribed"
 	// ReasonUnconfirmed: the topic is a double opt-in list and they have not confirmed.
 	ReasonUnconfirmed Reason = "unconfirmed"
+	// ReasonNotSubscribed: they are not on the topic list at all.
+	ReasonNotSubscribed Reason = "not_subscribed"
 )
 
 // Decision is the answer to "may this message go to this subscriber?".
 type Decision struct {
 	Allowed bool
 	Reason  Reason
-	// NeedsSubscription is set when a marketing send is allowed but the subscriber has no
-	// subscription to the topic yet; the sender records one (confirmed) so that their opt-out,
-	// through the unsubscribe link, has something to be recorded against.
-	NeedsSubscription bool
 }
 
 // Consent applies the sending rules, using what listmonk already stores rather than anything new:
 //
 //   - A blocklisted subscriber receives nothing, of either type. That is the suppression list.
 //   - A transactional message otherwise goes out: it is not subject to topic opt-outs.
-//   - A marketing message needs an enabled subscriber who has not unsubscribed from the topic list,
-//     and, if that list is double opt-in, has confirmed. Someone with no subscription to a
-//     single opt-in topic yet is treated as subscribed (an event or API call created the contact);
-//     their subscription is recorded when the message is sent.
+//   - A marketing message needs an enabled subscriber with a live subscription to the topic list:
+//     confirmed, or unconfirmed on a single opt-in list. Someone with no subscription gets nothing:
+//     listmonk deletes the row when someone is removed from a list, so "never joined" and "was
+//     taken off" look the same. An automation that mails new contacts adds them to the topic first.
 //
 // Note that this is the automation engine's rule. `POST /api/tx` keeps its upstream behaviour and
 // does not look at the blocklist.
@@ -70,10 +68,7 @@ func decide(subscriber, subscription string, hasSubscription bool, optin, messag
 	}
 	switch {
 	case !hasSubscription:
-		if optin == "double" {
-			return Decision{Reason: ReasonUnconfirmed}
-		}
-		return Decision{Allowed: true, NeedsSubscription: true}
+		return Decision{Reason: ReasonNotSubscribed}
 	case subscription == "unsubscribed":
 		return Decision{Reason: ReasonUnsubscribed}
 	case subscription == "unconfirmed" && optin == "double":

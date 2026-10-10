@@ -259,23 +259,110 @@ func TestConsent(t *testing.T) {
 	}
 }
 
-func TestMarketingSendRecordsASubscriptionToTheTopic(t *testing.T) {
+func TestMarketingNeedsASubscriptionToTheTopic(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func(h *harness, sub, topic int)
+		steps func(h *harness, topic int) ([]Node, []Edge)
+	}{
+		{"never joined the topic", func(*harness, int, int) {}, func(h *harness, topic int) ([]Node, []Edge) {
+			return []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, topic, h.campaign())}}, nil
+		}},
+		// listmonk deletes the subscription when someone is removed, so this looks like "never joined".
+		{"removed from the topic by an earlier step", func(h *harness, sub, topic int) { h.subscribe(sub, topic, "confirmed") }, func(h *harness, topic int) ([]Node, []Edge) {
+			return []Node{
+				{ID: "rm", Type: NodeRemoveFromList, Config: cfg(ListConfig{ListID: topic})},
+				{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, topic, h.campaign())},
+			}, []Edge{{From: "rm", To: "m"}}
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			ctx := context.Background()
+			topic, trig := h.list("topic", "single"), h.list("trigger", "single")
+			nodes, edges := c.steps(h, topic)
+			auto := h.publish("c", &Graph{Triggers: listTrigger(trig), Root: nodes[0].ID, Nodes: nodes, Edges: edges}, Settings{})
+			sub := h.subscriber("a@example.com", "enabled", nil)
+			c.setup(h, sub, topic)
+			h.must(h.eng.OnListJoined(ctx, sub, trig))
+			h.drain()
+
+			enr := h.enrollment(auto, sub)
+			if h.sender.count() != 0 || enr.Status != EnrollmentExited || *enr.ExitReason != string(ReasonNotSubscribed) {
+				t.Fatalf("sent %d, status %s, reason %v", h.sender.count(), enr.Status, enr.ExitReason)
+			}
+			var n int
+			h.must(h.db.Get(&n, `SELECT COUNT(*) FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2`, sub, topic))
+			if n != 0 {
+				t.Fatal("the send subscribed them to the topic")
+			}
+		})
+	}
+}
+
+func TestAddToListNeverUndoesAnOptOut(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	topic, trig := h.list("topic", "single"), h.list("trigger", "single")
+	auto := h.publish("a", &Graph{Triggers: listTrigger(trig), Root: "add", Nodes: []Node{
+		{ID: "add", Type: NodeAddToList, Config: cfg(ListConfig{ListID: topic, Status: "confirmed"})},
+		{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, topic, h.campaign())},
+	}, Edges: []Edge{{From: "add", To: "m"}}}, Settings{})
+	joined := h.publish("j", &Graph{Triggers: listTrigger(topic), Root: "d", Nodes: []Node{{ID: "d", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "1h"})}}}, Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, topic, "unsubscribed")
+	h.must(h.eng.OnListJoined(ctx, sub, trig))
+	h.drain()
+
+	var status string
+	h.must(h.db.Get(&status, `SELECT status::TEXT FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2`, sub, topic))
+	if status != "unsubscribed" {
+		t.Fatalf("subscription = %s", status)
+	}
+	if enr := h.enrollment(auto, sub); h.sender.count() != 0 || *enr.ExitReason != ExitUnsubscribed {
+		t.Fatalf("sent %d, %+v", h.sender.count(), enr)
+	}
+	var n int
+	h.must(h.db.Get(&n, `SELECT COUNT(*) FROM enrollments WHERE automation_id = $1`, joined))
+	if n != 0 {
+		t.Fatal("the step counted as joining the list")
+	}
+}
+
+func TestAddToListDoesNotDowngradeAConfirmedSubscription(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	trig, dbl := h.list("t", "single"), h.list("d", "double")
+	h.publish("a", &Graph{Triggers: listTrigger(trig), Root: "add", Nodes: []Node{{ID: "add", Type: NodeAddToList, Config: cfg(ListConfig{ListID: dbl})}}}, Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, dbl, "confirmed")
+	h.must(h.eng.OnListJoined(ctx, sub, trig))
+	h.drain()
+	var status string
+	h.must(h.db.Get(&status, `SELECT status::TEXT FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2`, sub, dbl))
+	if status != "confirmed" {
+		t.Fatalf("subscription = %s", status)
+	}
+}
+
+func TestMarketingWithATransactionalTemplateIsNeverSent(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
 	topic, trig := h.list("topic", "single"), h.list("trigger", "single")
 	auto := h.publish("c", &Graph{Triggers: listTrigger(trig), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, topic, h.campaign())}}}, Settings{})
-	sub := h.subscriber("a@example.com", "enabled", nil) // never joined the topic
+	// Saving refuses this now; a version published before that check could still hold it.
+	g := Graph{Triggers: listTrigger(trig), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: cfg(SendEmailConfig{MessageType: MessageMarketing, ListID: topic, TemplateID: 1})}}}
+	raw, _ := json.Marshal(g)
+	_, err := h.db.Exec(`UPDATE automation_versions SET graph = $2 WHERE id = (SELECT current_version_id FROM automations WHERE id = $1)`, auto, raw)
+	h.must(err)
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, topic, "confirmed")
 	h.must(h.eng.OnListJoined(ctx, sub, trig))
 	h.drain()
 
-	if h.sender.count() != 1 || h.enrollment(auto, sub).Status != EnrollmentCompleted {
-		t.Fatal("not sent")
-	}
-	// So that their opt-out has somewhere to be recorded.
-	var status string
-	h.must(h.db.Get(&status, `SELECT status::TEXT FROM subscriber_lists WHERE subscriber_id = $1 AND list_id = $2`, sub, topic))
-	if status != "confirmed" {
-		t.Fatalf("subscription = %q", status)
+	if enr := h.enrollment(auto, sub); h.sender.count() != 0 || enr.Status != EnrollmentFailed {
+		t.Fatalf("sent %d, status %s", h.sender.count(), enr.Status)
 	}
 }
 
@@ -1074,5 +1161,35 @@ func TestAnEventJobStartsRunsOnceEvenIfItRunsTwice(t *testing.T) {
 	}
 	if _, created, _ := h.eng.RecordEvent(ctx, sub, "signed_up", nil, "k", h.clock.Now()); created || h.pendingJobs() != 0 {
 		t.Fatal("a repeated idempotency key queued another job")
+	}
+}
+
+func TestARetriedEventJobRecognisesItsRunAfterARestart(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	g, _, _ := h.waitGraph("1h", true)
+	auto := h.publish("abandoned", g, Settings{Reentry: Reentry{Mode: "always"}})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	first := event(sub, "checkout_started", h.clock.Now(), map[string]any{"cart": "first"})
+	h.must(h.eng.OnEvent(ctx, sub, first))
+	h.drain()
+
+	// A second event restarts the wait (replacing the run's event), then the run times out and ends.
+	h.clock.Advance(10 * time.Minute)
+	h.must(h.eng.OnEvent(ctx, sub, event(sub, "checkout_started", h.clock.Now(), map[string]any{"cart": "second"})))
+	h.drain()
+	h.clock.Advance(2 * time.Hour)
+	h.drain()
+	if enr := h.enrollment(auto, sub); enr.Status != EnrollmentCompleted || h.sender.count() != 1 {
+		t.Fatalf("sent %d, %+v", h.sender.count(), enr)
+	}
+
+	// The first event's job runs again (a retry): it already started a run, so it starts no other.
+	h.must(h.eng.OnEvent(ctx, sub, first))
+	h.drain()
+	var runs int
+	h.must(h.db.Get(&runs, `SELECT COUNT(*) FROM enrollments WHERE automation_id = $1`, auto))
+	if runs != 1 || h.sender.count() != 1 {
+		t.Fatalf("runs=%d sent=%d", runs, h.sender.count())
 	}
 }

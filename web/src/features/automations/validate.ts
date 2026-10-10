@@ -26,7 +26,11 @@ export function stepIssues(s: Step, ctx: Context): Issue[] {
     case 'send_email':
       if (c.message_type !== 'marketing' && c.message_type !== 'transactional') bad('message_type', 'web.automations.required')
       if (c.message_type === 'marketing' && !pos(c.list_id)) bad('list_id', 'web.automations.email.topicRequired')
-      if (pos(c.campaign_id) === pos(c.template_id)) bad('content', 'web.automations.email.contentRequired')
+      if (c.message_type === 'marketing' && pos(c.template_id)) bad('content', 'web.automations.email.marketingTemplate')
+      else if (pos(c.campaign_id) === pos(c.template_id)) {
+        // Marketing emails can't use a template, so don't offer one.
+        bad('content', c.message_type === 'marketing' ? 'web.automations.email.writeRequired' : 'web.automations.email.contentRequired')
+      }
       break
     case 'wait_for_event': {
       if (!isDuration(String(c.timeout ?? ''))) bad('timeout', 'web.automations.invalidDuration')

@@ -51,6 +51,9 @@ type EnrollContext struct {
 	Trigger string          `json:"trigger"`
 	ListID  int             `json:"list_id,omitempty"`
 	Event   json.RawMessage `json:"event,omitempty"`
+	// TriggerEventID is the event that started the run. Event is replaced when a wait_for_event
+	// restarts, so this is what tells a retried event job that it already started this run.
+	TriggerEventID int64 `json:"trigger_event_id,omitempty"`
 }
 
 // Config wires an Engine.
@@ -325,6 +328,7 @@ func (e *Engine) enroll(ctx context.Context, a *Automation, subscriberID int, ec
 			if done {
 				return false, nil
 			}
+			ec.TriggerEventID = ev.ID
 		}
 	}
 

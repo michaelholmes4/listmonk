@@ -34,7 +34,8 @@ const messageType = computed(() => (config.value.message_type as string) ?? 'mar
 const campaignId = computed(() => (config.value.campaign_id as number | undefined) || undefined)
 const mode = computed(() => (config.value.template_id ? 'template' : 'custom'))
 function setMessageType(v: string) {
-  patch(v === 'marketing' ? { message_type: v } : { message_type: v, list_id: undefined })
+  // A transactional template has no unsubscribe link, so marketing emails always have their own content.
+  patch(v === 'marketing' ? { message_type: v, template_id: undefined } : { message_type: v, list_id: undefined })
 }
 
 // --- Transactional template ------------------------------------------------------------------------
@@ -95,11 +96,11 @@ async function writeEmail() {
 
     <div class="space-y-3">
       <Label>{{ t('web.automations.email.content') }}</Label>
-      <RadioGroup :model-value="mode" class="flex gap-6" :disabled="disabled" @update:model-value="setMode(String($event))">
+      <RadioGroup v-if="messageType === 'transactional' || mode === 'template'" :model-value="mode" class="flex gap-6" :disabled="disabled" @update:model-value="setMode(String($event))">
         <div class="flex items-center gap-2"><RadioGroupItem id="mode-custom" value="custom" /><Label for="mode-custom" class="font-normal">{{ t('web.automations.email.custom') }}</Label></div>
         <div class="flex items-center gap-2"><RadioGroupItem id="mode-template" value="template" /><Label for="mode-template" class="font-normal">{{ t('web.automations.email.template') }}</Label></div>
       </RadioGroup>
-      <p v-if="errors.content" class="text-sm text-destructive">{{ errors.content }}</p>
+      <p v-if="errors.content && (mode === 'template' || campaignId)" class="text-sm text-destructive">{{ errors.content }}</p>
     </div>
 
     <!-- A transactional template -->
@@ -115,9 +116,15 @@ async function writeEmail() {
 
     <!-- Own content -->
     <template v-else>
-      <Button v-if="!campaignId" type="button" :disabled="disabled || create.isPending.value" data-cy="create-email" @click="writeEmail">
-        <Loader2 v-if="create.isPending.value" class="animate-spin" />{{ t('web.automations.email.write') }}
-      </Button>
+      <!-- No email yet: where the card will be, with the way to write it (and why it isn't valid yet). -->
+      <div v-if="!campaignId" class="space-y-3 rounded-lg border border-dashed p-3" :class="errors.content && 'border-destructive'" data-cy="email-empty">
+        <p class="text-sm" :class="errors.content ? 'text-destructive' : 'text-muted-foreground'">
+          {{ errors.content || t('web.automations.email.none') }}
+        </p>
+        <Button type="button" size="sm" :disabled="disabled || create.isPending.value" data-cy="create-email" @click="writeEmail">
+          <Loader2 v-if="create.isPending.value" class="animate-spin" />{{ t('web.automations.email.write') }}
+        </Button>
+      </div>
       <EmailContentCard v-else :campaign-id="campaignId" :to="emailPage" :disabled="disabled" />
     </template>
   </div>

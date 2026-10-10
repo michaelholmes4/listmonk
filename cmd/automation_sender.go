@@ -21,6 +21,8 @@ import (
 type automationSender struct {
 	core *core.Core
 	mgr  *manager.Manager
+	// from is the sender of transactional-template steps, as /api/tx defaults it (app.from_email).
+	from string
 
 	// Compiling a campaign template is the expensive part of a send; a step is typically sent many
 	// times in a row, so keep the compiled campaign until it changes.
@@ -34,8 +36,8 @@ type cachedCampaign struct {
 	at      time.Time
 }
 
-func newAutomationSender(co *core.Core, mgr *manager.Manager) *automationSender {
-	return &automationSender{core: co, mgr: mgr, cache: map[int]cachedCampaign{}}
+func newAutomationSender(co *core.Core, mgr *manager.Manager, from string) *automationSender {
+	return &automationSender{core: co, mgr: mgr, from: from, cache: map[int]cachedCampaign{}}
 }
 
 // SendEmail implements automation.Sender.
@@ -87,6 +89,7 @@ func (s *automationSender) SendEmail(_ context.Context, m automation.Message) er
 	}
 	msg := models.Message{
 		Subscriber:  sub,
+		From:        s.from,
 		To:          []string{sub.Email},
 		Subject:     tx.Subject,
 		ContentType: tx.ContentType,
