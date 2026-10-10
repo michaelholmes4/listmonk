@@ -103,3 +103,46 @@ func TestLastRetryFailsTheEnrollmentAfterTimeout(t *testing.T) {
 		t.Fatalf("status = %s, want failed", enr.Status)
 	}
 }
+
+// A message the mail server did not get is sent again by the job's retry, once, and its lease's
+// wake-up goes: left behind, every failed attempt would add a job that retries on its own.
+func TestNotSentIsRetriedByTheJobAlone(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	list := h.list("l", "single")
+	auto := h.publish("w", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, h.campaign())}}}, Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, list, "confirmed")
+	h.must(h.eng.OnListJoined(ctx, sub, list))
+	var id int64
+	h.must(h.db.Get(&id, `SELECT id FROM enrollments WHERE automation_id = $1`, auto))
+	jobs := h.pendingJobs()
+
+	w := &advanceWorker{e: h.eng}
+	job := func(attempt int) *river.Job[AdvanceArgs] {
+		return &river.Job[AdvanceArgs]{JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: maxAttempts}, Args: AdvanceArgs{EnrollmentID: id}}
+	}
+	h.sender.Err = errors.New("message not sent: 451 4.7.1 try later")
+	for attempt := 1; attempt <= 3; attempt++ {
+		if err := w.Work(ctx, job(attempt)); err == nil {
+			t.Fatal("a refused send must fail the attempt, so the job retries")
+		}
+		if n := h.pendingJobs(); n != jobs {
+			t.Fatalf("attempt %d: %d queued jobs, want %d (the lease's wake-up must go)", attempt, n, jobs)
+		}
+		if st, ok := h.steps(id)["m"]; ok {
+			t.Fatalf("attempt %d: step left as %q", attempt, st)
+		}
+	}
+
+	h.sender.Err = nil
+	if err := w.Work(ctx, job(4)); err != nil {
+		t.Fatal(err)
+	}
+	if h.sender.count() != 1 {
+		t.Fatalf("sent %d, want 1", h.sender.count())
+	}
+	if enr := h.enrollment(auto, sub); enr.Status != EnrollmentCompleted {
+		t.Fatalf("status = %s", enr.Status)
+	}
+}

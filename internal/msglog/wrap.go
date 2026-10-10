@@ -52,6 +52,9 @@ func Wrap(m Messenger, w *Writer, source string, keepContent bool) Messenger {
 func (l *logged) Name() string { return l.inner.Name() }
 func (l *logged) Flush() error { return l.inner.Flush() }
 
+// Unwrap returns the wrapped messenger, so callers can tell what kind it is.
+func (l *logged) Unwrap() any { return l.inner }
+
 func (l *logged) Close() error {
 	err := l.inner.Close()
 	l.w.Close()

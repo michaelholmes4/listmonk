@@ -34,8 +34,9 @@ type Message struct {
 	Event json.RawMessage
 }
 
-// Sender delivers a Message, returning once the messenger has it. Returning an error means it was
-// NOT handed over and never will be, so the step is retried.
+// Sender delivers a Message, returning once the messenger has it. Returning an error means the mail
+// server certainly did NOT get it from this call and never will (not handed over, or refused), so the
+// step is retried. An error that leaves it unknown (a lost reply) must be reported as sent: nil.
 type Sender interface {
 	SendEmail(ctx context.Context, m Message) error
 }
@@ -252,13 +253,22 @@ func (e *Engine) StopAndCancel(ctx context.Context) error {
 // enqueue schedules a wake-up inside the caller's transaction, so the state change and the job
 // either both happen or neither does.
 func (e *Engine) enqueue(ctx context.Context, tx *sqlx.Tx, enrollmentID int64, at time.Time) error {
+	_, err := e.enqueueJob(ctx, tx, enrollmentID, at)
+	return err
+}
+
+// enqueueJob is enqueue, returning the job's ID.
+func (e *Engine) enqueueJob(ctx context.Context, tx *sqlx.Tx, enrollmentID int64, at time.Time) (int64, error) {
 	// The time comes from the engine's clock (the real one outside tests). See Config.FixedSchedule.
 	opts := &river.InsertOpts{ScheduledAt: at}
 	if !e.cfg.FixedSchedule && !at.After(e.clock.Now()) {
 		opts.ScheduledAt = time.Time{} // due now: available at once
 	}
-	_, err := e.river.InsertTx(ctx, tx.Tx, AdvanceArgs{EnrollmentID: enrollmentID}, opts)
-	return err
+	res, err := e.river.InsertTx(ctx, tx.Tx, AdvanceArgs{EnrollmentID: enrollmentID}, opts)
+	if err != nil {
+		return 0, err
+	}
+	return res.Job.ID, nil
 }
 
 // graph returns the (cached) graph of a version.

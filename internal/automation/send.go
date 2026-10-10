@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // sendLease is how long a run is held while its email is sent. It is longer than a job may run,
@@ -27,8 +28,9 @@ const sendLease = 2*jobTimeout + time.Minute
 //
 // If the process dies between 1 and 3, the wake-up at the end of the lease finds the 'sending' row
 // and carries on without sending again: a message may be lost in that rare crash, but is never sent
-// twice. If the sender reports that it did not hand the message over, the row is removed and the run
-// made due again, so the retry sends it.
+// twice. If the sender reports that the mail server did not get the message (it was never handed over,
+// or the server refused it), the row and the lease's wake-up are removed and the run made due again,
+// so the job's retry sends it; a run that runs out of retries fails, with the last error.
 func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *Automation, ix *Index, n *Node, s Settings, sub subscriberRow, now time.Time) (bool, error) {
 	var c SendEmailConfig
 	if err := decodeConfig(n, &c); err != nil {
@@ -82,7 +84,8 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 	if _, err := tx.ExecContext(ctx, `UPDATE enrollments SET status = 'active', next_run_at = $2 WHERE id = $1`, enr.ID, leaseEnd); err != nil {
 		return false, err
 	}
-	if err := e.enqueue(ctx, tx, enr.ID, leaseEnd); err != nil {
+	leaseJob, err := e.enqueueJob(ctx, tx, enr.ID, leaseEnd)
+	if err != nil {
 		return false, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -110,15 +113,10 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
 	if err != nil {
-		// Not handed over: forget that we tried, and end the lease, so the retry sends it. If this
+		// The mail server did not get it: forget that we tried, so the job's retry sends it. If this
 		// fails, the wake-up at the end of the lease finds the 'sending' row and the email is lost.
-		if _, derr := e.db.ExecContext(wctx, `WITH d AS (
-				DELETE FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2 AND status = $3
-				AND visit = (SELECT current_visit FROM enrollments WHERE id = $1)
-				RETURNING enrollment_id)
-			UPDATE enrollments SET next_run_at = $4 WHERE id IN (SELECT enrollment_id FROM d) AND status IN ('active', 'waiting')`,
-			enr.ID, n.ID, StepSending, now); derr != nil {
-			e.log.Printf("automation: clearing step %s of enrollment %d: %v", n.ID, enr.ID, derr)
+		if uerr := e.unsend(wctx, enr.ID, n.ID, leaseJob, now); uerr != nil {
+			e.log.Printf("automation: clearing step %s of enrollment %d: %v", n.ID, enr.ID, uerr)
 		}
 		return false, err
 	}
@@ -167,4 +165,29 @@ func (e *Engine) commitApply(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, 
 		f(ctx)
 	}
 	return again, nil
+}
+
+// unsend undoes part 1 of sendStep for a message the mail server did not get: it removes the step's
+// 'sending' row, makes the run due again and removes the lease's wake-up. The job's own retry (with
+// its backoff and its limit) then sends it; were the wake-up left, every failed attempt would add
+// one more job that retries on its own, and an outage would multiply them.
+func (e *Engine) unsend(ctx context.Context, enrollmentID int64, nodeID string, leaseJob int64, now time.Time) error {
+	tx, err := e.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `WITH d AS (
+			DELETE FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2 AND status = $3
+			AND visit = (SELECT current_visit FROM enrollments WHERE id = $1)
+			RETURNING enrollment_id)
+		UPDATE enrollments SET next_run_at = $4 WHERE id IN (SELECT enrollment_id FROM d) AND status IN ('active', 'waiting')`,
+		enrollmentID, nodeID, StepSending, now); err != nil {
+		return err
+	}
+	// Running only if the lease ran out meanwhile, and that job is carrying the run on: leave it.
+	if _, err := e.river.JobDeleteTx(ctx, tx.Tx, leaseJob); err != nil && !errors.Is(err, rivertype.ErrNotFound) && !errors.Is(err, rivertype.ErrJobRunning) {
+		return err
+	}
+	return tx.Commit()
 }

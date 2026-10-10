@@ -559,7 +559,7 @@ func (m *Manager) worker() {
 			if err != nil {
 				m.log.Printf("error sending message in campaign %s: subscriber %d: %v", msg.Campaign.Name, msg.Subscriber.ID, err)
 			}
-			msg.forkSent() // librelist fork
+			msg.forkSent(err) // librelist fork
 
 			// Increment the send rate or the error counter if there was an error.
 			if msg.pipe != nil {
