@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"reflect"
 
 	"github.com/lib/pq"
 )
@@ -39,6 +40,7 @@ func (c *Core) forkEnd(s *forkSnap) {
 	}
 	subs, attribs := c.forkRead(s.subIDs, s.listIDs)
 
+	var calls []func()
 	if c.h.OnSubscriptionsConfirmed != nil {
 		became := map[int][]int{}
 		for k, live := range subs {
@@ -47,17 +49,36 @@ func (c *Core) forkEnd(s *forkSnap) {
 			}
 		}
 		for sub, lists := range became {
-			go c.forkRun(func() { c.h.OnSubscriptionsConfirmed(sub, lists) })
+			calls = append(calls, func() { c.h.OnSubscriptionsConfirmed(sub, lists) })
 		}
 	}
 	if c.h.OnAttribsChanged != nil {
 		for id, after := range attribs {
-			if before := s.attribs[id]; before != nil || len(after) > 0 {
-				go c.forkRun(func() { c.h.OnAttribsChanged(id, before, after) })
+			before := s.attribs[id]
+			// Only those whose attributes changed (a bulk list change touches many and changes none).
+			if reflect.DeepEqual(before, after) || (before == nil && len(after) == 0) {
+				continue
 			}
+			calls = append(calls, func() { c.h.OnAttribsChanged(id, before, after) })
 		}
 	}
+	if len(calls) == 0 {
+		return
+	}
+
+	// One background task per mutation, and only a few at a time: a bulk change of thousands of
+	// subscribers must not become thousands of concurrent trigger lookups on the database.
+	go func() {
+		forkSlots <- struct{}{}
+		defer func() { <-forkSlots }()
+		for _, f := range calls {
+			c.forkRun(f)
+		}
+	}()
 }
+
+// forkSlots limits how many mutations' hooks run at once.
+var forkSlots = make(chan struct{}, 4)
 
 // forkRun runs a hook, keeping a panic in it from taking the process down.
 func (c *Core) forkRun(f func()) {
