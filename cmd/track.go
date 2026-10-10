@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/knadh/listmonk/internal/auth"
 	"github.com/knadh/listmonk/internal/subimporter"
 	"github.com/knadh/listmonk/models"
 	"github.com/labstack/echo/v4"
@@ -67,11 +68,15 @@ func (a *App) TrackEvent(c echo.Context) error {
 		props = []byte(`{}`)
 	}
 
-	// Find, or create, the subscriber.
+	// Find, or create, the subscriber. An existing one must be on a list the user may see, as for
+	// the other subscriber endpoints: the event can change their attributes and email them.
 	var sub models.Subscriber
 	if req.Subscriber.ID != 0 {
 		sub, err = a.core.GetSubscriber(req.Subscriber.ID, "", "")
 		if err != nil {
+			return err
+		}
+		if err := a.hasSubPerm(auth.GetUser(c), []int{sub.ID}); err != nil {
 			return err
 		}
 	} else {
@@ -93,6 +98,8 @@ func (a *App) TrackEvent(c echo.Context) error {
 			if err != nil {
 				return err
 			}
+		} else if err := a.hasSubPerm(auth.GetUser(c), []int{sub.ID}); err != nil {
+			return err
 		}
 	}
 

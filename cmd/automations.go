@@ -473,6 +473,9 @@ func (a *App) UpdateAutomationEmail(c echo.Context) error {
 	if cm.Type != "automation" {
 		return echo.NewHTTPError(http.StatusNotFound, a.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.campaign}"))
 	}
+	if err := a.automationEmailPerms(c, id, cm); err != nil {
+		return err
+	}
 
 	// As in UpdateCampaign: fields not in the request keep their stored values.
 	cm.Attribs = nil
@@ -498,6 +501,29 @@ func (a *App) UpdateAutomationEmail(c echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, okResp{out})
+}
+
+// automationEmailPerms refuses an edit to a step campaign that would let the user write to people
+// they could not reach by publishing (see automationPerms): its content goes out on every step that
+// sends it, so the user must manage each of their topic lists (and the list the campaign is linked to),
+// and needs tx:send if any of them is transactional.
+func (a *App) automationEmailPerms(c echo.Context, id int, cm models.Campaign) error {
+	steps, err := a.automation.Store().CampaignSteps(c.Request().Context(), id)
+	if err != nil {
+		return a.autoErr(c, err)
+	}
+	u := auth.GetUser(c)
+	lists := jsonIDs(cm.Lists)
+	for _, s := range steps {
+		lists = append(lists, s.ListID)
+		if s.MessageType == automation.MessageTransactional && !u.HasPerm(auth.PermTxSend) {
+			return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "transactional emails (tx:send)"))
+		}
+	}
+	if err := u.HasListPerm(auth.PermTypeManage, lists...); err != nil {
+		return echo.NewHTTPError(http.StatusForbidden, a.i18n.Ts("globals.messages.permissionDenied", "name", "a list this email is sent to"))
+	}
+	return nil
 }
 
 // jsonIDs reads the IDs out of a campaign's `lists` or `media` JSON ([{"id": 1, ...}, ...]).

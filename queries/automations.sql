@@ -42,7 +42,8 @@ UPDATE automations SET status = $2, updated_at = NOW() WHERE id = $1 AND status 
 SELECT * FROM automations WHERE id = $1 FOR UPDATE;
 
 -- name: automation-delete-automation
-DELETE FROM automations WHERE id = $1;
+-- Only one that is not live: the status is checked here, not before, so a publish in between wins.
+DELETE FROM automations WHERE id = $1 AND status IN ('draft', 'archived');
 
 -- name: automation-insert-version
 -- The next version number, with the given graph (a draft until published).
@@ -282,6 +283,12 @@ SELECT EXISTS (
       AND (EXISTS (SELECT 1 FROM automations a WHERE a.current_version_id = v.id)
            OR EXISTS (SELECT 1 FROM enrollments e WHERE e.version_id = v.id AND e.status IN ('active', 'waiting')))
 );
+
+-- name: automation-campaign-step-configs
+-- The config of every email step, in any version (a draft included), that sends this step campaign.
+SELECT n->'config' FROM automation_versions v
+CROSS JOIN LATERAL JSONB_ARRAY_ELEMENTS(COALESCE(v.graph->'nodes', '[]'::JSONB)) n
+WHERE n->>'type' = 'send_email' AND n->'config'->>'campaign_id' = $1::TEXT;
 
 -- name: automation-copy-step-campaign
 -- A copy of a step campaign's content, for a version whose step changed its topic. Lists are set by the caller.

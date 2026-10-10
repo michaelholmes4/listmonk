@@ -598,6 +598,10 @@ func (e *Engine) Archive(ctx context.Context, id int) (*Automation, error) {
 
 // fail ends an enrollment that can't continue.
 func (e *Engine) fail(ctx context.Context, id int64, cause error) error {
+	// Often called because the job's time ran out: with its context already done, the update would
+	// never run and the run would wait for good for a job that won't come.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
 	res, _ := json.Marshal(map[string]string{"error": cause.Error()})
 	_, err := e.db.ExecContext(ctx, `
 		UPDATE enrollments SET status = 'failed', exit_reason = 'error', exited_at = NOW(), next_run_at = NULL, context = context || $2::JSONB

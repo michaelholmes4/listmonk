@@ -268,3 +268,68 @@ func TestStepsCarryTheDeliveryOutcomeOfTheirEmail(t *testing.T) {
 		t.Fatalf("after: %+v", steps[0])
 	}
 }
+
+// Editing a step campaign changes every step that sends it, drafts included, so all of them are found.
+func TestCampaignSteps(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	list := h.list("topic", "single")
+	camp, unused := h.campaign(), h.campaign()
+
+	h.publish("live", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, camp)}}}, Settings{})
+	draft, err := h.store.Create(ctx, "draft", Settings{})
+	h.must(err)
+	_, _, err = h.store.SaveDraft(ctx, draft.ID, &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, camp)}}}, true)
+	h.must(err)
+
+	steps, err := h.store.CampaignSteps(ctx, camp)
+	h.must(err)
+	var marketing, transactional int
+	for _, s := range steps {
+		switch {
+		case s.MessageType == MessageMarketing && s.ListID == list:
+			marketing++
+		case s.MessageType == MessageTransactional:
+			transactional++
+		}
+	}
+	if marketing != 1 || transactional != 1 {
+		t.Fatalf("steps = %+v, want the published marketing step and the draft's transactional one", steps)
+	}
+
+	if steps, err := h.store.CampaignSteps(ctx, unused); err != nil || len(steps) != 0 {
+		t.Fatalf("unused campaign: %+v %v", steps, err)
+	}
+}
+
+// Only a draft or an archived automation can be deleted, and the delete itself checks: a live one
+// keeps its runs however the requests interleave.
+func TestDeleteOnlyWhenNotLive(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	list := h.list("l", "single")
+	g := &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, h.campaign())}}}
+
+	live := h.publish("live", g, Settings{})
+	if err := h.store.Delete(ctx, live); !errors.Is(err, ErrConflict) {
+		t.Fatalf("deleting an active automation: %v, want a conflict", err)
+	}
+	if _, err := h.store.Get(ctx, live); err != nil {
+		t.Fatalf("the active automation is gone: %v", err)
+	}
+
+	draft, err := h.store.Create(ctx, "draft", Settings{})
+	h.must(err)
+	h.must(h.store.Delete(ctx, draft.ID))
+	if _, err := h.store.Get(ctx, draft.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("draft still there: %v", err)
+	}
+
+	_, err = h.store.SetStatus(ctx, live, StatusActive, StatusArchived)
+	h.must(err)
+	h.must(h.store.Delete(ctx, live))
+
+	if err := h.store.Delete(ctx, live); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("deleting a missing automation: %v, want not found", err)
+	}
+}

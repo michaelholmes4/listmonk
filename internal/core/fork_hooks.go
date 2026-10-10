@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -31,7 +32,12 @@ func (c *Core) forkBegin(subIDs, listIDs []int) *forkSnap {
 		return nil
 	}
 	s := &forkSnap{subIDs: subIDs, listIDs: listIDs}
-	s.subs, s.attribs = c.forkRead(subIDs, listIDs)
+	var err error
+	if s.subs, s.attribs, err = c.forkRead(subIDs, listIDs); err != nil {
+		// Without the state before, everything would look new: skip this mutation's triggers.
+		c.log.Printf("automation hook: %v; triggers skipped", err)
+		return nil
+	}
 	return s
 }
 
@@ -40,7 +46,11 @@ func (c *Core) forkEnd(s *forkSnap) {
 	if s == nil || !c.forkOn() {
 		return
 	}
-	subs, attribs := c.forkRead(s.subIDs, s.listIDs)
+	subs, attribs, err := c.forkRead(s.subIDs, s.listIDs)
+	if err != nil {
+		c.log.Printf("automation hook: %v; triggers skipped", err)
+		return
+	}
 
 	var calls []func()
 	if c.h.OnSubscriptionsConfirmed != nil {
@@ -94,7 +104,10 @@ func (c *Core) forkRun(f func()) {
 
 // A subscription is live when messages may go out on it: confirmed, or unconfirmed on a single
 // opt-in list (where that is the normal state; only double opt-in waits for a confirmation).
-func (c *Core) forkRead(subIDs, listIDs []int) (map[[2]int]bool, map[int]map[string]any) {
+//
+// A read that fails, even partway, returns an error and no state: half a snapshot would make what
+// it missed look new, and fire the triggers again for subscriptions and attributes they already had.
+func (c *Core) forkRead(subIDs, listIDs []int) (map[[2]int]bool, map[int]map[string]any, error) {
 	subs := map[[2]int]bool{}
 	attribs := map[int]map[string]any{}
 
@@ -108,37 +121,45 @@ func (c *Core) forkRead(subIDs, listIDs []int) (map[[2]int]bool, map[int]map[str
 			FROM subscriber_lists sl JOIN lists l ON l.id = sl.list_id
 			WHERE sl.subscriber_id = ANY($1) AND ($2::INT[] IS NULL OR sl.list_id = ANY($2::INT[]))`, pq.Array(subIDs), lists)
 		if err != nil {
-			c.log.Printf("automation hook: reading subscriptions: %v", err)
-		} else {
-			defer rows.Close()
-			for rows.Next() {
-				var sub, list int
-				var live bool
-				if rows.Scan(&sub, &list, &live) == nil {
-					subs[[2]int{sub, list}] = live
-				}
+			return nil, nil, fmt.Errorf("reading subscriptions: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var sub, list int
+			var live bool
+			if err := rows.Scan(&sub, &list, &live); err != nil {
+				return nil, nil, fmt.Errorf("reading subscriptions: %w", err)
 			}
+			subs[[2]int{sub, list}] = live
+		}
+		if err := rows.Err(); err != nil {
+			return nil, nil, fmt.Errorf("reading subscriptions: %w", err)
 		}
 	}
 
 	if c.h.OnAttribsChanged != nil {
 		rows, err := c.db.Query(`SELECT id, attribs FROM subscribers WHERE id = ANY($1)`, pq.Array(subIDs))
 		if err != nil {
-			c.log.Printf("automation hook: reading attributes: %v", err)
-		} else {
-			defer rows.Close()
-			for rows.Next() {
-				var id int
-				var raw []byte
-				if rows.Scan(&id, &raw) == nil {
-					m := map[string]any{}
-					_ = json.Unmarshal(raw, &m)
-					attribs[id] = m
-				}
+			return nil, nil, fmt.Errorf("reading attributes: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id int
+			var raw []byte
+			if err := rows.Scan(&id, &raw); err != nil {
+				return nil, nil, fmt.Errorf("reading attributes: %w", err)
 			}
+			m := map[string]any{}
+			if err := json.Unmarshal(raw, &m); err != nil {
+				return nil, nil, fmt.Errorf("reading attributes of subscriber %d: %w", id, err)
+			}
+			attribs[id] = m
+		}
+		if err := rows.Err(); err != nil {
+			return nil, nil, fmt.Errorf("reading attributes: %w", err)
 		}
 	}
-	return subs, attribs
+	return subs, attribs, nil
 }
 
 // MergeSubscriberAttribs merges attribs into a subscriber's attributes (top-level keys) in one

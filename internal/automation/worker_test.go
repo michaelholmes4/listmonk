@@ -79,3 +79,27 @@ func TestLastRetryFailsTheEnrollment(t *testing.T) {
 		t.Fatalf("status = %s", enr.Status)
 	}
 }
+
+// The last attempt often fails because the job ran out of time: its context is already done, and the
+// enrollment must still be marked failed.
+func TestLastRetryFailsTheEnrollmentAfterTimeout(t *testing.T) {
+	h := newHarness(t)
+	list := h.list("l", "single")
+	auto := h.publish("w", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, h.campaign())}}}, Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, list, "confirmed")
+	h.must(h.eng.OnListJoined(context.Background(), sub, list))
+	var id int64
+	h.must(h.db.Get(&id, `SELECT id FROM enrollments WHERE automation_id = $1`, auto))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w := &advanceWorker{e: h.eng}
+	job := &river.Job[AdvanceArgs]{JobRow: &rivertype.JobRow{Attempt: maxAttempts, MaxAttempts: maxAttempts}, Args: AdvanceArgs{EnrollmentID: id}}
+	if err := w.Work(ctx, job); err != nil {
+		t.Fatalf("the final failure should end the job, got %v", err)
+	}
+	if enr := h.enrollment(auto, sub); enr.Status != EnrollmentFailed {
+		t.Fatalf("status = %s, want failed", enr.Status)
+	}
+}

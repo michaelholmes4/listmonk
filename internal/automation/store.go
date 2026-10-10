@@ -172,17 +172,20 @@ func (s *Store) Update(ctx context.Context, id int, name string, settings Settin
 	return &a, nil
 }
 
-// Delete removes an automation that is not live (a draft, or archived).
+// Delete removes an automation that is not live (a draft, or archived). The status is checked by the
+// delete itself: one published or resumed after a separate check would go, with its runs.
 func (s *Store) Delete(ctx context.Context, id int) error {
-	a, err := s.Get(ctx, id)
+	res, err := s.db.ExecContext(ctx, s.q.get("delete-automation"), id)
 	if err != nil {
 		return err
 	}
-	if a.Status != StatusDraft && a.Status != StatusArchived {
-		return fmt.Errorf("%w: archive an automation before deleting it", ErrConflict)
+	if n, err := res.RowsAffected(); err != nil || n > 0 {
+		return err
 	}
-	_, err = s.db.ExecContext(ctx, s.q.get("delete-automation"), id)
-	return err
+	if _, err := s.Get(ctx, id); err != nil {
+		return err
+	}
+	return fmt.Errorf("%w: archive an automation before deleting it", ErrConflict)
 }
 
 // Draft returns the editable version, creating one (a copy of the published graph) if none exists.
@@ -427,6 +430,24 @@ func (s *Store) CreateStepCampaign(ctx context.Context, p StepCampaign) (int, er
 		}
 	}
 	return id, tx.Commit()
+}
+
+// CampaignSteps returns the config of every email step, in any version, that sends a step campaign:
+// whoever edits the campaign changes what all of them send.
+func (s *Store) CampaignSteps(ctx context.Context, campaignID int) ([]SendEmailConfig, error) {
+	var raws []json.RawMessage
+	if err := s.db.SelectContext(ctx, &raws, s.q.get("campaign-step-configs"), campaignID); err != nil {
+		return nil, err
+	}
+	out := make([]SendEmailConfig, 0, len(raws))
+	for _, r := range raws {
+		var c SendEmailConfig
+		if err := json.Unmarshal(r, &c); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, nil
 }
 
 // checkStepCampaigns checks that every email step points at a hidden automation campaign (never an
