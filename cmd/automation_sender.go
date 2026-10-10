@@ -125,6 +125,10 @@ func (s *automationSender) campaign(id int) (*models.Campaign, error) {
 	if err := fresh.CompileTemplate(s.mgr.TemplateFuncs(&fresh)); err != nil {
 		return nil, fmt.Errorf("compiling campaign %d: %w", id, err)
 	}
+	// Before the campaign is shared: sends must not each add its attachments.
+	if err := s.mgr.LoadCampaignMedia(&fresh); err != nil {
+		return nil, err
+	}
 	s.cache[id] = cachedCampaign{camp: &fresh, updated: fresh.UpdatedAt.Time, at: time.Now()}
 	return &fresh, nil
 }

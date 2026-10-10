@@ -39,6 +39,13 @@ func (m *Manager) NewAutomationMessage(c *models.Campaign, s models.Subscriber, 
 	return msg, nil
 }
 
+// LoadCampaignMedia attaches a campaign's media once, up front. The automation sender shares one
+// compiled campaign between concurrent sends; with its media already loaded, PushCampaignMessage
+// finds nothing to add instead of appending to the shared campaign from several goroutines.
+func (m *Manager) LoadCampaignMedia(c *models.Campaign) error {
+	return m.attachMedia(c)
+}
+
 // forkTransactional reports a transactional automation email, which gets no List-Unsubscribe
 // header: it has no topic to unsubscribe from, and unsubscribing would not stop it.
 func (msg *CampaignMessage) forkTransactional() bool {
