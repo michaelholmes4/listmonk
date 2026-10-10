@@ -28,9 +28,10 @@ type automationSender struct {
 	from string
 
 	// Compiling a campaign template is the expensive part of a send; a step is typically sent many
-	// times in a row, so keep the compiled campaign until it changes.
+	// times in a row, so keep the compiled campaign until it changes. Each campaign has its own lock,
+	// so compiling one (and fetching its media) does not hold up the others' sends.
 	mu    sync.Mutex
-	cache map[int]cachedCampaign
+	cache map[int]*cachedCampaign
 }
 
 // deliveryWait is how long a step waits for a campaign worker to take its email. The queue it shares
@@ -39,13 +40,14 @@ type automationSender struct {
 const deliveryWait = 30 * time.Second
 
 type cachedCampaign struct {
+	mu      sync.Mutex
 	camp    *models.Campaign
 	updated time.Time
 	at      time.Time
 }
 
 func newAutomationSender(co *core.Core, mgr *manager.Manager, from string) *automationSender {
-	return &automationSender{core: co, mgr: mgr, from: from, cache: map[int]cachedCampaign{}}
+	return &automationSender{core: co, mgr: mgr, from: from, cache: map[int]*cachedCampaign{}}
 }
 
 // SendEmail implements automation.Sender.
@@ -126,8 +128,16 @@ func (s *automationSender) campaign(id int) (*models.Campaign, error) {
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if c, ok := s.cache[id]; ok && c.updated.Equal(fresh.UpdatedAt.Time) && time.Since(c.at) < time.Minute {
+	c, ok := s.cache[id]
+	if !ok {
+		c = &cachedCampaign{}
+		s.cache[id] = c
+	}
+	s.mu.Unlock()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.camp != nil && c.updated.Equal(fresh.UpdatedAt.Time) && time.Since(c.at) < time.Minute {
 		return c.camp, nil
 	}
 	if err := s.mgr.LoadInlineImages(&fresh); err != nil {
@@ -140,6 +150,6 @@ func (s *automationSender) campaign(id int) (*models.Campaign, error) {
 	if err := s.mgr.LoadCampaignMedia(&fresh); err != nil {
 		return nil, err
 	}
-	s.cache[id] = cachedCampaign{camp: &fresh, updated: fresh.UpdatedAt.Time, at: time.Now()}
+	c.camp, c.updated, c.at = &fresh, fresh.UpdatedAt.Time, time.Now()
 	return &fresh, nil
 }

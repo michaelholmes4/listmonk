@@ -802,6 +802,50 @@ func TestOneAutomationCanStartAnother(t *testing.T) {
 	}
 }
 
+func TestConfirmingALiveSubscriptionIsNotAJoin(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	first, second := h.list("first", "single"), h.list("second", "single")
+	h.publish("a", &Graph{Triggers: listTrigger(first), Root: "add", Nodes: []Node{{ID: "add", Type: NodeAddToList, Config: cfg(ListConfig{ListID: second})}}}, Settings{})
+	b := h.publish("b", &Graph{Triggers: listTrigger(second), Root: "d", Nodes: []Node{{ID: "d", Type: NodeDelay, Config: cfg(DelayConfig{Duration: "1h"})}}}, Settings{Reentry: Reentry{Mode: "always"}})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	// Already on the single opt-in list, unconfirmed: they joined it (and its automations) back then.
+	h.subscribe(sub, second, "unconfirmed")
+	h.subscribe(sub, first, "confirmed")
+	h.must(h.eng.OnListJoined(ctx, sub, first))
+	h.drain()
+
+	var n int
+	h.must(h.db.Get(&n, `SELECT COUNT(*) FROM enrollments WHERE automation_id = $1`, b))
+	if n != 0 {
+		t.Fatal("confirming an existing single opt-in member started the list's automation again")
+	}
+}
+
+func TestEnrollingCurrentMembersTakesLiveSubscriptions(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	single, double := h.list("s", "single"), h.list("d", "double")
+	confirmed := h.subscriber("c@example.com", "enabled", nil)
+	unconfirmed := h.subscriber("u@example.com", "enabled", nil)
+	pending := h.subscriber("p@example.com", "enabled", nil)
+	h.subscribe(confirmed, single, "confirmed")
+	h.subscribe(unconfirmed, single, "unconfirmed")
+	h.subscribe(pending, double, "unconfirmed")
+
+	got := map[int]bool{}
+	for _, l := range []int{single, double} {
+		ids, err := h.store.SubscriberIDsOnList(ctx, l, 0, 100)
+		h.must(err)
+		for _, id := range ids {
+			got[id] = true
+		}
+	}
+	if !got[confirmed] || !got[unconfirmed] || got[pending] {
+		t.Fatalf("members = %v (confirmed %d, unconfirmed on single %d, unconfirmed on double %d)", got, confirmed, unconfirmed, pending)
+	}
+}
+
 func TestDoubleOptInListsAreJoinedUnconfirmed(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()

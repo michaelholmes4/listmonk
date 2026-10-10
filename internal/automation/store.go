@@ -700,7 +700,8 @@ func (s *Store) DeleteEventsBefore(ctx context.Context, before time.Time) (int64
 	return res.RowsAffected()
 }
 
-// SubscriberIDsOnList pages through the confirmed, enabled members of a list.
+// SubscriberIDsOnList pages through the enabled members of a list with a live subscription (confirmed,
+// or unconfirmed on a single opt-in list).
 func (s *Store) SubscriberIDsOnList(ctx context.Context, listID, afterID, limit int) ([]int, error) {
 	var ids []int
 	if err := s.db.SelectContext(ctx, &ids, s.q.get("subscriber-ids-by-list"), listID, afterID, limit); err != nil {

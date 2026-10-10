@@ -310,15 +310,15 @@ func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *
 		if err := decodeConfig(n, &c); err != nil {
 			return outcome{}, err
 		}
+		var optin string
+		if err := tx.GetContext(ctx, &optin, e.q.get("get-list-optin"), c.ListID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return outcome{}, permanent("step %s: the list no longer exists", n.ID)
+			}
+			return outcome{}, err
+		}
 		status := c.Status
 		if status == "" {
-			var optin string
-			if err := tx.GetContext(ctx, &optin, e.q.get("get-list-optin"), c.ListID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return outcome{}, permanent("step %s: the list no longer exists", n.ID)
-				}
-				return outcome{}, err
-			}
 			status = "confirmed"
 			if optin == "double" {
 				status = "unconfirmed"
@@ -332,7 +332,9 @@ func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *
 			return outcome{}, err
 		}
 		o := done(ix.Next(n.ID, ""), map[string]any{"list_id": c.ListID, "status": res.Current})
-		if res.Current == "confirmed" && res.Previous != "confirmed" {
+		// Only a subscription that wasn't live before is a join (as the core's trigger counts it):
+		// confirming an unconfirmed member of a single opt-in list is not.
+		if liveSubscription(res.Current, optin) && !liveSubscription(res.Previous, optin) {
 			o.after = append(o.after, func(ctx context.Context) {
 				if err := e.OnListJoined(ctx, sub.ID, c.ListID); err != nil {
 					e.log.Printf("automation: list triggers for subscriber %d: %v", sub.ID, err)

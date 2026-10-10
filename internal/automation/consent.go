@@ -77,6 +77,12 @@ func decide(subscriber, subscription string, hasSubscription bool, optin, messag
 	return Decision{Allowed: true}
 }
 
+// liveSubscription reports whether messages may go out on a subscription with this status ("" for
+// none) to a list with this opt-in: confirmed, or unconfirmed on a single opt-in list.
+func liveSubscription(status, optin string) bool {
+	return status == "confirmed" || (status == "unconfirmed" && optin == "single")
+}
+
 func nilIfZero(n int) any {
 	if n == 0 {
 		return nil

@@ -306,7 +306,10 @@ INSERT INTO campaign_lists (campaign_id, list_id, list_name) SELECT $1, id, name
 SELECT id FROM templates WHERE is_default = true AND type = 'campaign' LIMIT 1;
 
 -- name: automation-subscriber-ids-by-list
--- Confirmed members of a list who can be enrolled (for "also enroll current matches").
+-- Members of a list who can be enrolled (for "also enroll current matches"): those with a live subscription,
+-- as the "joined a list" trigger counts it (confirmed, or unconfirmed on a single opt-in list).
 SELECT s.id FROM subscribers s
-JOIN subscriber_lists sl ON sl.subscriber_id = s.id AND sl.list_id = $1 AND sl.status = 'confirmed'
+JOIN subscriber_lists sl ON sl.subscriber_id = s.id AND sl.list_id = $1
+JOIN lists l ON l.id = sl.list_id
+    AND (sl.status = 'confirmed' OR (sl.status = 'unconfirmed' AND l.optin = 'single'))
 WHERE s.status = 'enabled' AND s.id > $2 ORDER BY s.id LIMIT $3;
