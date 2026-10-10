@@ -238,3 +238,33 @@ func TestPublishChecksSeeTheGraphAndCanRefuseIt(t *testing.T) {
 		t.Fatalf("a refused publish went live: %+v", got)
 	}
 }
+
+func TestStepsCarryTheDeliveryOutcomeOfTheirEmail(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	list := h.list("l", "single")
+	auto := h.publish("d", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{
+		{ID: "m", Type: NodeSendEmail, Config: mail(MessageTransactional, 0, h.campaign())},
+	}}, Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.must(h.eng.OnListJoined(ctx, sub, list))
+	h.drain()
+	enr := h.enrollment(auto, sub)
+
+	steps, err := h.store.Steps(ctx, enr.ID)
+	h.must(err)
+	if len(steps) != 1 || steps[0].DeliveryStatus != nil {
+		t.Fatalf("before the message is logged: %+v", steps)
+	}
+
+	// The messenger refused it (what the message log records after the step was already done).
+	_, err = h.db.Exec(`INSERT INTO librelist_messages (source, status, error, subscriber_id, automation_id, enrollment_id)
+		VALUES ('automation', 'failed', 'smtp: 550 mailbox unavailable', $1, $2, $3)`, sub, auto, enr.ID)
+	h.must(err)
+	steps, err = h.store.Steps(ctx, enr.ID)
+	h.must(err)
+	if steps[0].Status != StepDone || steps[0].DeliveryStatus == nil || *steps[0].DeliveryStatus != "failed" ||
+		steps[0].DeliveryError == nil || *steps[0].DeliveryError != "smtp: 550 mailbox unavailable" || steps[0].MessageLogID == nil {
+		t.Fatalf("after: %+v", steps[0])
+	}
+}

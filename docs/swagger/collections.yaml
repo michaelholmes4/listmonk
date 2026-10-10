@@ -5737,6 +5737,9 @@ components:
         result: { type: object, additionalProperties: true }
         error: { type: string, nullable: true }
         visit: { type: integer, description: Which arrival at the step this row belongs to, from 1. }
+        delivery_status: { type: string, enum: [sent, failed], nullable: true, description: "Email steps: whether the mail server accepted the message (from the message log). Null while not logged yet." }
+        delivery_error: { type: string, nullable: true }
+        message_log_id: { type: integer, nullable: true, description: The message log entry of the email }
     AutomationNodeStat:
       type: object
       properties:

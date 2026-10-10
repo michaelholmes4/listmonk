@@ -10,6 +10,11 @@ const { t, te } = useI18n()
 const known = (key: string, raw: string) => (te(key) ? t(key) : raw)
 const stamp = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
 const variant = (s?: string) => (s === 'done' ? 'success' : s === 'failed' ? 'destructive' : s === 'skipped' ? 'secondary' : 'outline')
+/** An email step's delivery outcome from the message log; "pending" until the message is logged. */
+const delivery = (s: AutomationStep): 'sent' | 'failed' | 'pending' | null => {
+  if (s.delivery_status) return s.delivery_status
+  return s.status === 'done' && (s.result as Record<string, unknown> | undefined)?.message_type ? 'pending' : null
+}
 const detail = (s: AutomationStep): string => {
   const r = (s.result ?? {}) as Record<string, unknown>
   if (s.error) return s.error
@@ -35,6 +40,11 @@ const detail = (s: AutomationStep): string => {
         <Badge :variant="variant(s.status)">{{ t(`web.automations.stepStatus.${s.status}`) }}</Badge>
       </div>
       <p class="mt-1 text-xs text-muted-foreground">{{ stamp(s.started_at) }}<template v-if="(s.visit ?? 1) > 1"> · {{ t('web.automations.goTo.visit', { n: s.visit }) }}</template></p>
+      <p v-if="delivery(s)" class="mt-1 flex items-center gap-2 text-sm" data-cy="delivery">
+        <Badge :variant="delivery(s) === 'failed' ? 'destructive' : delivery(s) === 'sent' ? 'success' : 'outline'">{{ t(`web.automations.delivery.${delivery(s)}`) }}</Badge>
+        <span v-if="s.delivery_error" class="text-destructive">{{ s.delivery_error }}</span>
+        <RouterLink v-if="s.message_log_id" :to="{ name: 'message', params: { id: s.message_log_id } }" class="text-xs underline">{{ t('web.automations.delivery.viewLog') }}</RouterLink>
+      </p>
       <p v-if="detail(s)" class="mt-1 text-sm" :class="s.error ? 'text-destructive' : ''">{{ detail(s) }}</p>
     </li>
   </ol>

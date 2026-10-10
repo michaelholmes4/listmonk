@@ -156,7 +156,17 @@ WHERE enrollment_id = $1 AND node_id = $2
 AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
 
 -- name: automation-list-steps
-SELECT * FROM enrollment_steps WHERE enrollment_id = $1 ORDER BY started_at, id;
+-- An email step also carries the outcome of the message it handed to listmonk, from the message log: the
+-- first message of this run logged at or after the step started (steps run one after another).
+SELECT st.*, m.status AS delivery_status, NULLIF(m.error, '') AS delivery_error, m.id AS message_log_id
+FROM enrollment_steps st
+LEFT JOIN LATERAL (
+    SELECT id, status, error FROM librelist_messages
+    WHERE enrollment_id = st.enrollment_id AND created_at >= st.started_at
+        AND st.result ? 'message_type'
+    ORDER BY created_at, id LIMIT 1
+) m ON TRUE
+WHERE st.enrollment_id = $1 ORDER BY st.started_at, st.id;
 
 -- name: automation-node-stats
 -- Per step of an automation, how many people reached it, finished it, or are waiting on it.

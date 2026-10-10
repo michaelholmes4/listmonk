@@ -2835,6 +2835,14 @@ export interface components {
             error?: string | null;
             /** @description Which arrival at the step this row belongs to */
             visit?: number;
+            /**
+             * @description Email steps: whether the mail server accepted the message (from the message log). Null while not logged yet.
+             * @enum {string|null}
+             */
+            delivery_status?: "sent" | "failed" | null;
+            delivery_error?: string | null;
+            /** @description The message log entry of the email */
+            message_log_id?: number | null;
         };
         AutomationNodeStat: {
             node_id?: string;

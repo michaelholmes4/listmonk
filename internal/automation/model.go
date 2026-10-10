@@ -301,6 +301,11 @@ type Step struct {
 	Error        *string         `db:"error" json:"error"`
 	// Visit is which arrival at the node this row belongs to, from 1.
 	Visit int `db:"visit" json:"visit"`
+	// What the mail server said about the email this step handed over, from the message log: "sent" (accepted),
+	// "failed" (with DeliveryError), or nil while it is not logged yet or the step sends nothing.
+	DeliveryStatus *string `db:"delivery_status" json:"delivery_status"`
+	DeliveryError  *string `db:"delivery_error" json:"delivery_error"`
+	MessageLogID   *int64  `db:"message_log_id" json:"message_log_id"`
 }
 
 // Event is something that happened to a subscriber.
