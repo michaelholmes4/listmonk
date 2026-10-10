@@ -34,9 +34,8 @@ type Message struct {
 	Event json.RawMessage
 }
 
-// Sender delivers a Message, returning once the messenger has it. Returning an error means the mail
-// server certainly did NOT get it from this call and never will (not handed over, or refused), so the
-// step is retried. An error that leaves it unknown (a lost reply) must be reported as sent: nil.
+// Sender delivers a Message, returning once the messenger has it. Returning an error means it was
+// NOT handed over and never will be, so the step is retried.
 type Sender interface {
 	SendEmail(ctx context.Context, m Message) error
 }

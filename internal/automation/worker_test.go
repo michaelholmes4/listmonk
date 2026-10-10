@@ -104,8 +104,8 @@ func TestLastRetryFailsTheEnrollmentAfterTimeout(t *testing.T) {
 	}
 }
 
-// A message the mail server did not get is sent again by the job's retry, once, and its lease's
-// wake-up goes: left behind, every failed attempt would add a job that retries on its own.
+// A message that was not handed over (a shutdown) is sent again by the job's retry, once, and its
+// lease's wake-up goes: left behind, every failed attempt would add a job that retries on its own.
 func TestNotSentIsRetriedByTheJobAlone(t *testing.T) {
 	h := newHarness(t)
 	ctx := context.Background()
@@ -122,10 +122,10 @@ func TestNotSentIsRetriedByTheJobAlone(t *testing.T) {
 	job := func(attempt int) *river.Job[AdvanceArgs] {
 		return &river.Job[AdvanceArgs]{JobRow: &rivertype.JobRow{Attempt: attempt, MaxAttempts: maxAttempts}, Args: AdvanceArgs{EnrollmentID: id}}
 	}
-	h.sender.Err = errors.New("message not sent: 451 4.7.1 try later")
+	h.sender.Err = errors.New("message not sent: still queued after 30s")
 	for attempt := 1; attempt <= 3; attempt++ {
 		if err := w.Work(ctx, job(attempt)); err == nil {
-			t.Fatal("a refused send must fail the attempt, so the job retries")
+			t.Fatal("a send that was not handed over must fail the attempt, so the job retries")
 		}
 		if n := h.pendingJobs(); n != jobs {
 			t.Fatalf("attempt %d: %d queued jobs, want %d (the lease's wake-up must go)", attempt, n, jobs)
