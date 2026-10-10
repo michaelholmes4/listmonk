@@ -65,6 +65,14 @@ func closeMessageLog() {
 // reTrackingPixel is the view-tracking image of a campaign message.
 var reTrackingPixel = regexp.MustCompile(`(?i)<img[^>]+/campaign/[^/"'\s]+/[^/"'\s]+/px\.png[^>]*>`)
 
+// reTrackedLink is a link the email routes through listmonk: a click or an unsubscribe. In a preview they
+// must do nothing, as clicking one would record a click for the subscriber or take them off a list.
+var reTrackedLink = regexp.MustCompile(`(?i)href\s*=\s*(?:"[^"]*` + trackedPath + `[^"]*"|'[^']*` + trackedPath + `[^']*')`)
+
+const trackedPath = `/(?:link/[^/"'\s]+/[^/"'\s]+/[^/"'\s]+|subscription/[^/"'\s]+/[^/"'\s]+|campaign/[^/"'\s]+/[^/"'\s]+)`
+
+const maxMessageLogPage = 1000
+
 // messageDetail is a logged message as the API returns it. The content itself is served by
 // the preview endpoint.
 type messageDetail struct {
@@ -112,6 +120,11 @@ func (a *App) GetMessageLog(c echo.Context) error {
 		}
 	}
 
+	// per_page=all would be one row per campaign recipient.
+	if f.Limit <= 0 || f.Limit > maxMessageLogPage {
+		f.Limit = maxMessageLogPage
+	}
+
 	store, _ := messageLog()
 	rows, total, err := store.Query(c.Request().Context(), f)
 	if err != nil {
@@ -146,7 +159,7 @@ func (a *App) PreviewMessageLogEntry(c echo.Context) error {
 	switch contentKind(d) {
 	case "stored":
 		// Never count an admin looking at a message as the subscriber opening it.
-		body := reTrackingPixel.ReplaceAllString(*d.Body, "")
+		body := reTrackedLink.ReplaceAllString(reTrackingPixel.ReplaceAllString(*d.Body, ""), `href="#"`)
 		if d.ContentType == models.CampaignContentTypePlain {
 			return c.HTML(http.StatusOK, "<pre style=\"white-space:pre-wrap;font-family:inherit\">"+html.EscapeString(body)+"</pre>")
 		}

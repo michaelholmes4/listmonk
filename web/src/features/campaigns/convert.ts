@@ -96,9 +96,9 @@ const isHTMLType = (t: ContentType) => t === 'richtext' || t === 'html' || t ===
 
 /** Strips <body>/<head> wrappers and beautifies, as the classic editor did before converting. */
 function normalizeHTML(body: string): string {
-  const d = document.createElement('div')
-  d.innerHTML = body
-  return beautifyHTML(d.innerHTML.trim())
+  // DOMParser builds an inert document: unlike innerHTML on a live element it never loads images or runs handlers.
+  const doc = new DOMParser().parseFromString(body, 'text/html')
+  return beautifyHTML(doc.body.innerHTML.trim())
 }
 
 /**
