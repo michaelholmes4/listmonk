@@ -12,7 +12,7 @@ import (
 	"github.com/knadh/listmonk/models"
 )
 
-// librelist fork: NewAutomationMessage is NewCampaignMessage for an automation email step. The
+// fork: NewAutomationMessage is NewCampaignMessage for an automation email step. The
 // message is rendered exactly like a campaign message, and templates additionally get:
 //
 //	{{ .Event.Name }}  {{ .Event.Properties.item }}   the event that started the automation, if any

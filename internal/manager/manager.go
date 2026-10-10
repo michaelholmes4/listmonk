@@ -114,7 +114,7 @@ type Manager struct {
 type CampaignMessage struct {
 	Campaign   *models.Campaign
 	Subscriber models.Subscriber
-	// librelist fork: set for automation email steps (see fork.go).
+	// fork: set for automation email steps (see fork.go).
 	Event      map[string]any
 	Automation map[string]any
 	delivery   *delivery
@@ -506,7 +506,7 @@ func (m *Manager) worker() {
 				continue
 			}
 
-			// librelist fork: an automation email its sender stopped waiting for (see fork.go).
+			// fork: an automation email its sender stopped waiting for (see fork.go).
 			if !msg.forkClaim() {
 				continue
 			}
@@ -548,7 +548,7 @@ func (m *Manager) worker() {
 				}
 			}
 
-			// librelist fork: tell the message log which automation this is (see fork.go).
+			// fork: tell the message log which automation this is (see fork.go).
 			msg.forkLogHeaders(h)
 
 			// Set the headers.
@@ -559,7 +559,7 @@ func (m *Manager) worker() {
 			if err != nil {
 				m.log.Printf("error sending message in campaign %s: subscriber %d: %v", msg.Campaign.Name, msg.Subscriber.ID, err)
 			}
-			msg.forkSent() // librelist fork
+			msg.forkSent() // fork
 
 			// Increment the send rate or the error counter if there was an error.
 			if msg.pipe != nil {

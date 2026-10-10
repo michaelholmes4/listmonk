@@ -1,4 +1,4 @@
-# librelist (listmonk fork)
+# listmonk fork
 
 Fork of listmonk adding a Vue 3 + shadcn-vue admin UI (`web/`) and marketing automation
 (`internal/automation/`). Full plan: ~/.claude/plans/so-i-use-listmonk-calm-puzzle.md (host ~/.claude is bind-mounted into the devcontainer). Fork merge notes: FORK.md.

@@ -1,10 +1,10 @@
-name: librelist release
+name: Fork release
 
-# Tag the fork like v6.2.0-librelist.1. Upstream's own v* tags (fetched when merging) never match.
+# Tag the fork like v6.2.0-fork.1. Upstream's own v* tags (fetched when merging) never match.
 on:
   push:
     tags:
-      - "v*-librelist.*"
+      - "v*-fork.*"
 
 permissions:
   contents: write
@@ -40,7 +40,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
-          args: release --parallelism 1 --clean --config .goreleaser.librelist.yml
+          args: release --parallelism 1 --clean --config .goreleaser.fork.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ORG: ${{ github.repository_owner }}

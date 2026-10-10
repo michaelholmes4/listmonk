@@ -31,7 +31,7 @@ mkdir -p uploads
 # Build everything once so the binary has the embedded assets, then install the schema.
 make dist
 ./listmonk --install --idempotent --yes --config .devcontainer/config.toml
-# --install skips an existing database; this brings it up to date (upstream, then librelist's migrations).
+# --install skips an existing database; this brings it up to date (upstream, then the fork's migrations).
 ./listmonk --upgrade --yes --config .devcontainer/config.toml
 
 echo "Ready. Run 'make dev' (or 'make run' for the Go API only)."

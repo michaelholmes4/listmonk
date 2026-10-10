@@ -1,4 +1,4 @@
-name: librelist CI
+name: Fork CI
 
 on:
   push:

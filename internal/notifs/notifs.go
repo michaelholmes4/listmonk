@@ -25,7 +25,7 @@ const (
 
 type FuncPush func(msg models.Message) error
 
-// Pusher sends a message: the e-mail messenger, or a wrapper of it (librelist logs sent messages).
+// Pusher sends a message: the e-mail messenger, or a wrapper of it (the fork logs sent messages).
 type Pusher interface{ Push(models.Message) error }
 type FuncNotif func(toEmails []string, subject, tplName string, data any, headers textproto.MIMEHeader) error
 type FuncNotifSystem func(subject, tplName string, data any, headers textproto.MIMEHeader) error

@@ -10,7 +10,7 @@ BUILDSTR := ${VERSION} (\#${LAST_COMMIT} $(BUILDDATE))
 YARN ?= yarn
 GOPATH ?= $(HOME)/go
 STUFFBIN ?= $(GOPATH)/bin/stuffbin
-# librelist: the admin UI is web/ (pnpm). Only the visual email builder (a React app, used inside
+# fork: the admin UI is web/ (pnpm). Only the visual email builder (a React app, used inside
 # the campaign editor) is still built with yarn, from frontend/email-builder, and its output is
 # copied into web/public so the UI serves it at /admin/static/email-builder.
 FRONTEND_EMAIL_BUILDER = frontend/email-builder
@@ -123,7 +123,7 @@ init-dev-docker: build-dev-docker ## Delete the docker containers including DB v
 	cd dev; \
 	docker compose run --rm backend sh -c "make dist && ./listmonk --install --idempotent --yes --config dev/config.toml"
 
-# ---- librelist fork additions ------------------------------------------------
+# ---- fork additions ---------------------------------------------------------
 DEV_CONFIG ?= .devcontainer/config.toml
 
 # Run the Go backend against the devcontainer config.

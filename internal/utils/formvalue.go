@@ -10,7 +10,7 @@ import (
 
 // FormValue is echo's c.FormValue plus a fallback for DELETE requests.
 //
-// librelist fork: net/http parses a url-encoded body into Request.Form only for POST, PUT and
+// fork: net/http parses a url-encoded body into Request.Form only for POST, PUT and
 // PATCH, so a DELETE carrying `password=...` in its body (what the admin UIs send when turning
 // off 2FA) was never seen by c.FormValue(). For everything else this behaves exactly like it.
 func FormValue(c echo.Context, name string) string {

@@ -258,7 +258,7 @@ func TestStepsCarryTheDeliveryOutcomeOfTheirEmail(t *testing.T) {
 	}
 
 	// The messenger refused it (what the message log records after the step was already done).
-	_, err = h.db.Exec(`INSERT INTO librelist_messages (source, status, error, subscriber_id, automation_id, enrollment_id)
+	_, err = h.db.Exec(`INSERT INTO message_log (source, status, error, subscriber_id, automation_id, enrollment_id)
 		VALUES ('automation', 'failed', 'smtp: 550 mailbox unavailable', $1, $2, $3)`, sub, auto, enr.ID)
 	h.must(err)
 	steps, err = h.store.Steps(ctx, enr.ID)

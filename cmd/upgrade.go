@@ -64,7 +64,7 @@ func upgrade(db *sqlx.DB, fs stuffbin.FileSystem, prompt bool, record bool) {
 		}
 	}
 
-	// librelist fork: our migrations run after upstream's, also when there are none of those.
+	// fork: our migrations run after upstream's, also when there are none of those.
 	defer forkUpgrade(db)
 
 	_, toRun, err := getPendingMigrations(db)
@@ -104,7 +104,7 @@ func upgrade(db *sqlx.DB, fs stuffbin.FileSystem, prompt bool, record bool) {
 // checkUpgrade checks if the current database schema matches the expected
 // binary version.
 func checkUpgrade(db *sqlx.DB) {
-	forkCheckUpgrade(db) // librelist fork
+	forkCheckUpgrade(db) // fork
 
 	lastVer, toRun, err := getPendingMigrations(db)
 	if err != nil {

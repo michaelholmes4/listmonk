@@ -12,8 +12,8 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// librelist fork: POST /api/track records an event about a subscriber and starts any automation
-// that listens for it. It is how an application tells librelist what its users did.
+// fork: POST /api/track records an event about a subscriber and starts any automation
+// that listens for it. It is how an application tells listmonk what its users did.
 
 type trackReq struct {
 	Subscriber struct {

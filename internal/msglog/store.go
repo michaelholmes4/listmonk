@@ -12,7 +12,7 @@ import (
 	"github.com/lib/pq"
 )
 
-// Store reads and writes the librelist_messages table.
+// Store reads and writes the message_log table.
 type Store struct {
 	db *sqlx.DB
 }
@@ -79,7 +79,7 @@ func (s *Store) insertBatch(ctx context.Context, entries []Entry) error {
 		sb   strings.Builder
 		args = make([]any, 0, len(entries)*numInsertCols)
 	)
-	sb.WriteString(`INSERT INTO librelist_messages (` + insertCols + `) VALUES `)
+	sb.WriteString(`INSERT INTO message_log (` + insertCols + `) VALUES `)
 	for i, e := range entries {
 		if i > 0 {
 			sb.WriteByte(',')
@@ -124,7 +124,7 @@ const selectRow = `
 	(m.campaign_id IS NOT NULL AND m.subscriber_id IS NOT NULL AND EXISTS (
 		SELECT 1 FROM link_clicks l WHERE l.subscriber_id = m.subscriber_id AND l.campaign_id = m.campaign_id)) AS clicked`
 
-const fromRow = ` FROM librelist_messages m
+const fromRow = ` FROM message_log m
 	LEFT JOIN campaigns c ON c.id = m.campaign_id
 	LEFT JOIN automations a ON a.id = m.automation_id`
 
@@ -183,7 +183,7 @@ func (s *Store) Query(ctx context.Context, f Filter) ([]Row, int, error) {
 	where, args := f.where()
 
 	var total int
-	if err := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM librelist_messages m`+where, args...); err != nil {
+	if err := s.db.GetContext(ctx, &total, `SELECT COUNT(*) FROM message_log m`+where, args...); err != nil {
 		return nil, 0, err
 	}
 
@@ -212,7 +212,7 @@ func (s *Store) Get(ctx context.Context, id int64) (Detail, error) {
 
 // DeleteBefore removes messages older than t and reports how many.
 func (s *Store) DeleteBefore(ctx context.Context, t time.Time) (int64, error) {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM librelist_messages WHERE created_at < $1`, t)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM message_log WHERE created_at < $1`, t)
 	if err != nil {
 		return 0, err
 	}

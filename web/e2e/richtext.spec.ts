@@ -88,14 +88,14 @@ test('richtext: switching the theme rebuilds the editor with the matching skin',
     const light = await page.evaluate(() => document.getElementById('tinymce-skin')?.textContent?.length ?? 0)
 
     await page.evaluate(() => document.documentElement.classList.add('dark'))
-    await page.evaluate(() => localStorage.setItem('librelist-theme', 'dark'))
+    await page.evaluate(() => localStorage.setItem('listmonk-theme', 'dark'))
     await page.reload()
     await expect(page.locator('.tox-tinymce')).toBeVisible()
     const dark = await page.evaluate(() => document.getElementById('tinymce-skin')?.textContent?.length ?? 0)
     expect(light).toBeGreaterThan(0)
     expect(dark).toBeGreaterThan(0)
     expect(dark).not.toBe(light)
-    await page.evaluate(() => localStorage.setItem('librelist-theme', 'light'))
+    await page.evaluate(() => localStorage.setItem('listmonk-theme', 'light'))
   } finally {
     await teardown(page, id, list.id)
   }

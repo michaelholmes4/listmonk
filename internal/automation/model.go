@@ -1,4 +1,4 @@
-// Package automation is librelist's marketing automation engine: triggers enroll subscribers
+// Package automation is the marketing automation engine: triggers enroll subscribers
 // into versioned step graphs (send, delay, condition, ...) that a job queue (River) advances.
 //
 // Email steps reuse what listmonk already has: content, templates and open/click tracking live

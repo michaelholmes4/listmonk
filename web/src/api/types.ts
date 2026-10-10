@@ -50,7 +50,7 @@ export type Settings = Schemas['Settings']
 export type SettingsSaved = Schemas['SettingsSaved']
 export type SMTPTestRequest = Schemas['SMTPTest']
 
-// librelist: automations.
+// fork: automations.
 export type Automation = Schemas['Automation']
 export type AutomationRow = Schemas['AutomationRow']
 export type AutomationStatus = Schemas['AutomationStatus']

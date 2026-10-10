@@ -10,7 +10,7 @@ import (
 	"github.com/lib/pq"
 )
 
-// librelist fork: automation triggers. Core calls these helpers around the few mutations that can
+// fork: automation triggers. Core calls these helpers around the few mutations that can
 // start an automation (a subscription becoming confirmed, an attribute changing). They do nothing
 // unless the app has set the matching hooks, and the hooks run in the background so a slow or
 // failing automation never delays or breaks the request that caused it.

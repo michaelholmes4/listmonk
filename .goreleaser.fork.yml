@@ -1,7 +1,7 @@
-# librelist release: the same binary and Docker image layout as upstream (a drop-in for the
+# Fork release: the same binary and Docker image layout as upstream (a drop-in for the
 # listmonk image), but published only to GHCR, for linux amd64/arm64. Used by
-# .github/workflows/librelist-release.yml; upstream's .goreleaser.yml is left untouched.
-project_name: librelist
+# .github/workflows/fork-release.yml; upstream's .goreleaser.yml is left untouched.
+project_name: listmonk
 
 env:
   - GO111MODULE=on

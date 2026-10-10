@@ -35,7 +35,7 @@ classic `frontend/src/router/index.js` (deleted; see git history before the "Ret
 - [x] i18n from `/api/lang/:lang`
 - [x] Dark mode
 - [x] Command palette + provider registry
-- [x] Login, 2FA, forgot/reset, OIDC: **decision: keep the server-rendered pages** (they are the security boundary) and theme them with `librelist-auth.css`. They return to `/app` when `next` says so; the default `next` stays `/admin` until Phase 7. Upstream's `SanitizeURI` drops query strings from `next`
+- [x] Login, 2FA, forgot/reset, OIDC: **decision: keep the server-rendered pages** (they are the security boundary) and theme them with `admin-auth.css`. They return to `/app` when `next` says so; the default `next` stays `/admin` until Phase 7. Upstream's `SanitizeURI` drops query strings from `next`
 - [x] "Settings changed, restart needed" flow: save waits for the reload; `GlobalNotices` shows the restart banner (with a Restart action) when campaigns blocked the automatic reload
 - [x] Update notice and project messages (`GlobalNotices`), and the legacy-admin-credentials warning
 - [x] Source-code link (AGPL §13): shown in the user menu when `VITE_SOURCE_URL` is set at build time (the release workflow sets it to the repository); hidden otherwise, since the classic UI has none and local builds have no public URL
@@ -45,7 +45,7 @@ classic `frontend/src/router/index.js` (deleted; see git history before the "Ret
 `pnpm spec:coverage` lists routes missing from `docs/swagger/collections.yaml` (a few misc: settings by key,
 exports, subscriber PATCH). Document each when its screen is ported.
 
-## librelist-only screens (no classic equivalent)
+## Fork-only screens (no classic equivalent)
 
 | Route | Screen | Notes |
 |---|---|---|

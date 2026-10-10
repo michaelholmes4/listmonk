@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 // These pages are server-rendered by the Go backend (the security boundary for login, 2FA,
-// reset and OIDC). The new UI only themes them; see static/public/static/librelist-auth.css.
+// reset and OIDC). The new UI only themes them; see static/public/static/admin-auth.css.
 test.use({ storageState: { cookies: [], origins: [] } })
 
 const font = (page: import('@playwright/test').Page, sel: string) =>
@@ -33,15 +33,15 @@ test('login page follows the light/dark choice saved by the admin UI', async ({ 
   await page.goto('/admin/login')
   const systemDark = await bg()
 
-  await page.evaluate(() => localStorage.setItem('librelist-theme', 'light'))
+  await page.evaluate(() => localStorage.setItem('listmonk-theme', 'light'))
   await page.reload()
-  await expect(page.locator('html')).toHaveAttribute('data-librelist-theme', 'light')
+  await expect(page.locator('html')).toHaveAttribute('data-listmonk-theme', 'light')
   expect(await bg()).not.toBe(systemDark)
 
   await page.emulateMedia({ colorScheme: 'light' })
-  await page.evaluate(() => localStorage.setItem('librelist-theme', 'dark'))
+  await page.evaluate(() => localStorage.setItem('listmonk-theme', 'dark'))
   await page.reload()
-  await expect(page.locator('html')).toHaveAttribute('data-librelist-theme', 'dark')
+  await expect(page.locator('html')).toHaveAttribute('data-listmonk-theme', 'dark')
   expect(await bg()).toBe(systemDark)
 })
 

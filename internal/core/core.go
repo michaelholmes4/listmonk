@@ -53,7 +53,7 @@ type Constants struct {
 type Hooks struct {
 	SendOptinConfirmation func(models.Subscriber, []int) (int, error)
 
-	// librelist fork: automation triggers (see fork_hooks.go). Both are optional.
+	// fork: automation triggers (see fork_hooks.go). Both are optional.
 	// OnSubscriptionsConfirmed is called with the lists a subscriber has just joined (a live subscription:
 	// confirmed, or unconfirmed on a single opt-in list).
 	OnSubscriptionsConfirmed func(subscriberID int, listIDs []int)

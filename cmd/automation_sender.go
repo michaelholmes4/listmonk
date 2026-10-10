@@ -16,7 +16,7 @@ import (
 	"github.com/knadh/listmonk/models"
 )
 
-// librelist fork: automationSender turns an automation's email step into a message on the same
+// fork: automationSender turns an automation's email step into a message on the same
 // queue (and so the same messengers, rate limits and tracking) that campaigns use; a
 // transactional-template step goes straight to the messenger, as /api/tx is not rate limited either.
 // SendEmail returns once the messenger has the email, so a step is never marked done for an email

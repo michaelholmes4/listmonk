@@ -7,7 +7,7 @@ import (
 	"github.com/knadh/listmonk/internal/migrations/fork"
 )
 
-// librelist fork: the fork's own migrations (internal/migrations/fork) run after upstream's, on
+// fork: the fork's own migrations (internal/migrations/fork) run after upstream's, on
 // `--install` and `--upgrade`, and a pending one stops startup the same way an upstream one does.
 
 // forkUpgrade applies pending fork migrations.
@@ -27,6 +27,6 @@ func forkCheckUpgrade(db *sqlx.DB) {
 		lo.Fatalf("error checking fork migrations: %v", err)
 	}
 	if len(todo) > 0 {
-		lo.Fatalf("there are %d pending librelist database upgrade(s). Backup the database and run listmonk --upgrade", len(todo))
+		lo.Fatalf("there are %d pending fork database upgrade(s). Backup the database and run listmonk --upgrade", len(todo))
 	}
 }

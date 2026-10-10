@@ -342,7 +342,7 @@ func (c *Core) InsertSubscriber(sub models.Subscriber, listIDs []int, listUUIDs 
 		return models.Subscriber{}, false, err
 	}
 
-	// librelist fork: a new subscriber starts from nothing, so whatever is confirmed now is new.
+	// fork: a new subscriber starts from nothing, so whatever is confirmed now is new.
 	c.forkEnd(&forkSnap{subIDs: []int{out.ID}, subs: map[[2]int]bool{}, attribs: map[int]map[string]any{}})
 
 	hasOptin := false
@@ -373,7 +373,7 @@ func (c *Core) UpdateSubscriber(id int, sub models.Subscriber) (models.Subscribe
 		}
 	}
 
-	snap := c.forkBegin([]int{id}, nil) // librelist fork
+	snap := c.forkBegin([]int{id}, nil) // fork
 	_, err := c.q.UpdateSubscriber.Exec(id,
 		sub.Email,
 		strings.TrimSpace(sub.Name),
@@ -416,7 +416,7 @@ func (c *Core) UpdateSubscriberWithLists(id int, sub models.Subscriber, listIDs 
 		}
 	}
 
-	snap := c.forkBegin([]int{id}, nil) // librelist fork
+	snap := c.forkBegin([]int{id}, nil) // fork
 	_, err := c.q.UpdateSubscriberWithLists.Exec(id,
 		sub.Email,
 		strings.TrimSpace(sub.Name),
@@ -522,7 +522,7 @@ func (c *Core) ConfirmOptionSubscription(subUUID string, listUUIDs []string, met
 		meta = models.JSON{}
 	}
 
-	var snap *forkSnap // librelist fork
+	var snap *forkSnap // fork
 	if c.forkOn() {
 		snap = c.forkBegin([]int{c.forkSubscriberID(subUUID)}, nil)
 	}

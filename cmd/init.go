@@ -251,7 +251,7 @@ func initFS(appDir, frontendDir, staticDir, i18nDir string) stuffbin.FileSystem 
 	files := []string{}
 	if !hasEmbed {
 		files = append(files, joinFSPaths(appDir, appFiles)...)
-		files = append(files, webFSFiles()...) // librelist: the admin UI (web/) at /admin
+		files = append(files, webFSFiles()...) // fork: the admin UI (web/) at /admin
 	}
 
 	// Irrespective of the embeds, if there are user specified static or i18n paths,
@@ -612,7 +612,7 @@ func initCampaignManager(msgrs []manager.Messenger, q *models.Queries, u *UrlCon
 
 	// Attach all messengers to the campaign manager.
 	for _, m := range msgrs {
-		mgr.AddMessenger(wrapMessageLog(m)) // librelist: message log
+		mgr.AddMessenger(wrapMessageLog(m)) // fork: message log
 	}
 
 	return mgr

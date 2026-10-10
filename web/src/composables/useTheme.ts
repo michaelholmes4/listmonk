@@ -6,6 +6,6 @@ export function useTheme() {
     selector: 'html',
     attribute: 'class',
     modes: { light: '', dark: 'dark' },
-    storageKey: 'librelist-theme',
+    storageKey: 'listmonk-theme',
   })
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// librelist fork: marketing automation. The engine lives in internal/automation; this file wires
+// fork: marketing automation. The engine lives in internal/automation; this file wires
 // it to the app (startup, trigger hooks) and exposes the admin API.
 
 // stopAutomations stops the engine at shutdown, while the campaign manager is still sending. A

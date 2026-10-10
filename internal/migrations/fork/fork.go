@@ -1,4 +1,4 @@
-// Package fork holds librelist's own database migrations. They are a separate sequence from
+// Package fork holds the fork's own database migrations. They are a separate sequence from
 // upstream's (internal/migrations), tracked under the settings key `fork_migrations`, so upstream
 // version numbers can never collide with ours. Run after upstream's migrations by `--install` and
 // `--upgrade` (see cmd/fork_migrate.go).

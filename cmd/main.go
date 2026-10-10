@@ -48,7 +48,7 @@ type App struct {
 	auth       *auth.Auth
 	media      media.Store
 	bounce     *bounce.Manager
-	automation *automation.Engine // librelist fork
+	automation *automation.Engine // fork
 	captcha    *captcha.Captcha
 	i18n       *i18n.I18n
 	pg         *paginator.Paginator
@@ -246,7 +246,7 @@ func main() {
 	}
 
 	// Initialize the global admin/sub e-mail notifier.
-	initNotifs(fs, i18n, logMessenger(emailMsgr, msglog.SourceNotification), urlCfg, ko) // librelist: message log
+	initNotifs(fs, i18n, logMessenger(emailMsgr, msglog.SourceNotification), urlCfg, ko) // fork: message log
 
 	// Initialize and cache tx templates in memory.
 	initTxTemplates(mgr, core)
@@ -264,7 +264,7 @@ func main() {
 	// messages) get processed at the specified interval.
 	go mgr.Run()
 
-	// librelist: start the automation engine (needs the manager to send).
+	// fork: start the automation engine (needs the manager to send).
 	eng := initAutomation(fs, db, core, mgr, lo, ko)
 
 	// =========================================================================
@@ -278,7 +278,7 @@ func main() {
 		core:       core,
 		manager:    mgr,
 		messengers: msgrs,
-		emailMsgr:  logMessenger(emailMsgr, msglog.SourceSystem), // librelist: message log
+		emailMsgr:  logMessenger(emailMsgr, msglog.SourceSystem), // fork: message log
 		importer:   importer,
 		auth:       auth,
 		media:      media,
@@ -328,13 +328,13 @@ func main() {
 		defer cancel()
 		srv.Shutdown(ctx)
 
-		// librelist: stop automations before the DB goes away (see stopAutomations).
+		// fork: stop automations before the DB goes away (see stopAutomations).
 		stopAutomations(eng)
 
 		// Close the campaign manager.
 		mgr.Close()
 
-		// librelist: write out the message log before the DB goes away.
+		// fork: write out the message log before the DB goes away.
 		closeMessageLog()
 
 		// Close the DB pool.

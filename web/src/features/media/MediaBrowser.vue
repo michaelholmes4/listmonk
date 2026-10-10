@@ -52,7 +52,7 @@ function submitSearch() {
 }
 
 // --- Upload. The panel's open state is a per-user convenience, so localStorage is right. ---------
-const showUpload = useLocalStorage('librelist.media.upload', false)
+const showUpload = useLocalStorage('listmonk.media.upload', false)
 const files = ref<File[]>([])
 const upload = useUploadMedia()
 function submitUpload() {

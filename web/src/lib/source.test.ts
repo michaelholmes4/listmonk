@@ -12,6 +12,6 @@ describe('sourceLink', () => {
     expect(sourceLink('data:text/html,hi')).toBeNull()
   })
   it('accepts http(s) repositories', () => {
-    expect(sourceLink('https://github.com/acme/librelist')).toBe('https://github.com/acme/librelist')
+    expect(sourceLink('https://github.com/acme/listmonk')).toBe('https://github.com/acme/listmonk')
   })
 })

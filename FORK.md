@@ -1,6 +1,6 @@
 # Fork notes
 
-librelist tracks upstream listmonk (`upstream` remote). Base: v6.2.0.
+This fork tracks upstream listmonk (`upstream` remote). Base: v6.2.0.
 
 ## Merging upstream
 ```
@@ -17,7 +17,7 @@ Known conflict hotspots (the only upstream files we edit):
 - `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `stopAutomations(eng)` in the shutdown closure (it must fit the 3 s before `awaitReload` forces the reload); `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
-- `static/public/templates/index.html` (one `<link>` for `librelist-auth.css`, one `<script>` for `librelist-auth.js`)
+- `static/public/templates/index.html` (one `<link>` for `admin-auth.css`, one `<script>` for `admin-auth.js`)
 - `.devcontainer/*`, `.gitignore`
 
 The hooks are one-liners that call into `cmd/web.go` (`/app` routes, `webFSFiles()`), so a
@@ -29,12 +29,12 @@ TS types in `web/src/api/schema.d.ts`; after a merge run `pnpm -C web gen:api` a
 `pnpm -C web spec:coverage`.
 
 Admin login, 2FA, forgot/reset and OIDC stay server-rendered (the security boundary); the new UI only
-themes them via `static/public/static/librelist-auth.css`, scoped to `section.login` so the public
-subscriber pages are untouched; `librelist-auth.js` applies the light/dark choice the admin saved (same origin). Post-login `next` still defaults to `/admin` until Phase 7.
+themes them via `static/public/static/admin-auth.css`, scoped to `section.login` so the public
+subscriber pages are untouched; `admin-auth.js` applies the light/dark choice the admin saved (same origin). Post-login `next` still defaults to `/admin` until Phase 7.
 
 Everything else we add lives in new files: `web/`, `internal/automation/`,
 `internal/migrations/fork/`, `queries/automations.sql`, `cmd/automations.go`, `cmd/automation_sender.go`,
-`cmd/track.go`, `cmd/web.go`, `cmd/message_log.go`, `internal/msglog/`, `static/public/static/librelist-auth.css`, `librelist-auth.js`.
+`cmd/track.go`, `cmd/web.go`, `cmd/message_log.go`, `internal/msglog/`, `static/public/static/admin-auth.css`, `admin-auth.js`.
 
 ## Automation: things to know
 - **Engine.** River (poll-only; jobs: advance a run, act on a recorded event) drives `internal/automation`; one DB transaction per node. Email steps are
@@ -80,13 +80,13 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   and enrollments.
 
 ## Message log
-Every email handed to a messenger is recorded in `librelist_messages` (migration 6) with the messenger's real answer
+Every email handed to a messenger is recorded in `message_log` (migration 6) with the messenger's real answer
 (`sent` = the SMTP server accepted it, `failed` + the error otherwise). It is a decorator, `msglog.Wrap`, around each
 messenger, so no send site is edited. There is one wrapper per kind of sender, and it supplies the source of messages that
 do not say (a campaign says so itself): the campaign manager (campaigns, `/api/tx`, automations), notifications (admin
 mails and opt-in confirmations), and system mail (password resets, data exports).
 - **Content.** Kept, as the exact email, for automation and notification mail. *Not* kept for `/api/tx` mail by default,
-  since other apps send password resets and login codes through it; `librelist.message_log_tx_content = true` keeps it. *Not* kept for campaign
+  since other apps send password resets and login codes through it; `message_log.tx_content = true` keeps it. *Not* kept for campaign
   mail (it would be one copy per recipient): the row stores campaign + subscriber, and `GET /api/message-log/:id/preview`
   re-renders it, with a dummy campaign UUID so that looking never counts as an open or click. System mail is recorded
   without a body because it carries credentials (a reset link). Both previews (`msglog.PreviewHTML`) strip the tracking pixel and
@@ -95,9 +95,9 @@ mails and opt-in confirmations), and system mail (password resets, data exports)
   log) rather than slowing a send; a clean shutdown drains it (`closeMessageLog()`).
 - **Erasure.** Deleting a subscriber deletes their rows (FK cascade); an entry whose subscriber vanished before the
   flush is dropped, not kept anonymously. A deleted campaign leaves its rows, without the campaign.
-- **Retention.** 90 days by default; `librelist.message_log_retention_days` (0 = forever), pruned daily by the writer, or
+- **Retention.** 90 days by default; `message_log.retention_days` (0 = forever), pruned daily by the writer, or
   by hand with `DELETE /api/maintenance/message-log?before_date=`.
-- **Internal headers.** The automation sender and `manager.forkLogHeaders` pass `X-Librelist-Log-Automation` /
+- **Internal headers.** The automation sender and `manager.forkLogHeaders` pass `X-Listmonk-Log-Automation` /
   `-Enrollment` to the wrapper, which removes them before the messenger sees the message.
 - **Merging upstream:** if a merge adds a new `Messenger.Push` call site, decide which wrapper it should go through.
   `message_log:get` is deliberately not part of a new role's default permissions: the log shows every subscriber's mail.
@@ -119,10 +119,10 @@ Upstream's `.goreleaser.yml`, `.goreleaser-nightly.yml` and the `dev/` Docker su
 here and its `front` service no longer applies.
 
 ## Releasing
-Tag the fork `vX.Y.Z-librelist.N` (for example `v6.2.0-librelist.1`); upstream's own `v*` tags, which come in
-with merges, never match. `.github/workflows/librelist-release.yml` then runs GoReleaser with
-`.goreleaser.librelist.yml` (upstream's `.goreleaser.yml` is untouched): both UIs are built once, packed into the
-binary with `make pack-bin-only`, and `ghcr.io/<owner>/librelist:<tag>` (linux amd64/arm64) is pushed. The
+Tag the fork `vX.Y.Z-fork.N` (for example `v6.2.0-fork.1`); upstream's own `v*` tags, which come in
+with merges, never match. `.github/workflows/fork-release.yml` then runs GoReleaser with
+`.goreleaser.fork.yml` (upstream's `.goreleaser.yml` is untouched): both UIs are built once, packed into the
+binary with `make pack-bin-only`, and `ghcr.io/<owner>/listmonk:<tag>` (linux amd64/arm64) is pushed. The
 `VITE_SOURCE_URL` it sets is the "Source code" link in the admin (AGPL §13).
 
 The image is a drop-in for `listmonk/listmonk` in an existing compose file: change `image:`, back up with
@@ -131,7 +131,7 @@ a restored copy of the production database first.
 
 ## Rolling back to upstream
 The fork only adds to the schema, so stock listmonk (the same upstream version as the fork's base, or newer) runs
-on a librelist database: switch `image:` back. Stock listmonk ignores the fork's tables and its `settings` keys,
+on a fork database: switch `image:` back. Stock listmonk ignores the fork's tables and its `settings` keys,
 accepts the extra `automation` campaign type, and can read the dashboard view as migration 4 rewrote it.
 What changes:
 - Automations stop: runs stay frozen where they are, and `POST /api/track` returns 404, so the site's calls to it
@@ -143,7 +143,7 @@ What changes:
   version stock listmonk upgraded the database to. If they were dropped, delete the `fork_migrations` setting too,
   so `--upgrade` recreates them.
 
-`.github/workflows/librelist-ci.yml` lints, type-checks, tests and builds `web/` and vets the Go code on every
+`.github/workflows/fork-ci.yml` lints, type-checks, tests and builds `web/` and vets the Go code on every
 push and pull request. The GoReleaser config and the workflows are syntax-checked only so far; the first tag is
 their real test. A single binary packed with `make pack-bin-only` was verified to serve `/app` (index, deep links
 and hashed assets) and `/admin` from its embedded files.

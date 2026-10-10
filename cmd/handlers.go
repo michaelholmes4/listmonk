@@ -75,7 +75,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		g.GET(path.Join(uriAdmin, "/custom.js"), serveCustomAppearance("admin.custom_js"))
 		g.GET(path.Join(uriAdmin, "/*"), a.AdminPage)
 
-		// librelist: the UI used to live at /app.
+		// fork: the UI used to live at /app.
 		g.GET(uriLegacyWeb, a.LegacyWebRedirect)
 		g.GET(uriLegacyWeb+"/*", a.LegacyWebRedirect)
 	}
@@ -200,7 +200,7 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		g.POST("/api/tx", pm(a.SendTxMessage, "tx:send"))
 
-		// librelist: automations and event tracking.
+		// fork: automations and event tracking.
 		initAutomationRoutes(g, a)
 
 		g.GET("/api/profile", a.GetUserProfile)

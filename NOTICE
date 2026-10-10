@@ -1,4 +1,4 @@
-librelist is a fork of listmonk (https://github.com/knadh/listmonk),
+This program is a fork of listmonk (https://github.com/knadh/listmonk),
 Copyright (c) Kailash Nadh and listmonk contributors, licensed under AGPL-3.0.
 
 Design tokens and UI composition patterns in web/ are adapted from libredesk

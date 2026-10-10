@@ -14,7 +14,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// librelist fork: the message log (internal/msglog). Messengers are wrapped so that every email
+// fork: the message log (internal/msglog). Messengers are wrapped so that every email
 // handed to one is recorded with its outcome. There is one wrapper per kind of sender, and the
 // wrapper supplies the source of messages that don't say (a campaign says so itself):
 //
@@ -22,10 +22,10 @@ import (
 //	logMessenger(m, msglog.SourceNotification) admin notifications and opt-in confirmations
 //	logMessenger(m, msglog.SourceSystem)       password resets, data exports: recorded without content
 //
-// /api/tx mail is recorded without content too, unless `librelist.message_log_tx_content` is set:
+// /api/tx mail is recorded without content too, unless `message_log.tx_content` is set:
 // other apps send their password resets and login codes through it. Automation mail is always kept.
 
-// defaultMessageLogDays is how long entries are kept unless `librelist.message_log_retention_days` says otherwise.
+// defaultMessageLogDays is how long entries are kept unless `message_log.retention_days` says otherwise.
 const defaultMessageLogDays = 90
 
 // logKeepsContent reports whether the body of a source's messages is stored.
@@ -34,7 +34,7 @@ func logKeepsContent(source string) bool {
 	case msglog.SourceNotification:
 		return true
 	case msglog.SourceTx:
-		return ko.Bool("librelist.message_log_tx_content")
+		return ko.Bool("message_log.tx_content")
 	}
 	return false
 }
@@ -48,8 +48,8 @@ var msgLog struct {
 func messageLog() (*msglog.Store, *msglog.Writer) {
 	msgLog.once.Do(func() {
 		days := defaultMessageLogDays
-		if ko.Exists("librelist.message_log_retention_days") {
-			days = ko.Int("librelist.message_log_retention_days")
+		if ko.Exists("message_log.retention_days") {
+			days = ko.Int("message_log.retention_days")
 		}
 		msgLog.store = msglog.NewStore(db)
 		msgLog.writer = msglog.NewWriter(msgLog.store, lo, time.Duration(days)*24*time.Hour)

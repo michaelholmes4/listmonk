@@ -2,7 +2,7 @@
 -- Expand-only: a new table, referencing upstream tables by primary key and altering none of them.
 -- Campaign and system rows carry no body (campaign copies are re-rendered on demand; system mails
 -- hold credentials such as password-reset links).
-CREATE TABLE IF NOT EXISTS librelist_messages (
+CREATE TABLE IF NOT EXISTS message_log (
     id             BIGSERIAL PRIMARY KEY,
     created_at     TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 
@@ -27,9 +27,9 @@ CREATE TABLE IF NOT EXISTS librelist_messages (
     headers        JSONB NOT NULL DEFAULT '{}',
     attachments    JSONB NOT NULL DEFAULT '[]'
 );
-CREATE INDEX IF NOT EXISTS idx_librelist_messages_created ON librelist_messages (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_librelist_messages_sub ON librelist_messages (subscriber_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_librelist_messages_camp ON librelist_messages (campaign_id);
-CREATE INDEX IF NOT EXISTS idx_librelist_messages_auto ON librelist_messages (automation_id);
-CREATE INDEX IF NOT EXISTS idx_librelist_messages_failed ON librelist_messages (created_at DESC) WHERE status = 'failed';
-CREATE INDEX IF NOT EXISTS idx_librelist_messages_to ON librelist_messages (LOWER(to_email[1]));
+CREATE INDEX IF NOT EXISTS idx_message_log_created ON message_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_log_sub ON message_log (subscriber_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_log_camp ON message_log (campaign_id);
+CREATE INDEX IF NOT EXISTS idx_message_log_auto ON message_log (automation_id);
+CREATE INDEX IF NOT EXISTS idx_message_log_failed ON message_log (created_at DESC) WHERE status = 'failed';
+CREATE INDEX IF NOT EXISTS idx_message_log_to ON message_log (LOWER(to_email[1]));

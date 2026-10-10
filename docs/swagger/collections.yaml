@@ -56,7 +56,7 @@ tags:
   - name: Roles
     description: Roles API
   - name: Automations
-    description: Marketing automation and event tracking (librelist)
+    description: Marketing automation and event tracking (fork)
   - name: Maintenance
     description: Maintenance API
   - name: Public

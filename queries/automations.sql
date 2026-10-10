@@ -1,4 +1,4 @@
--- librelist marketing automation. Loaded by internal/automation (not by models.Queries).
+-- The fork's marketing automation. Loaded by internal/automation (not by models.Queries).
 
 -- name: automation-insert-automation
 INSERT INTO automations (uuid, name, settings) VALUES ($1, $2, $3) RETURNING *;
@@ -170,7 +170,7 @@ AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
 SELECT st.*, m.status AS delivery_status, NULLIF(m.error, '') AS delivery_error, m.id AS message_log_id
 FROM enrollment_steps st
 LEFT JOIN LATERAL (
-    SELECT id, status, error FROM librelist_messages
+    SELECT id, status, error FROM message_log
     WHERE enrollment_id = st.enrollment_id AND created_at >= st.started_at
         AND st.result ? 'message_type'
     ORDER BY created_at, id LIMIT 1

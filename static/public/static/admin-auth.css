@@ -1,5 +1,5 @@
 /*
- * librelist: theme for the server-rendered admin auth pages (login, first-time setup, 2FA,
+ * fork: theme for the server-rendered admin auth pages (login, first-time setup, 2FA,
  * forgot/reset password), matching the new UI in web/. Everything is scoped to pages that
  * contain `section.login`, so the public subscriber pages that share style.css are untouched.
  *
@@ -37,9 +37,9 @@ body:has(section.login) {
   color-scheme: light;
 }
 
-/* Dark mode follows the admin UI's saved choice, or the system's: librelist-auth.js sets the
+/* Dark mode follows the admin UI's saved choice, or the system's: admin-auth.js sets the
    attribute. */
-:root[data-librelist-theme="dark"] body:has(section.login) {
+:root[data-listmonk-theme="dark"] body:has(section.login) {
   --background: hsl(120 2.6% 7.6%);
   --foreground: hsl(150 6% 93%);
   --card: hsl(120 2% 10%);
@@ -57,7 +57,7 @@ body:has(section.login) {
 
 /* The bundled wordmark is black-on-transparent; flip it in dark mode. A custom logo (Settings →
    Appearance) is left as the admin uploaded it. */
-:root[data-librelist-theme="dark"] body:has(section.login) .header .logo img[src^="/public/static/logo.svg"] {
+:root[data-listmonk-theme="dark"] body:has(section.login) .header .logo img[src^="/public/static/logo.svg"] {
   filter: invert(1) hue-rotate(180deg);
 }
 

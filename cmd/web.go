@@ -7,7 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// librelist fork: the admin UI is web/ (Vue 3 + shadcn-vue), served at /admin/* by AdminPage (the
+// fork: the admin UI is web/ (Vue 3 + shadcn-vue), served at /admin/* by AdminPage (the
 // SPA entry for every /admin path; routing is done client side). The server-rendered login pages
 // (/admin/login, /admin/forgot, ...) are registered as exact routes and win over that catch-all.
 // The UI uses the session auth and the /api/* of the server.

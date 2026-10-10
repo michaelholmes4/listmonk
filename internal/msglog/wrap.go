@@ -16,8 +16,8 @@ import (
 // Internal headers a sender can set to tell the log which automation a message belongs to. They are
 // removed before the message reaches the messenger, so they are never sent.
 const (
-	HdrAutomation = "X-Librelist-Log-Automation"
-	HdrEnrollment = "X-Librelist-Log-Enrollment"
+	HdrAutomation = "X-Listmonk-Log-Automation"
+	HdrEnrollment = "X-Listmonk-Log-Enrollment"
 )
 
 // Messenger is manager.Messenger (declared again so this package does not import the manager).
