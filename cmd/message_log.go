@@ -3,9 +3,7 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"html"
 	"net/http"
-	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -61,15 +59,6 @@ func closeMessageLog() {
 	_, w := messageLog()
 	w.Close()
 }
-
-// reTrackingPixel is the view-tracking image of a campaign message.
-var reTrackingPixel = regexp.MustCompile(`(?i)<img[^>]+/campaign/[^/"'\s]+/[^/"'\s]+/px\.png[^>]*>`)
-
-// reTrackedLink is a link the email routes through listmonk: a click or an unsubscribe. In a preview they
-// must do nothing, as clicking one would record a click for the subscriber or take them off a list.
-var reTrackedLink = regexp.MustCompile(`(?i)href\s*=\s*(?:"[^"]*` + trackedPath + `[^"]*"|'[^']*` + trackedPath + `[^']*')`)
-
-const trackedPath = `/(?:link/[^/"'\s]+/[^/"'\s]+/[^/"'\s]+|subscription/[^/"'\s]+/[^/"'\s]+|campaign/[^/"'\s]+/[^/"'\s]+)`
 
 const maxMessageLogPage = 1000
 
@@ -158,12 +147,7 @@ func (a *App) PreviewMessageLogEntry(c echo.Context) error {
 
 	switch contentKind(d) {
 	case "stored":
-		// Never count an admin looking at a message as the subscriber opening it.
-		body := reTrackedLink.ReplaceAllString(reTrackingPixel.ReplaceAllString(*d.Body, ""), `href="#"`)
-		if d.ContentType == models.CampaignContentTypePlain {
-			return c.HTML(http.StatusOK, "<pre style=\"white-space:pre-wrap;font-family:inherit\">"+html.EscapeString(body)+"</pre>")
-		}
-		return c.HTML(http.StatusOK, body)
+		return c.HTML(http.StatusOK, msglog.PreviewHTML(*d.Body, d.ContentType == models.CampaignContentTypePlain))
 
 	case "rerender":
 		camp, err := a.core.GetCampaignForPreview(*d.CampaignID, 0)
@@ -185,7 +169,8 @@ func (a *App) PreviewMessageLogEntry(c echo.Context) error {
 			a.log.Printf("error rendering campaign %d for the message log: %v", camp.ID, err)
 			return echo.NewHTTPError(http.StatusInternalServerError, a.i18n.T("globals.messages.internalError"))
 		}
-		return c.HTML(http.StatusOK, string(msg.Body()))
+		// Rendered for the real subscriber, so its links act on them: strip them like a stored one's.
+		return c.HTML(http.StatusOK, msglog.PreviewHTML(string(msg.Body()), camp.ContentType == models.CampaignContentTypePlain))
 	}
 	return echo.NewHTTPError(http.StatusNotFound, a.i18n.Ts("globals.messages.notFound", "name", "message"))
 }

@@ -2706,6 +2706,7 @@ export interface components {
                 /** @example 30d */
                 interval?: string;
             };
+            /** @description Times are HH:MM in the subscriber's timezone; `end` (exclusive) must be after `start`. */
             send_window?: {
                 days?: number[];
                 /** @example 09:00 */

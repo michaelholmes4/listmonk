@@ -96,16 +96,10 @@ func (a *App) TrackEvent(c echo.Context) error {
 		}
 	}
 
+	// Merged in the database: writing back the whole subscriber as read above could undo a
+	// blocklisting (a bounce, an unsubscribe) or another call's attributes made in between.
 	if len(req.UpsertAttrs) > 0 {
-		merged := models.JSON{}
-		for k, v := range sub.Attribs {
-			merged[k] = v
-		}
-		for k, v := range req.UpsertAttrs {
-			merged[k] = v
-		}
-		sub.Attribs = merged
-		if _, err := a.core.UpdateSubscriber(sub.ID, sub); err != nil {
+		if err := a.core.MergeSubscriberAttribs(sub.ID, req.UpsertAttrs); err != nil {
 			return err
 		}
 	}

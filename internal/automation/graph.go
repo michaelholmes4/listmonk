@@ -506,6 +506,8 @@ func (s Settings) Validate(opts ValidateOpts) []Problem {
 		}
 		if (w.Start == "") != (w.End == "") || (w.Start != "" && (!timeRe.MatchString(w.Start) || !timeRe.MatchString(w.End))) {
 			bad("send window times are HH:MM, both start and end")
+		} else if w.Start != "" && w.End <= w.Start {
+			bad("send window end must be after its start")
 		}
 	}
 	if s.Timezone != "" {

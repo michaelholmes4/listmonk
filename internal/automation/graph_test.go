@@ -171,6 +171,8 @@ func TestSettings(t *testing.T) {
 		"day out of range":          {SendWindow: &SendWindow{Days: []int{7}}},
 		"half a window":             {SendWindow: &SendWindow{Start: "09:00"}},
 		"bad time":                  {SendWindow: &SendWindow{Start: "9am", End: "5pm"}},
+		"window past midnight":      {SendWindow: &SendWindow{Start: "22:00", End: "06:00"}},
+		"empty window":              {SendWindow: &SendWindow{Start: "09:00", End: "09:00"}},
 		"unknown timezone":          {Timezone: "Mars/Olympus"},
 	} {
 		if ps := s.Validate(ValidateOpts{}); len(ps) == 0 {

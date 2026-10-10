@@ -39,7 +39,14 @@ func TestNextSendTime(t *testing.T) {
 		{"the subscriber's own clock: New York", at(t, L, "2026-01-14 08:00", time.UTC), weekdays9to5, ny, at(t, L, "2026-01-14 09:00", ny)},
 		{"days only", at(t, L, "2026-03-04 22:00", time.UTC), &SendWindow{Days: []int{4}}, time.UTC, at(t, L, "2026-03-05 00:00", time.UTC)},
 		{"hours only", at(t, L, "2026-03-04 22:00", time.UTC), &SendWindow{Start: "08:00", End: "20:00"}, time.UTC, at(t, L, "2026-03-05 08:00", time.UTC)},
-		{"a window that wraps midnight is ignored", at(t, L, "2026-03-04 03:00", time.UTC), &SendWindow{Start: "22:00", End: "06:00"}, time.UTC, at(t, L, "2026-03-04 03:00", time.UTC)},
+		// Saving refuses these; versions published before that check still hold mail back, overnight.
+		{"overnight window, open after midnight", at(t, L, "2026-03-04 03:00", time.UTC), &SendWindow{Start: "22:00", End: "06:00"}, time.UTC, at(t, L, "2026-03-04 03:00", time.UTC)},
+		{"overnight window, closed in the day", at(t, L, "2026-03-04 12:00", time.UTC), &SendWindow{Start: "22:00", End: "06:00"}, time.UTC, at(t, L, "2026-03-04 22:00", time.UTC)},
+		{"overnight window, open before midnight", at(t, L, "2026-03-04 23:00", time.UTC), &SendWindow{Start: "22:00", End: "06:00"}, time.UTC, at(t, L, "2026-03-04 23:00", time.UTC)},
+		// Wednesday 03:00 belongs to Tuesday night's window, which is not an allowed day.
+		{"overnight window keeps to its opening day", at(t, L, "2026-03-04 03:00", time.UTC), &SendWindow{Days: []int{3}, Start: "22:00", End: "06:00"}, time.UTC, at(t, L, "2026-03-04 22:00", time.UTC)},
+		{"overnight window from yesterday's opening", at(t, L, "2026-03-05 03:00", time.UTC), &SendWindow{Days: []int{3}, Start: "22:00", End: "06:00"}, time.UTC, at(t, L, "2026-03-05 03:00", time.UTC)},
+		{"equal start and end is a full day from the start", at(t, L, "2026-03-04 08:00", time.UTC), &SendWindow{Days: []int{3}, Start: "09:00", End: "09:00"}, time.UTC, at(t, L, "2026-03-04 09:00", time.UTC)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1193,3 +1193,56 @@ func TestARetriedEventJobRecognisesItsRunAfterARestart(t *testing.T) {
 		t.Fatalf("runs=%d sent=%d", runs, h.sender.count())
 	}
 }
+
+// An archive that commits while a pause, resume or publish is under way must stay archived: they
+// used to check the status first and then write theirs back over it.
+func TestArchiveIsNotUndoneByAConcurrentStatusChange(t *testing.T) {
+	ctx := context.Background()
+	for name, run := range map[string]func(h *harness, auto int) error{
+		"pause":   func(h *harness, auto int) error { _, err := h.eng.Pause(ctx, auto); return err },
+		"resume":  func(h *harness, auto int) error { _, err := h.eng.Resume(ctx, auto); return err },
+		"publish": func(h *harness, auto int) error { _, _, err := h.store.Publish(ctx, auto, true); return err },
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t)
+			list := h.list("l", "single")
+			auto := h.publish("p", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{
+				{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, h.campaign())},
+			}}, Settings{})
+			if name == "resume" {
+				_, err := h.eng.Pause(ctx, auto)
+				h.must(err)
+			}
+
+			// The archive holds the row until it commits; the other change starts meanwhile.
+			tx := h.db.MustBegin()
+			defer tx.Rollback()
+			if _, err := tx.Exec(`UPDATE automations SET status = 'archived' WHERE id = $1`, auto); err != nil {
+				t.Fatal(err)
+			}
+			done := make(chan error, 1)
+			go func() { done <- run(h, auto) }()
+			for i := 0; ; i++ {
+				var waiting int
+				h.must(h.db.Get(&waiting, `SELECT COUNT(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`))
+				if waiting > 0 {
+					break
+				}
+				if i > 200 {
+					t.Fatal("the status change never waited for the archive")
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			h.must(tx.Commit())
+
+			if err := <-done; !errors.Is(err, ErrConflict) {
+				t.Fatalf("got %v, want a conflict", err)
+			}
+			var status string
+			h.must(h.db.Get(&status, `SELECT status FROM automations WHERE id = $1`, auto))
+			if status != string(StatusArchived) {
+				t.Fatalf("status = %s, want archived", status)
+			}
+		})
+	}
+}

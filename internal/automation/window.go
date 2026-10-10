@@ -43,13 +43,17 @@ func NextSendTime(now time.Time, w *SendWindow, loc *time.Location) time.Time {
 	if w.Start != "" {
 		startMin, endMin = hm(w.Start), hm(w.End)
 	}
+	// Saving refuses an end at or before the start; versions published before that check get here.
+	// Such a window runs overnight, from the start on an allowed day to the end the next day, so
+	// it still holds mail back rather than letting it go at any hour.
+	closeDay := 0
 	if endMin <= startMin {
-		// A window can't wrap past midnight; treat it as unusable and don't hold mail back forever.
-		return now
+		closeDay = 1
 	}
 
 	local := now.In(loc)
-	for add := 0; add <= 8; add++ {
+	// From yesterday: an overnight window that opened then may still be open.
+	for add := -closeDay; add <= 8; add++ {
 		day := time.Date(local.Year(), local.Month(), local.Day()+add, 0, 0, 0, 0, loc)
 		if len(allowed) > 0 && !allowed[day.Weekday()] {
 			continue
@@ -59,7 +63,7 @@ func NextSendTime(now time.Time, w *SendWindow, loc *time.Location) time.Time {
 		if endMin >= 24*60 {
 			closeAt = time.Date(day.Year(), day.Month(), day.Day()+1, 0, 0, 0, 0, loc)
 		} else {
-			closeAt = time.Date(day.Year(), day.Month(), day.Day(), endMin/60, endMin%60, 0, 0, loc)
+			closeAt = time.Date(day.Year(), day.Month(), day.Day()+closeDay, endMin/60, endMin%60, 0, 0, loc)
 		}
 		if !now.Before(closeAt) {
 			continue

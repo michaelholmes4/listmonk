@@ -33,6 +33,14 @@ UPDATE automations SET name = $2, settings = $3, updated_at = NOW() WHERE id = $
 -- name: automation-set-automation-status
 UPDATE automations SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *;
 
+-- name: automation-move-status
+-- Changes the status only from $3, so that a pause or resume racing an archive can't undo it.
+-- No row back: the automation is gone or no longer in that status.
+UPDATE automations SET status = $2, updated_at = NOW() WHERE id = $1 AND status = $3 RETURNING *;
+
+-- name: automation-lock-automation
+SELECT * FROM automations WHERE id = $1 FOR UPDATE;
+
 -- name: automation-delete-automation
 DELETE FROM automations WHERE id = $1;
 

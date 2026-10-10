@@ -5607,6 +5607,7 @@ components:
             interval: { type: string, example: 30d }
         send_window:
           type: object
+          description: Times are HH:MM in the subscriber's timezone; `end` (exclusive) must be after `start`.
           properties:
             days: { type: array, items: { type: integer, minimum: 0, maximum: 6 } }
             start: { type: string, example: "09:00" }

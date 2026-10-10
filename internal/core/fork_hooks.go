@@ -2,8 +2,10 @@ package core
 
 import (
 	"encoding/json"
+	"net/http"
 	"reflect"
 
+	"github.com/labstack/echo/v4"
 	"github.com/lib/pq"
 )
 
@@ -137,6 +139,29 @@ func (c *Core) forkRead(subIDs, listIDs []int) (map[[2]int]bool, map[int]map[str
 		}
 	}
 	return subs, attribs
+}
+
+// MergeSubscriberAttribs merges attribs into a subscriber's attributes (top-level keys) in one
+// statement, firing the attribute hook. Nothing else about the subscriber is written, so a
+// concurrent blocklisting or attribute change is never overwritten with what was read earlier.
+func (c *Core) MergeSubscriberAttribs(id int, attribs map[string]any) error {
+	b, err := json.Marshal(attribs)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, c.i18n.Ts("globals.messages.invalidFields", "name", "attribs"))
+	}
+
+	snap := c.forkBegin([]int{id}, nil)
+	res, err := c.db.Exec(`UPDATE subscribers SET attribs = COALESCE(attribs, '{}'::JSONB) || $2::JSONB, updated_at = NOW() WHERE id = $1`, id, b)
+	if err != nil {
+		c.log.Printf("error updating subscriber attributes: %v", err)
+		return echo.NewHTTPError(http.StatusInternalServerError,
+			c.i18n.Ts("globals.messages.errorUpdating", "name", "{globals.terms.subscriber}", "error", pqErrMsg(err)))
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, c.i18n.Ts("globals.messages.notFound", "name", "{globals.terms.subscriber}"))
+	}
+	c.forkEnd(snap)
+	return nil
 }
 
 // forkSubscriberID resolves a subscriber UUID (the optin link carries one).

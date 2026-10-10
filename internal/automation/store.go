@@ -268,13 +268,6 @@ func (s *Store) SaveDraft(ctx context.Context, automationID int, graph *Graph, a
 // at it. A paused automation stays paused; a draft becomes active. Each of checks (the caller's
 // permission checks) sees the graph that is about to go live, and can refuse it.
 func (s *Store) Publish(ctx context.Context, automationID int, allowSQL bool, checks ...func(*Graph) error) (*Automation, *Version, error) {
-	a, err := s.Get(ctx, automationID)
-	if err != nil {
-		return nil, nil, err
-	}
-	if a.Status == StatusArchived {
-		return nil, nil, fmt.Errorf("%w: an archived automation cannot be published", ErrConflict)
-	}
 	draft, err := s.Draft(ctx, automationID)
 	if err != nil {
 		return nil, nil, err
@@ -285,6 +278,17 @@ func (s *Store) Publish(ctx context.Context, automationID int, allowSQL bool, ch
 		return nil, nil, err
 	}
 	defer tx.Rollback()
+
+	// The automation is locked first (always before the draft), so its status and settings can't
+	// change until this commits: an archive or pause in between waits, and one before is seen here
+	// instead of being overwritten with the status read earlier.
+	var a Automation
+	if err := tx.GetContext(ctx, &a, s.q.get("lock-automation"), automationID); err != nil {
+		return nil, nil, notFound(err)
+	}
+	if a.Status == StatusArchived {
+		return nil, nil, fmt.Errorf("%w: an archived automation cannot be published", ErrConflict)
+	}
 
 	// The draft is locked from here on, so what is checked is what goes live (a save in between waits).
 	if err := tx.GetContext(ctx, draft, s.q.get("lock-draft"), draft.ID); err != nil {
@@ -356,12 +360,20 @@ func (s *Store) Publish(ctx context.Context, automationID int, allowSQL bool, ch
 	return out, &v, err
 }
 
-// SetStatus moves between active and paused (the engine handles the consequences). Archiving goes
-// through Engine.Archive so live enrollments are ended.
-func (s *Store) SetStatus(ctx context.Context, id int, status Status) (*Automation, error) {
+// SetStatus moves between active and paused (the engine handles the consequences), but only from
+// `from`: checked and changed in one statement, so a concurrent archive is never undone. Archiving
+// goes through Engine.Archive so live enrollments are ended.
+func (s *Store) SetStatus(ctx context.Context, id int, from, to Status) (*Automation, error) {
+	return moveStatus(ctx, s.db, s.q, id, from, to)
+}
+
+func moveStatus(ctx context.Context, q sqlx.QueryerContext, queries Queries, id int, from, to Status) (*Automation, error) {
 	var a Automation
-	if err := s.db.GetContext(ctx, &a, s.q.get("set-automation-status"), id, status); err != nil {
-		return nil, notFound(err)
+	if err := sqlx.GetContext(ctx, q, &a, queries.get("move-status"), id, to, from); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("%w: the automation is no longer %s", ErrConflict, from)
+		}
+		return nil, err
 	}
 	return &a, nil
 }

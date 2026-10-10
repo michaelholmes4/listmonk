@@ -62,7 +62,7 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
 - **Opened / clicked conditions** only work when `privacy.individual_tracking` is on (otherwise views and clicks carry no
   subscriber). The builder should say so.
 - **Raw SQL conditions** need `subscribers:sql_query` to create or edit, run in a read-only transaction with a 5 s timeout.
-- **`POST /api/track`** records the event and queues a job to act on it (waiting runs, triggers) in one transaction, so a passing failure cannot lose what the event starts. It merges `upsert_attribs` (top-level keys) into the subscriber *before* recording the event;
+- **`POST /api/track`** records the event and queues a job to act on it (waiting runs, triggers) in one transaction, so a passing failure cannot lose what the event starts. It merges `upsert_attribs` (top-level keys) into the subscriber *before* recording the event, in one statement that writes nothing else (so it never undoes a concurrent blocklisting);
   retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
 - **Wait for an event.** `POST /api/track` events also reach runs waiting on a `wait_for_event` step (before triggers fire).
   `.Event` in emails is the event that started the run, or the latest one that restarted a wait.
@@ -84,7 +84,8 @@ mails and opt-in confirmations), and system mail (password resets, data exports)
 - **Content.** Kept, as the exact email, for transactional, automation and notification mail. *Not* kept for campaign
   mail (it would be one copy per recipient): the row stores campaign + subscriber, and `GET /api/message-log/:id/preview`
   re-renders it, with a dummy campaign UUID so that looking never counts as an open or click. System mail is recorded
-  without a body because it carries credentials (a reset link). The stored copy has the tracking pixel stripped on preview.
+  without a body because it carries credentials (a reset link). Both previews (`msglog.PreviewHTML`) strip the tracking pixel and
+  point listmonk links (clicks, unsubscribe, preferences, browser view) at `#`, since they would act on the real subscriber.
 - **Writes are asynchronous** (`msglog.Writer`: queue, batches of 500 or 1 s). A full queue drops entries (counted in the
   log) rather than slowing a send; a clean shutdown drains it (`closeMessageLog()`).
 - **Erasure.** Deleting a subscriber deletes their rows (FK cascade); an entry whose subscriber vanished before the

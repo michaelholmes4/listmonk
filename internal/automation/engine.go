@@ -500,7 +500,7 @@ func (e *Engine) Pause(ctx context.Context, id int) (*Automation, error) {
 	if a.Status != StatusActive {
 		return nil, fmt.Errorf("%w: only an active automation can be paused", ErrConflict)
 	}
-	return e.store.SetStatus(ctx, id, StatusPaused)
+	return e.store.SetStatus(ctx, id, StatusActive, StatusPaused)
 }
 
 // Resume continues a paused automation: every live enrollment gets a wake-up again.
@@ -518,8 +518,9 @@ func (e *Engine) Resume(ctx context.Context, id int) (*Automation, error) {
 	}
 	defer tx.Rollback()
 
-	var out Automation
-	if err := tx.GetContext(ctx, &out, e.q.get("set-automation-status"), id, StatusActive); err != nil {
+	// Only from paused: an archive in between stays archived, and a second resume queues nothing.
+	out, err := moveStatus(ctx, tx, e.q, id, StatusPaused, StatusActive)
+	if err != nil {
 		return nil, err
 	}
 	var live []Enrollment
@@ -553,7 +554,7 @@ func (e *Engine) Resume(ctx context.Context, id int) (*Automation, error) {
 			return nil, err
 		}
 	}
-	return &out, tx.Commit()
+	return out, tx.Commit()
 }
 
 // Archive retires an automation and ends everyone still inside it.
