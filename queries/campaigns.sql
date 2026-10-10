@@ -465,7 +465,8 @@ UPDATE campaigns SET
     WHERE id=$1;
 
 -- name: delete-campaign
-DELETE FROM campaigns WHERE id=$1;
+-- librelist: the hidden campaigns behind automation email steps are never deleted here.
+DELETE FROM campaigns WHERE id=$1 AND type <> 'automation';
 
 -- name: delete-campaigns
 DELETE FROM campaigns c
@@ -475,6 +476,8 @@ WHERE (
         ELSE $2 = '' OR TO_TSVECTOR(CONCAT(name, ' ', subject)) @@ TO_TSQUERY($2) OR CONCAT(c.name, ' ', c.subject) ILIKE $2
     END
 )
+-- librelist: the hidden campaigns behind automation email steps are never deleted here.
+AND c.type <> 'automation'
 -- Get all campaigns or filter by permitted list IDs.
 AND (
     $3 OR EXISTS (
