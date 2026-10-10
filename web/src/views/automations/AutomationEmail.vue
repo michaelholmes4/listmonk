@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import CopyText from '@/components/CopyText.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import FormActions from '@/components/layout/FormActions.vue'
 import Page from '@/components/layout/Page.vue'
@@ -92,6 +93,11 @@ const { leaveOpen, decide } = useUnsavedGuard(mail.dirty, mail.saving)
   <Page :title="mail.ready.value ? title : (automation?.name ?? '…')" :description="step && automation ? t('web.automations.email.pageDescription', { step: stepId, automation: automation.name }) : undefined">
     <template v-if="step" #badges>
       <Badge variant="secondary">{{ t(`web.automations.messageType.${step.config.message_type === 'transactional' ? 'transactional' : 'marketing'}`) }}</Badge>
+    </template>
+    <!-- The hidden campaign's ID (what PUT /api/automations/emails/:id takes) and UUID, as on a campaign's page. -->
+    <template v-if="mail.ready.value" #meta>
+      <span>{{ t('globals.fields.id') }}: <CopyText :text="String(mail.campaign.value!.id)" /></span>
+      <span>{{ t('globals.fields.uuid') }}: <CopyText :text="mail.campaign.value!.uuid ?? ''" /></span>
     </template>
 
     <FormActions
