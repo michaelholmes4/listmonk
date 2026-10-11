@@ -69,6 +69,8 @@ const initial = (): CampaignForm =>
 const { handleSubmit, resetForm, values, setFieldValue, errors } = useForm({
   validationSchema: toTypedSchema(campaignSchema(t)),
   initialValues: initial(),
+  // Inactive tabs and conditional blocks unmount their fields; their values still belong to the form.
+  keepValuesOnUnmount: true,
 })
 // The config (default from address) may arrive after the form is created.
 watch(

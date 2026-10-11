@@ -283,7 +283,8 @@ function onKey(e: KeyboardEvent) {
         </FlowBuilder>
       </TabsContent>
       <TabsContent value="activity"><EnrollmentsPanel :automation-id="id" /></TabsContent>
-      <TabsContent value="settings">
+      <!-- Kept mounted: the panel holds unsaved edits, and reports them to the leave guard. -->
+      <TabsContent value="settings" force-mount class="data-[state=inactive]:hidden">
         <SettingsPanel ref="settingsPanel" :automation="automation" :flow="flow" :readonly="readonly" />
       </TabsContent>
       <TabsContent value="versions">

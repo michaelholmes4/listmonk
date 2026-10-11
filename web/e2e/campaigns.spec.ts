@@ -206,3 +206,32 @@ test('campaigns: a test message carries the unsaved form, and arrives when SMTP 
     await cleanup(page, name, list.id)
   }
 })
+
+test('campaigns: switching tabs keeps the form, saved and unsaved', async ({ page }) => {
+  const list = await withList(page)
+  const name = `E2E tabs ${Date.now()}`
+  const created = await page.request.post('/api/campaigns', {
+    data: { name, subject: 'Saved subject', lists: [list.id], content_type: 'html', body: '<p>x</p>', type: 'regular', messenger: 'email', tags: ['e2e'] },
+  })
+  const id = (await created.json()).data.id
+  try {
+    await page.goto(`/admin/campaigns/${id}`)
+    await page.getByLabel('Subject').fill('Unsaved subject')
+    await page.getByRole('tab', { name: 'Content' }).click()
+    await expect(page.locator('.cm-content')).toContainText('<p>x</p>')
+    await page.getByRole('tab', { name: 'Archive' }).click()
+    await page.getByRole('tab', { name: 'Campaign' }).click()
+
+    await expect(page.getByLabel('Name', { exact: true })).toHaveValue(name)
+    await expect(page.getByLabel('Subject')).toHaveValue('Unsaved subject')
+    await expect(page.getByText('e2e', { exact: true })).toBeVisible()
+    // Only the subject changed; saving must not send blanked fields.
+    const saved = page.waitForRequest((r) => r.url().endsWith(`/api/campaigns/${id}`) && r.method() === 'PUT')
+    await page.locator('[data-cy=btn-save]').click()
+    const body = (await saved).postDataJSON()
+    expect(body).toMatchObject({ name, subject: 'Unsaved subject', lists: [list.id], body: '<p>x</p>', tags: ['e2e'] })
+    await expect(page.getByText(`"${name}" updated`)).toBeVisible()
+  } finally {
+    await cleanup(page, name, list.id)
+  }
+})

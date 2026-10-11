@@ -561,3 +561,19 @@ test('the email page of a step that has no email says so', async ({ page, reques
     await dropAutomation(request, id)
   }
 })
+
+test('unsaved settings survive a switch to another tab', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const id = await newAutomation(request, waitFlow)
+  try {
+    await page.goto(`/admin/automations/${id}?tab=settings`)
+    await page.locator('#a-name').fill('Renamed, not saved')
+    await page.getByRole('tab', { name: 'Flow' }).click()
+    await expect(page.locator('[data-cy=automation-settings]')).toBeHidden()
+    await page.getByRole('tab', { name: 'Settings' }).click()
+    await expect(page.locator('#a-name')).toHaveValue('Renamed, not saved')
+    await expect(page.locator('[data-cy=save-settings]')).toBeEnabled()
+  } finally {
+    await request.delete(`/api/automations/${id}`)
+  }
+})

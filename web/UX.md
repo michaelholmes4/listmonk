@@ -86,6 +86,9 @@ visibility of system status).
    - Never grey out a tab. If it can't apply yet, hide it (a new campaign has only its settings;
      an automation's Activity and Versions appear after the first publish). If it's just empty,
      keep it and say so in the panel.
+   - Switching tabs never loses edits. Inactive `TabsContent` unmounts, so a `useForm` that spans
+     tabs (or has `v-if` fields) sets `keepValuesOnUnmount: true`, and a panel that keeps its own
+     unsaved state is `force-mount class="data-[state=inactive]:hidden"`.
    - The segmented "pill" tabs (`TabsList` default variant) are only for switching views inside
      one panel, such as Appearance's admin / public CSS. They are not page navigation.
    - The header has one primary button. Occasional actions (pause, archive) go in a "⋯" menu

@@ -39,6 +39,8 @@ const saving = computed(() => create.isPending.value || update.isPending.value)
 const { handleSubmit, resetForm, values, setFieldValue, meta } = useForm({
   validationSchema: toTypedSchema(templateSchema(t)),
   initialValues: props.template ? toForm(props.template) : emptyTemplate(),
+  // The subject and body fields come and go with the type; switching back must not lose their values.
+  keepValuesOnUnmount: true,
 })
 watch(
   () => props.template,
