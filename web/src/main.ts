@@ -2,6 +2,8 @@ import '@fontsource-variable/geist'
 import { VueQueryPlugin } from '@tanstack/vue-query'
 import { createPinia } from 'pinia'
 import { createApp } from 'vue'
+// vue-sonner v2 ships its toast layout as a separate stylesheet; without it toasts render off-screen.
+import 'vue-sonner/style.css'
 import App from './App.vue'
 import './assets/main.css'
 import { configQuery } from './composables/queries/useConfig'

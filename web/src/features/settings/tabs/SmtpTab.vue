@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Loader2, Plus, Rocket } from '@lucide/vue'
 import { useFormContext } from 'vee-validate'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -74,6 +74,11 @@ function sendTest(i: number, s: SmtpForm) {
   // The password is masked until retyped; the server can't test with bullets.
   if (!s.host || !s.port || (s.auth_protocol !== 'none' && s.password.includes('•'))) {
     toast.error(t('settings.smtp.testEnterEmail'))
+    // As upstream: clear the masked password and put the cursor there for retyping.
+    if (s.password.includes('•')) {
+      setFieldValue('smtp', servers.value.map((x, n) => (n === i ? { ...x, password: '' } : x)))
+      nextTick(() => document.querySelector<HTMLInputElement>(`input[name="smtp[${i}].password"]`)?.focus())
+    }
     return
   }
   testing.value = i

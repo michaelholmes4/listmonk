@@ -80,6 +80,22 @@ test('settings: the SMTP test reports a connection that fails', async ({ page })
   await expect(page.locator('[data-cy=smtp-test-error]')).toContainText(/refused|connect/i)
 })
 
+test('settings: the SMTP test asks for the masked password to be retyped', async ({ page }) => {
+  await page.goto('/admin/settings?tab=smtp')
+  await openCard(page, 'smtp-0')
+  const card = page.locator('[data-cy=smtp-0]')
+  await card.locator('[data-cy="smtp[0].auth_protocol"]').click()
+  await page.getByRole('option', { name: 'LOGIN' }).click()
+  const pwd = card.getByLabel('Password', { exact: true })
+  await pwd.fill('••••••••')
+
+  await card.getByLabel(/To e-?mail/i).fill('e2e-test@example.com')
+  await page.locator('[data-cy=smtp-send-test-0]').click()
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: /Re-enter password/ })).toBeInViewport()
+  await expect(pwd).toHaveValue('')
+  await expect(pwd).toBeFocused()
+})
+
 test('settings: blocks can be added and removed without saving', async ({ page }) => {
   await page.goto('/admin/settings?tab=smtp')
   await expect(page.locator('[data-cy=smtp-0]')).toBeVisible()
