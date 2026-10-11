@@ -5,6 +5,9 @@ cd /workspace
 
 git config --global --add safe.directory /workspace
 
+# Claude Code's config volume mounts root-owned; it holds the login and session history.
+sudo chown -R "$(id -u):$(id -g)" /home/vscode/.claude
+
 # The go-mod-cache named volume mounts root-owned; the vscode user must be able to write to it.
 sudo chown -R "$(id -u):$(id -g)" /go/pkg/mod
 # Go's checksum-database cache lives in /go/pkg/sumdb, which is not created or writable by default;

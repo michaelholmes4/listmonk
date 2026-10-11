@@ -6,8 +6,9 @@
   "shutdownAction": "stopCompose",
   "remoteUser": "vscode",
   "mounts": [
-    "source=${localEnv:HOME}/.claude,target=/home/vscode/.claude,type=bind"
+    "source=claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
   ],
+  "containerEnv": { "CLAUDE_CONFIG_DIR": "/home/vscode/.claude" },
   "features": {
     "ghcr.io/devcontainers/features/go:1": { "version": "1.26" },
     "ghcr.io/devcontainers/features/node:1": { "version": "22", "pnpmVersion": "latest", "nodeGypDependencies": false },
