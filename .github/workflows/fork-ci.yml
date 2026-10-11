@@ -25,10 +25,24 @@ jobs:
 
   go:
     runs-on: ubuntu-latest
+    # testdb skips (not fails) without a database, so CI must provide one.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: listmonk-dev
+          POSTGRES_PASSWORD: listmonk-dev
+          POSTGRES_DB: listmonk-dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      LISTMONK_TEST_DB: host=localhost port=5432 user=listmonk-dev password=listmonk-dev dbname=listmonk-dev sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - run: go vet ./cmd/... ./internal/...
-      - run: go build ./cmd
+      - run: go build -o /dev/null ./cmd
+      - run: go test ./cmd/... ./internal/...
