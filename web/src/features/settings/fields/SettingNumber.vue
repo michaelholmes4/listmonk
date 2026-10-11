@@ -2,7 +2,7 @@
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 
-/** A numeric input; the form holds a number (or undefined while the box is empty). */
+/** A numeric input, sized for a number; the form holds a number (or undefined while the box is empty). */
 defineProps<{ name: string; label: string; help?: string; min?: number; max?: number; placeholder?: string; disabled?: boolean }>()
 </script>
 
@@ -13,6 +13,7 @@ defineProps<{ name: string; label: string; help?: string; min?: number; max?: nu
       <FormControl>
         <Input
           type="number"
+          class="w-40"
           inputmode="numeric"
           :model-value="value"
           :min="min"

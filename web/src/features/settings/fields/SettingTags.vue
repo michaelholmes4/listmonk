@@ -8,8 +8,7 @@ defineProps<{ name: string; label: string; help?: string; placeholder?: string; 
 
 <template>
   <FormField v-slot="{ value, handleChange }" :name="name">
-    <!-- A lone text field stays at a readable width, like FormSection's fields column; grids size their own cells. -->
-    <FormItem class="max-w-xl">
+    <FormItem>
       <FormLabel>{{ label }}</FormLabel>
       <TagsInput
         :model-value="(value as string[] | undefined) ?? []"

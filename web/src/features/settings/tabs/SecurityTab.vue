@@ -4,9 +4,9 @@ import { useFormContext } from 'vee-validate'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CopyText from '@/components/CopyText.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Separator } from '@/components/ui/separator'
 import { useConfig } from '@/composables/queries/useConfig'
 import { useListRoles, useUserRoles } from '@/composables/queries/useRoles'
 import { usePermission } from '@/composables/usePermission'
@@ -66,80 +66,99 @@ const urlLooksPublic = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section class="space-y-4" data-cy="oidc">
-      <SettingSwitch name="security.oidc.enabled" :label="t('settings.security.enableOIDC')" :help="t('settings.security.OIDCHelp')" />
-      <div class="space-y-4 pl-0 md:pl-12" :class="!oidcOn && 'opacity-60'">
-        <div class="space-y-2">
-          <SettingInput
-            name="security.oidc.provider_url"
-            type="url"
-            :label="t('settings.security.OIDCURL')"
-            placeholder="https://login.yoursite.com"
-            :disabled="!oidcOn"
-          />
-          <div class="flex gap-3 text-xs">
-            <button v-for="(p, key) in oidcProviders" :key="key" type="button" class="link-style" :disabled="!oidcOn" @click="setProvider(key)">
-              {{ p.name }}
-            </button>
-          </div>
-        </div>
-        <SettingInput name="security.oidc.provider_name" :label="t('settings.security.OIDCName')" :maxlength="200" :disabled="!oidcOn" />
-        <SettingInput name="security.oidc.client_id" :label="t('settings.security.OIDCClientID')" :maxlength="200" :disabled="!oidcOn" />
+  <div class="space-y-8">
+    <FormSection
+      :title="t('web.settings.security.sso')"
+      :description="t('web.settings.security.ssoHelp')"
+      data-cy="oidc"
+    >
+      <SettingSwitch
+        name="security.oidc.enabled"
+        :label="t('settings.security.enableOIDC')"
+        :help="t('settings.security.OIDCHelp')"
+      />
+      <div class="space-y-2">
         <SettingInput
-          name="security.oidc.client_secret"
-          type="password"
-          autocomplete="new-password"
-          :label="t('settings.security.OIDCClientSecret')"
-          :maxlength="200"
+          name="security.oidc.provider_url"
+          type="url"
+          :label="t('settings.security.OIDCURL')"
+          placeholder="https://login.yoursite.com"
           :disabled="!oidcOn"
         />
-
-        <Separator />
-
-        <SettingSwitch
-          name="security.oidc.auto_create_users"
-          :label="t('settings.security.OIDCAutoCreateUsers')"
-          :help="t('settings.security.OIDCAutoCreateUsersHelp')"
-          :disabled="!oidcOn"
-        />
-        <div v-if="can('roles:get')" class="grid items-start gap-6 md:grid-cols-2">
-          <SettingSelect
-            name="security.oidc.default_user_role_id"
-            :label="t('settings.security.OIDCDefaultUserRole')"
-            :help="t('settings.security.OIDCDefaultRoleHelp')"
-            :options="userRoleOptions"
-            :disabled="!autoCreate"
-            number
-          />
-          <SettingSelect
-            name="security.oidc.default_list_role_id"
-            :label="t('settings.security.OIDCDefaultListRole')"
-            :help="t('settings.security.OIDCDefaultRoleHelp')"
-            :options="listRoleOptions"
-            :nullable="t('globals.terms.none')"
-            :disabled="!autoCreate"
-            number
-          />
+        <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+          <button
+            v-for="(p, key) in oidcProviders"
+            :key="key"
+            type="button"
+            class="link-style"
+            :disabled="!oidcOn"
+            @click="setProvider(key)"
+          >
+            {{ p.name }}
+          </button>
         </div>
-
-        <Separator />
-
-        <div class="space-y-1">
-          <Label>{{ t('settings.security.OIDCRedirectURL') }}</Label>
-          <div class="text-sm"><code><CopyText :text="redirectURL" /></code></div>
-        </div>
-        <p v-if="oidcOn && !urlLooksPublic" class="flex items-center gap-2 text-sm text-destructive">
-          <TriangleAlert class="size-4" />{{ t('settings.security.OIDCRedirectWarning') }}
-        </p>
       </div>
-    </section>
+      <SettingInput
+        name="security.oidc.provider_name"
+        :label="t('settings.security.OIDCName')"
+        :maxlength="200"
+        :disabled="!oidcOn"
+      />
+      <SettingInput
+        name="security.oidc.client_id"
+        :label="t('settings.security.OIDCClientID')"
+        :maxlength="200"
+        :disabled="!oidcOn"
+      />
+      <SettingInput
+        name="security.oidc.client_secret"
+        type="password"
+        autocomplete="new-password"
+        :label="t('settings.security.OIDCClientSecret')"
+        :maxlength="200"
+        :disabled="!oidcOn"
+      />
+      <div class="space-y-1">
+        <Label>{{ t('settings.security.OIDCRedirectURL') }}</Label>
+        <div class="text-sm">
+          <code><CopyText :text="redirectURL" /></code>
+        </div>
+      </div>
+      <p v-if="oidcOn && !urlLooksPublic" class="flex items-center gap-2 text-sm text-destructive">
+        <TriangleAlert class="size-4 shrink-0" />{{ t('settings.security.OIDCRedirectWarning') }}
+      </p>
+    </FormSection>
 
-    <Separator />
+    <FormSection :title="t('web.settings.security.ssoUsers')" :description="t('web.settings.security.ssoUsersHelp')">
+      <SettingSwitch
+        name="security.oidc.auto_create_users"
+        :label="t('settings.security.OIDCAutoCreateUsers')"
+        :help="t('settings.security.OIDCAutoCreateUsersHelp')"
+        :disabled="!oidcOn"
+      />
+      <template v-if="can('roles:get')">
+        <SettingSelect
+          name="security.oidc.default_user_role_id"
+          :label="t('settings.security.OIDCDefaultUserRole')"
+          :options="userRoleOptions"
+          :disabled="!autoCreate"
+          number
+        />
+        <SettingSelect
+          name="security.oidc.default_list_role_id"
+          :label="t('settings.security.OIDCDefaultListRole')"
+          :help="t('settings.security.OIDCDefaultRoleHelp')"
+          :options="listRoleOptions"
+          :nullable="t('globals.terms.none')"
+          :disabled="!autoCreate"
+          number
+        />
+      </template>
+    </FormSection>
 
-    <section class="space-y-4" data-cy="captcha">
-      <ToggleRow v-model="captchaOn" :label="t('settings.security.enableCaptcha')" :help="t('settings.security.enableCaptchaHelp')" />
-      <div v-if="captchaOn" class="space-y-4 pl-0 md:pl-12">
+    <FormSection title="CAPTCHA" :description="t('settings.security.enableCaptchaHelp')" data-cy="captcha">
+      <ToggleRow v-model="captchaOn" :label="t('settings.security.enableCaptcha')" />
+      <template v-if="captchaOn">
         <RadioGroup v-model="provider" class="flex gap-6">
           <div class="flex items-center gap-2">
             <RadioGroupItem id="captcha-altcha" value="altcha" />
@@ -150,15 +169,14 @@ const urlLooksPublic = computed(() => {
             <Label for="captcha-hcaptcha">hCaptcha (deprecated)</Label>
           </div>
         </RadioGroup>
-        <div v-if="provider === 'altcha'" class="max-w-xs">
-          <SettingNumber
-            name="security.captcha.altcha.complexity"
-            :label="t('settings.security.altchaComplexity')"
-            :help="t('settings.security.altchaComplexityHelp')"
-            :min="1000"
-            :max="1000000"
-          />
-        </div>
+        <SettingNumber
+          v-if="provider === 'altcha'"
+          name="security.captcha.altcha.complexity"
+          :label="t('settings.security.altchaComplexity')"
+          :help="t('settings.security.altchaComplexityHelp')"
+          :min="1000"
+          :max="1000000"
+        />
         <template v-else>
           <SettingInput
             name="security.captcha.hcaptcha.key"
@@ -174,14 +192,14 @@ const urlLooksPublic = computed(() => {
             :maxlength="200"
           />
         </template>
-      </div>
-    </section>
+      </template>
+    </FormSection>
 
-    <Separator />
-
-    <section class="space-y-2">
-      <h2 class="text-sm font-semibold">{{ t('settings.security.trustedURLs') }} / CORS</h2>
-      <SettingText name="security.trusted_urls" :help="t('settings.security.trustedURLsHelp')" placeholder="https://example.com" />
-    </section>
+    <FormSection
+      :title="`${t('settings.security.trustedURLs')} / CORS`"
+      :description="t('settings.security.trustedURLsHelp')"
+    >
+      <SettingText name="security.trusted_urls" placeholder="https://example.com" />
+    </FormSection>
   </div>
 </template>

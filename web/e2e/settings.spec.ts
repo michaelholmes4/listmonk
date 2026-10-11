@@ -1,4 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
+
+/** Opens a server card (SMTP, messengers) if it starts closed. */
+async function openCard(page: Page, cy: string) {
+  const toggle = page.locator(`[data-cy=${cy}-toggle]`)
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+}
 
 test.beforeEach(({ page }) => {
   page.on('pageerror', (e) => {
@@ -13,6 +19,7 @@ test.beforeEach(({ page }) => {
 test('settings: validation stays on the page and finds the section with the problem', async ({ page }) => {
   await page.goto('/admin/settings')
   await page.locator('[data-cy=nav-settings-smtp]').click()
+  await openCard(page, 'smtp-0')
   await page.getByLabel('Idle timeout').first().fill('soon')
 
   let puts = 0
@@ -43,6 +50,7 @@ test('settings: leaving with unsaved edits asks first', async ({ page }) => {
 
 test('settings: a half-edited secret is refused before anything is sent', async ({ page }) => {
   await page.goto('/admin/settings?tab=smtp')
+  await openCard(page, 'smtp-0')
   const pwd = page.locator('[data-cy=smtp-0]').getByLabel('Password')
   await expect(pwd).toBeVisible()
 
@@ -57,6 +65,7 @@ test('settings: a half-edited secret is refused before anything is sent', async 
 
 test('settings: the SMTP test reports a connection that fails', async ({ page }) => {
   await page.goto('/admin/settings?tab=smtp')
+  await openCard(page, 'smtp-0')
   const card = page.locator('[data-cy=smtp-0]')
   await card.getByLabel('Host', { exact: true }).fill('localhost')
   await card.getByLabel('Port', { exact: true }).fill('1')
@@ -65,7 +74,6 @@ test('settings: the SMTP test reports a connection that fails', async ({ page })
   await card.locator('[data-cy="smtp[0].tls_type"]').click()
   await page.getByRole('option', { name: 'Off' }).click()
 
-  await page.locator('[data-cy=smtp-test-0]').click()
   await card.getByLabel(/To e-?mail/i).fill('e2e-test@example.com')
   await page.locator('[data-cy=smtp-send-test-0]').click()
   await expect(page.locator('[data-cy=smtp-test-error]')).toBeVisible({ timeout: 20_000 })
@@ -79,7 +87,10 @@ test('settings: blocks can be added and removed without saving', async ({ page }
   await page.locator('[data-cy=smtp-add]').click()
   await expect(page.locator('section[data-cy^=smtp-]')).toHaveCount(before + 1)
   await expect(page.locator('[data-cy=btn-save]')).toBeEnabled()
-  await page.locator(`[data-cy=smtp-delete-${before}]`).click()
+  // A new server opens; Delete is in its ⋯ menu.
+  await expect(page.locator(`[data-cy=smtp-${before}-toggle]`)).toHaveAttribute('aria-expanded', 'true')
+  await page.locator(`[data-cy=smtp-${before}-menu]`).click()
+  await page.locator(`[data-cy=smtp-${before}-delete]`).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click()
   await expect(page.locator('section[data-cy^=smtp-]')).toHaveCount(before)
   await expect(page.locator('[data-cy=btn-save]')).toBeDisabled()

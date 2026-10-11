@@ -25,7 +25,7 @@ const NONE = '__none__'
         :disabled="disabled"
         @update:model-value="handleChange($event === NONE ? null : props.number ? Number($event) : $event)"
       >
-        <FormControl><SelectTrigger class="w-full" :data-cy="name"><SelectValue /></SelectTrigger></FormControl>
+        <FormControl><SelectTrigger class="w-56" :data-cy="name"><SelectValue /></SelectTrigger></FormControl>
         <SelectContent>
           <SelectItem v-if="nullable" :value="NONE">{{ nullable }}</SelectItem>
           <SelectItem v-for="o in options" :key="o.value" :value="o.value">{{ o.label }}</SelectItem>

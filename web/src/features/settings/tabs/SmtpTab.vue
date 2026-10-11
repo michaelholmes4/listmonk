@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { Loader2, Plus, Rocket, Trash2 } from '@lucide/vue'
+import { Loader2, Plus, Rocket } from '@lucide/vue'
 import { useFormContext } from 'vee-validate'
-import { computed, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { useTestSMTP } from '@/composables/queries/useSettings'
 import SettingInput from '../fields/SettingInput.vue'
 import SettingNumber from '../fields/SettingNumber.vue'
@@ -16,6 +16,7 @@ import SettingSelect from '../fields/SettingSelect.vue'
 import SettingSwitch from '../fields/SettingSwitch.vue'
 import SettingTags from '../fields/SettingTags.vue'
 import SettingText from '../fields/SettingText.vue'
+import ServerCard from '../ServerCard.vue'
 import {
   emptySmtp,
   fromAddressPattern,
@@ -27,17 +28,29 @@ import {
 } from '../schema'
 
 const { t } = useI18n()
-const { values, setFieldValue } = useFormContext<SettingsForm>()
+const { values, errors, setFieldValue } = useFormContext<SettingsForm>()
 const servers = computed(() => values.smtp ?? [])
 
+// Which cards are open, by server key. A lone server starts open, several start closed.
+const open = reactive<Record<string, boolean>>(servers.value.length === 1 ? { [servers.value[0]!._key]: true } : {})
+// A server with a problem is flagged and opened, so a failed save shows the field at fault.
+const hasErrors = (i: number) => Object.keys(errors.value).some((p) => p.startsWith(`smtp[${i}]`) || p.startsWith(`smtp.${i}.`))
+watch(errors, () => servers.value.forEach((s, i) => hasErrors(i) && (open[s._key] = true)))
+
 function add() {
-  setFieldValue('smtp', [...servers.value, emptySmtp()])
+  const s = emptySmtp()
+  open[s._key] = true
+  setFieldValue('smtp', [...servers.value, s])
 }
 const toRemove = ref<number | null>(null)
 const removeOpen = computed({ get: () => toRemove.value !== null, set: (o) => !o && (toRemove.value = null) })
 function remove() {
   setFieldValue('smtp', servers.value.filter((_, i) => i !== toRemove.value))
   toRemove.value = null
+}
+
+function setEnabled(i: number, on: boolean) {
+  setFieldValue('smtp', servers.value.map((s, n) => (n === i ? { ...s, enabled: on } : s)))
 }
 
 function applyPreset(i: number, key: keyof typeof smtpPresets) {
@@ -51,21 +64,19 @@ function applyPreset(i: number, key: keyof typeof smtpPresets) {
 const showHeaders = ref(new Set<string>())
 
 // --- Test a server with a real message. -------------------------------------------------------------
+// The server last tested: its result shows under it.
 const testing = ref<number | null>(null)
 const testEmail = ref('')
 const errMsg = ref('')
 const test = useTestSMTP()
 
-function startTest(i: number) {
-  testing.value = i
-  errMsg.value = ''
-}
-function sendTest(s: SmtpForm) {
+function sendTest(i: number, s: SmtpForm) {
   // The password is masked until retyped; the server can't test with bullets.
   if (!s.host || !s.port || (s.auth_protocol !== 'none' && s.password.includes('•'))) {
     toast.error(t('settings.smtp.testEnterEmail'))
     return
   }
+  testing.value = i
   errMsg.value = ''
   test.mutate(
     {
@@ -110,82 +121,148 @@ const tlsOptions = computed(() => [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <section v-for="(s, i) in servers" :key="s._key" class="space-y-6 rounded-lg border p-4" :data-cy="`smtp-${i}`">
-      <div class="flex items-center justify-between gap-4">
-        <SettingSwitch :name="`smtp[${i}].enabled`" :label="t('globals.buttons.enabled')" />
-        <Button v-if="servers.length > 1" type="button" variant="ghost" size="sm" :data-cy="`smtp-delete-${i}`" @click="toRemove = i">
-          <Trash2 />{{ t('globals.buttons.delete') }}
-        </Button>
-      </div>
-
-      <fieldset :disabled="!s.enabled" class="min-w-0 space-y-6 border-0 p-0" :class="!s.enabled && 'opacity-60'">
-        <div class="grid items-start gap-6 md:grid-cols-[1fr_10rem]">
-          <SettingInput
-            :name="`smtp[${i}].host`"
-            :label="t('settings.mailserver.host')"
-            :help="t('settings.mailserver.hostHelp')"
-            placeholder="smtp.yourmailserver.net"
-            :maxlength="200"
-          />
-          <SettingNumber :name="`smtp[${i}].port`" :label="t('settings.mailserver.port')" :help="t('settings.mailserver.portHelp')" :min="1" :max="65535" />
-        </div>
-
-        <div class="grid items-start gap-6 md:grid-cols-[10rem_1fr_1fr]">
-          <SettingSelect :name="`smtp[${i}].auth_protocol`" :label="t('settings.mailserver.authProtocol')" :options="authOptions" />
-          <SettingInput
-            :name="`smtp[${i}].username`"
-            :label="t('settings.mailserver.username')"
-            placeholder="mysmtp"
-            :maxlength="200"
-            :disabled="s.auth_protocol === 'none'"
-          />
-          <SettingInput
-            :name="`smtp[${i}].password`"
-            type="password"
-            autocomplete="new-password"
-            :label="t('settings.mailserver.password')"
-            :help="t('settings.mailserver.passwordHelp')"
-            :maxlength="200"
-            :disabled="s.auth_protocol === 'none'"
-          />
-        </div>
-
-        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          <button v-for="(label, key) in smtpPresetLabels" :key="key" type="button" class="link-style" @click="applyPreset(i, key)">
-            {{ label }}
-          </button>
-        </div>
-
-        <Separator />
-
-        <div class="grid items-start gap-6 md:grid-cols-2">
-          <SettingInput :name="`smtp[${i}].hello_hostname`" :label="t('settings.smtp.heloHost')" :help="t('settings.smtp.heloHostHelp')" :maxlength="200" />
-          <div class="space-y-4">
-            <SettingSelect :name="`smtp[${i}].tls_type`" :label="t('settings.mailserver.tls')" :help="t('settings.mailserver.tlsHelp')" :options="tlsOptions" />
-            <SettingSwitch
-              :name="`smtp[${i}].tls_skip_verify`"
-              :label="t('settings.mailserver.skipTLS')"
-              :help="t('settings.mailserver.skipTLSHelp')"
-              :disabled="s.tls_type === 'none'"
+  <div class="space-y-4">
+    <!-- One card per server: its header always shows, its settings open inside it. -->
+    <ServerCard
+      v-for="(s, i) in servers"
+      :key="s._key"
+      v-model:open="open[s._key]"
+      :title="s.name || t('web.settings.smtp.server', { n: i + 1 })"
+      :subtitle="s.host ? `${s.host}:${s.port}` : undefined"
+      :enabled="s.enabled"
+      :has-errors="hasErrors(i)"
+      :deletable="servers.length > 1"
+      :cy="`smtp-${i}`"
+      :data-cy="`smtp-${i}`"
+      @update:enabled="setEnabled(i, $event)"
+      @delete="toRemove = i"
+    >
+      <fieldset :disabled="!s.enabled" class="min-w-0 space-y-8 border-0 p-0" :class="!s.enabled && 'opacity-60'">
+        <FormSection :title="t('web.settings.smtp.connection')" :description="t('web.settings.smtp.connectionHelp')">
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <button
+              v-for="(label, key) in smtpPresetLabels"
+              :key="key"
+              type="button"
+              class="link-style"
+              @click="applyPreset(i, key)"
+            >
+              {{ label }}
+            </button>
+          </div>
+          <div class="grid items-start gap-6 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <SettingInput
+              :name="`smtp[${i}].host`"
+              :label="t('settings.mailserver.host')"
+              :help="t('settings.mailserver.hostHelp')"
+              placeholder="smtp.yourmailserver.net"
+              :maxlength="200"
+            />
+            <SettingNumber
+              :name="`smtp[${i}].port`"
+              :label="t('settings.mailserver.port')"
+              :help="t('settings.mailserver.portHelp')"
+              :min="1"
+              :max="65535"
             />
           </div>
-        </div>
+          <SettingSelect
+            :name="`smtp[${i}].tls_type`"
+            :label="t('settings.mailserver.tls')"
+            :help="t('settings.mailserver.tlsHelp')"
+            :options="tlsOptions"
+          />
+          <SettingSwitch
+            :name="`smtp[${i}].tls_skip_verify`"
+            :label="t('settings.mailserver.skipTLS')"
+            :help="t('settings.mailserver.skipTLSHelp')"
+            :disabled="s.tls_type === 'none'"
+          />
+          <SettingInput
+            :name="`smtp[${i}].hello_hostname`"
+            :label="t('settings.smtp.heloHost')"
+            :help="t('settings.smtp.heloHostHelp')"
+            :maxlength="200"
+          />
+        </FormSection>
 
-        <Separator />
+        <FormSection :title="t('web.settings.smtp.auth')">
+          <SettingSelect
+            :name="`smtp[${i}].auth_protocol`"
+            :label="t('settings.mailserver.authProtocol')"
+            :options="authOptions"
+          />
+          <div class="grid items-start gap-6 sm:grid-cols-2">
+            <SettingInput
+              :name="`smtp[${i}].username`"
+              :label="t('settings.mailserver.username')"
+              placeholder="mysmtp"
+              :maxlength="200"
+              :disabled="s.auth_protocol === 'none'"
+            />
+            <SettingInput
+              :name="`smtp[${i}].password`"
+              type="password"
+              autocomplete="new-password"
+              :label="t('settings.mailserver.password')"
+              :help="t('settings.mailserver.passwordHelp')"
+              :maxlength="200"
+              :disabled="s.auth_protocol === 'none'"
+            />
+          </div>
+        </FormSection>
 
-        <div class="grid items-start gap-6 md:grid-cols-3">
-          <SettingNumber :name="`smtp[${i}].max_conns`" :label="t('settings.mailserver.maxConns')" :help="t('settings.mailserver.maxConnsHelp')" :min="1" :max="65535" />
-          <SettingInput :name="`smtp[${i}].idle_timeout`" :label="t('settings.mailserver.idleTimeout')" :help="t('settings.mailserver.idleTimeoutHelp')" placeholder="15s" :maxlength="10" />
-          <SettingInput :name="`smtp[${i}].wait_timeout`" :label="t('settings.mailserver.waitTimeout')" :help="t('settings.mailserver.waitTimeoutHelp')" placeholder="5s" :maxlength="10" />
-          <SettingNumber :name="`smtp[${i}].max_msg_retries`" :label="t('settings.smtp.retries')" :help="t('settings.smtp.retriesHelp')" :min="1" :max="1000" />
-          <SettingInput :name="`smtp[${i}].msg_retry_delay`" :label="t('settings.smtp.retryDelay')" :help="t('settings.smtp.retryDelayHelp')" placeholder="0s" :maxlength="10" />
-        </div>
+        <FormSection :title="t('web.settings.smtp.limits')" :description="t('web.settings.smtp.limitsHelp')">
+          <div class="grid items-start gap-6 sm:grid-cols-2">
+            <SettingNumber
+              :name="`smtp[${i}].max_conns`"
+              :label="t('settings.mailserver.maxConns')"
+              :help="t('settings.mailserver.maxConnsHelp')"
+              :min="1"
+              :max="65535"
+            />
+            <SettingNumber
+              :name="`smtp[${i}].max_msg_retries`"
+              :label="t('settings.smtp.retries')"
+              :help="t('settings.smtp.retriesHelp')"
+              :min="1"
+              :max="1000"
+            />
+            <SettingInput
+              :name="`smtp[${i}].idle_timeout`"
+              :label="t('settings.mailserver.idleTimeout')"
+              :help="t('settings.mailserver.idleTimeoutHelp')"
+              placeholder="15s"
+              :maxlength="10"
+              short
+            />
+            <SettingInput
+              :name="`smtp[${i}].wait_timeout`"
+              :label="t('settings.mailserver.waitTimeout')"
+              :help="t('settings.mailserver.waitTimeoutHelp')"
+              placeholder="5s"
+              :maxlength="10"
+              short
+            />
+          </div>
+          <SettingInput
+            :name="`smtp[${i}].msg_retry_delay`"
+            :label="t('settings.smtp.retryDelay')"
+            :help="t('settings.smtp.retryDelayHelp')"
+            placeholder="0s"
+            :maxlength="10"
+            short
+          />
+        </FormSection>
 
-        <Separator />
-
-        <div class="grid items-start gap-6 md:grid-cols-2">
-          <SettingInput :name="`smtp[${i}].name`" :label="t('globals.fields.name')" :help="t('settings.mailserver.nameHelp')" placeholder="email-primary" :maxlength="100" />
+        <FormSection :title="t('web.settings.smtp.routing')" :description="t('web.settings.smtp.routingHelp')">
+          <SettingInput
+            :name="`smtp[${i}].name`"
+            :label="t('globals.fields.name')"
+            :help="t('settings.mailserver.nameHelp')"
+            placeholder="email-primary"
+            :maxlength="100"
+          />
           <SettingTags
             :name="`smtp[${i}].from_addresses`"
             :label="t('settings.smtp.fromAddresses')"
@@ -193,43 +270,62 @@ const tlsOptions = computed(() => [
             placeholder="user@example.com, anothersite.com"
             :accept="validFrom"
           />
-        </div>
-
-        <SettingText
-          v-if="s.strEmailHeaders || showHeaders.has(s._key)"
-          :name="`smtp[${i}].strEmailHeaders`"
-          :help="t('settings.smtp.customHeadersHelp')"
-          placeholder="[{&quot;X-Custom&quot;: &quot;value&quot;}, {&quot;X-Custom2&quot;: &quot;value&quot;}]"
-        />
-        <button v-else type="button" class="link-style inline-flex items-center gap-1 text-sm" @click="showHeaders = new Set(showHeaders).add(s._key)">
-          <Plus class="size-4" />{{ t('settings.smtp.setCustomHeaders') }}
-        </button>
+          <SettingText
+            v-if="s.strEmailHeaders || showHeaders.has(s._key)"
+            :name="`smtp[${i}].strEmailHeaders`"
+            :label="t('settings.smtp.customHeaders')"
+            :help="t('settings.smtp.customHeadersHelp')"
+            placeholder="[{&quot;X-Custom&quot;: &quot;value&quot;}, {&quot;X-Custom2&quot;: &quot;value&quot;}]"
+          />
+          <button
+            v-else
+            type="button"
+            class="link-style inline-flex items-center gap-1 text-sm"
+            @click="showHeaders = new Set(showHeaders).add(s._key)"
+          >
+            <Plus class="size-4" />{{ t('settings.smtp.setCustomHeaders') }}
+          </button>
+        </FormSection>
       </fieldset>
 
-      <Separator />
-
-      <div class="space-y-3">
-        <div v-if="testing === i" class="flex flex-wrap items-end gap-4">
-          <div class="text-sm">
-            <p class="font-medium">{{ t('settings.general.fromEmail') }}</p>
-            <p class="text-muted-foreground">{{ values.app?.from_email }}</p>
-          </div>
+      <FormSection
+        :title="t('settings.smtp.testConnection')"
+        :description="t('web.settings.smtp.testHelp', { from: values.app?.from_email ?? '' })"
+      >
+        <div class="flex flex-wrap items-end gap-4">
           <div class="w-64 space-y-2">
             <Label :for="`smtp-test-${i}`">{{ t('settings.smtp.toEmail') }}</Label>
-            <Input :id="`smtp-test-${i}`" v-model="testEmail" type="email" placeholder="email@site.com" @keydown.enter.prevent="sendTest(s)" />
+            <Input
+              :id="`smtp-test-${i}`"
+              v-model="testEmail"
+              type="email"
+              placeholder="email@site.com"
+              @keydown.enter.prevent="sendTest(i, s)"
+            />
           </div>
-          <Button type="button" :disabled="test.isPending.value || !testEmail" :data-cy="`smtp-send-test-${i}`" @click="sendTest(s)">
-            <Loader2 v-if="test.isPending.value" class="animate-spin" />{{ t('settings.smtp.sendTest') }}
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="test.isPending.value || !testEmail"
+            :data-cy="`smtp-send-test-${i}`"
+            @click="sendTest(i, s)"
+          >
+            <Loader2 v-if="test.isPending.value && testing === i" class="animate-spin" /><Rocket v-else />{{
+              t('settings.smtp.sendTest')
+            }}
           </Button>
         </div>
-        <Button v-else type="button" variant="ghost" size="sm" :data-cy="`smtp-test-${i}`" @click="startTest(i)">
-          <Rocket />{{ t('settings.smtp.testConnection') }}
-        </Button>
-        <pre v-if="errMsg && testing === i" class="whitespace-pre-wrap rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive" data-cy="smtp-test-error">{{ errMsg }}</pre>
-      </div>
-    </section>
+        <pre
+          v-if="errMsg && testing === i"
+          class="whitespace-pre-wrap rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive"
+          data-cy="smtp-test-error"
+        >{{ errMsg }}</pre>
+      </FormSection>
+    </ServerCard>
 
-    <Button type="button" data-cy="smtp-add" @click="add"><Plus />{{ t('globals.buttons.addNew') }}</Button>
+    <Button type="button" variant="outline" data-cy="smtp-add" @click="add">
+      <Plus />{{ t('web.settings.smtp.add') }}
+    </Button>
 
     <ConfirmDialog
       v-model:open="removeOpen"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useFormContext } from 'vee-validate'
 import { useI18n } from 'vue-i18n'
-import { Separator } from '@/components/ui/separator'
+import FormSection from '@/components/layout/FormSection.vue'
 import SettingInput from '../fields/SettingInput.vue'
 import SettingNumber from '../fields/SettingNumber.vue'
 import SettingSwitch from '../fields/SettingSwitch.vue'
@@ -12,8 +12,11 @@ const { values } = useFormContext<SettingsForm>()
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="grid items-start gap-6 md:grid-cols-2">
+  <div class="space-y-8">
+    <FormSection
+      :title="t('web.settings.performance.sending')"
+      :description="t('web.settings.performance.sendingHelp')"
+    >
       <SettingNumber
         name="app.concurrency"
         :label="t('settings.performance.concurrency')"
@@ -46,56 +49,53 @@ const { values } = useFormContext<SettingsForm>()
         :max="100000"
         placeholder="1999"
       />
-    </div>
+    </FormSection>
 
-    <Separator />
-
-    <section class="space-y-4">
-      <SettingSwitch
-        name="app.message_sliding_window"
-        :label="t('settings.performance.slidingWindow')"
-        :help="t('settings.performance.slidingWindowHelp')"
+    <FormSection
+      :title="t('web.settings.performance.window')"
+      :description="t('settings.performance.slidingWindowHelp')"
+    >
+      <SettingSwitch name="app.message_sliding_window" :label="t('settings.performance.slidingWindow')" />
+      <SettingNumber
+        name="app.message_sliding_window_rate"
+        :label="t('settings.performance.slidingWindowRate')"
+        :help="t('settings.performance.slidingWindowRateHelp')"
+        :min="1"
+        :max="10000000"
+        placeholder="25"
+        :disabled="!values.app?.message_sliding_window"
       />
-      <div class="grid items-start gap-6 md:grid-cols-2">
-        <SettingNumber
-          name="app.message_sliding_window_rate"
-          :label="t('settings.performance.slidingWindowRate')"
-          :help="t('settings.performance.slidingWindowRateHelp')"
-          :min="1"
-          :max="10000000"
-          placeholder="25"
-          :disabled="!values.app?.message_sliding_window"
-        />
-        <SettingInput
-          name="app.message_sliding_window_duration"
-          :label="t('settings.performance.slidingWindowDuration')"
-          :help="t('settings.performance.slidingWindowDurationHelp')"
-          placeholder="1h"
-          :maxlength="10"
-          :disabled="!values.app?.message_sliding_window"
-        />
-      </div>
-    </section>
-
-    <Separator />
-
-    <section class="space-y-4">
-      <SettingSwitch
-        name="app.cache_slow_queries"
-        :label="t('settings.performance.cacheSlowQueries')"
-        :help="t('settings.performance.cacheSlowQueriesHelp')"
+      <SettingInput
+        name="app.message_sliding_window_duration"
+        :label="t('settings.performance.slidingWindowDuration')"
+        :help="t('settings.performance.slidingWindowDurationHelp')"
+        placeholder="1h"
+        :maxlength="10"
+        short
+        :disabled="!values.app?.message_sliding_window"
       />
-      <div class="max-w-xs">
-        <SettingInput
-          name="app.cache_slow_queries_interval"
-          :label="t('settings.maintenance.cron')"
-          placeholder="0 3 * * *"
-          :disabled="!values.app?.cache_slow_queries"
-        />
-      </div>
-      <a href="https://listmonk.app/docs/maintenance/performance/" target="_blank" rel="noopener noreferrer" class="link-style text-sm">
-        {{ t('globals.buttons.learnMore') }}
+    </FormSection>
+
+    <FormSection
+      :title="t('web.settings.performance.cache')"
+      :description="t('settings.performance.cacheSlowQueriesHelp')"
+    >
+      <SettingSwitch name="app.cache_slow_queries" :label="t('settings.performance.cacheSlowQueries')" />
+      <SettingInput
+        name="app.cache_slow_queries_interval"
+        :label="t('settings.maintenance.cron')"
+        placeholder="0 3 * * *"
+        short
+        :disabled="!values.app?.cache_slow_queries"
+      />
+      <a
+        href="https://listmonk.app/docs/maintenance/performance/"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="link-style text-sm"
+      >
+        {{ t('globals.buttons.learnMore') }} &rarr;
       </a>
-    </section>
+    </FormSection>
   </div>
 </template>

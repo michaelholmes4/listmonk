@@ -8,6 +8,7 @@ import { deleteOldEvents } from '@/api/automations'
 import { useDeleteOldMessageLog } from '@/composables/queries/useMessageLog'
 import { analyticsExportURL, type AnalyticsType, type OrphanType } from '@/api/maintenance'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import FormSection from '@/components/layout/FormSection.vue'
 import Page from '@/components/layout/Page.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -89,52 +90,68 @@ function run() {
 
 <template>
   <Page :title="t('maintenance.title')" :description="t('maintenance.help')" width="form">
-    <section class="space-y-4 rounded-lg border p-4" data-cy="gc-subscribers">
-      <h2 class="font-medium">{{ t('globals.terms.subscribers') }}</h2>
-      <div class="flex flex-wrap items-end gap-4">
-        <div class="w-56 space-y-2">
-          <Label>{{ t('web.maintenance.data') }}</Label>
-          <Select v-model="subscriberType">
-            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="orphan">{{ t('dashboard.orphanSubs') }}</SelectItem>
-              <SelectItem value="blocklisted">{{ t('subscribers.status.blocklisted') }}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button variant="destructive" :disabled="busy" @click="pending = 'subscribers'">{{ t('globals.buttons.delete') }}</Button>
-      </div>
-      <p class="text-xs text-muted-foreground">{{ t('maintenance.orphanHelp') }}</p>
-    </section>
-
-    <section class="space-y-4 rounded-lg border p-4" data-cy="gc-subscriptions">
-      <h2 class="font-medium">{{ t('globals.terms.subscriptions', 2) }}</h2>
-      <div class="flex flex-wrap items-end gap-4">
-        <div class="w-56 space-y-2">
-          <Label>{{ t('web.maintenance.data') }}</Label>
-          <Select model-value="optin">
-            <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="optin">{{ t('maintenance.maintenance.unconfirmedOptins') }}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div class="space-y-2">
-          <Label for="gc-subscriptions-date">{{ t('maintenance.olderThan') }}</Label>
-          <Input id="gc-subscriptions-date" v-model="subscriptionDate" type="date" class="w-44" />
-        </div>
-        <Button variant="destructive" :disabled="busy || !subscriptionDate" @click="pending = 'subscriptions'">{{ t('globals.buttons.delete') }}</Button>
-      </div>
-    </section>
-
-    <section class="space-y-6 rounded-lg border p-4" data-cy="gc-analytics">
-      <div class="space-y-4">
-        <h2 class="font-medium">{{ t('globals.terms.analytics') }}</h2>
+    <div class="space-y-8">
+      <FormSection
+        :title="t('globals.terms.subscribers')"
+        :description="t('maintenance.orphanHelp')"
+        data-cy="gc-subscribers"
+      >
         <div class="flex flex-wrap items-end gap-4">
-          <div class="w-56 space-y-2">
+          <div class="space-y-2">
+            <Label>{{ t('web.maintenance.data') }}</Label>
+            <Select v-model="subscriberType">
+              <SelectTrigger class="w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="orphan">{{ t('dashboard.orphanSubs') }}</SelectItem>
+                <SelectItem value="blocklisted">{{ t('subscribers.status.blocklisted') }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button variant="destructive" :disabled="busy" @click="pending = 'subscribers'">
+            {{
+              t('globals.buttons.delete')
+            }}
+          </Button>
+        </div>
+      </FormSection>
+
+      <FormSection
+        :title="t('globals.terms.subscriptions', 2)"
+        :description="t('web.maintenance.subscriptionsHelp')"
+        data-cy="gc-subscriptions"
+      >
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="space-y-2">
+            <Label>{{ t('web.maintenance.data') }}</Label>
+            <Select model-value="optin">
+              <SelectTrigger class="w-64"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="optin">{{ t('maintenance.maintenance.unconfirmedOptins') }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div class="space-y-2">
+            <Label for="gc-subscriptions-date">{{ t('maintenance.olderThan') }}</Label>
+            <Input id="gc-subscriptions-date" v-model="subscriptionDate" type="date" class="w-44" />
+          </div>
+          <Button variant="destructive" :disabled="busy || !subscriptionDate" @click="pending = 'subscriptions'">
+            {{
+              t('globals.buttons.delete')
+            }}
+          </Button>
+        </div>
+      </FormSection>
+
+      <FormSection
+        :title="t('globals.terms.analytics')"
+        :description="t('web.maintenance.analyticsHelp')"
+        data-cy="gc-analytics"
+      >
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="space-y-2">
             <Label>{{ t('web.maintenance.data') }}</Label>
             <Select v-model="analyticsType">
-              <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger class="w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{{ t('globals.terms.all') }}</SelectItem>
                 <SelectItem value="views">{{ t('dashboard.campaignViews') }}</SelectItem>
@@ -146,17 +163,24 @@ function run() {
             <Label for="gc-analytics-date">{{ t('maintenance.olderThan') }}</Label>
             <Input id="gc-analytics-date" v-model="analyticsDate" type="date" class="w-44" />
           </div>
-          <Button variant="destructive" :disabled="busy || !analyticsDate" @click="pending = 'analytics'">{{ t('globals.buttons.delete') }}</Button>
+          <Button variant="destructive" :disabled="busy || !analyticsDate" @click="pending = 'analytics'">
+            {{
+              t('globals.buttons.delete')
+            }}
+          </Button>
         </div>
-      </div>
+      </FormSection>
 
-      <div class="space-y-4 border-t pt-4">
-        <h3 class="text-sm font-medium">{{ t('subscribers.export') }}</h3>
+      <FormSection
+        :title="t('web.maintenance.export')"
+        :description="t('web.maintenance.exportHelp')"
+        data-cy="export-analytics"
+      >
         <div class="flex flex-wrap items-end gap-4">
-          <div class="w-56 space-y-2">
+          <div class="space-y-2">
             <Label>{{ t('web.maintenance.data') }}</Label>
             <Select v-model="exportType">
-              <SelectTrigger class="w-full"><SelectValue /></SelectTrigger>
+              <SelectTrigger class="w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="views">{{ t('dashboard.campaignViews') }}</SelectItem>
                 <SelectItem value="clicks">{{ t('dashboard.linkClicks') }}</SelectItem>
@@ -171,34 +195,47 @@ function run() {
             <a :href="exportURL" download data-cy="export-link"><Download />{{ t('subscribers.export') }}</a>
           </Button>
         </div>
-      </div>
-    </section>
+      </FormSection>
 
-    <section v-if="can('automations:manage')" class="space-y-4 rounded-lg border p-4" data-cy="gc-events">
-      <h2 class="font-medium">{{ t('web.maintenance.events') }}</h2>
-      <div class="flex flex-wrap items-end gap-4">
-        <div class="space-y-2">
-          <Label for="gc-events-date">{{ t('maintenance.olderThan') }}</Label>
-          <Input id="gc-events-date" v-model="eventsDate" type="date" class="w-44" />
+      <FormSection
+        v-if="can('automations:manage')"
+        :title="t('web.maintenance.events')"
+        :description="t('web.maintenance.eventsHelp')"
+        data-cy="gc-events"
+      >
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="space-y-2">
+            <Label for="gc-events-date">{{ t('maintenance.olderThan') }}</Label>
+            <Input id="gc-events-date" v-model="eventsDate" type="date" class="w-44" />
+          </div>
+          <Button variant="destructive" :disabled="busy || !eventsDate" @click="pending = 'events'">
+            {{
+              t('globals.buttons.delete')
+            }}
+          </Button>
         </div>
-        <Button variant="destructive" :disabled="busy || !eventsDate" @click="pending = 'events'">{{ t('globals.buttons.delete') }}</Button>
-      </div>
-      <p class="text-xs text-muted-foreground">{{ t('web.maintenance.eventsHelp') }}</p>
-    </section>
+      </FormSection>
 
-    <section class="space-y-4 rounded-lg border p-4" data-cy="gc-messages">
-      <h2 class="font-medium">{{ t('web.maintenance.messageLog') }}</h2>
-      <div class="flex flex-wrap items-end gap-4">
-        <div class="space-y-2">
-          <Label for="gc-messages-date">{{ t('maintenance.olderThan') }}</Label>
-          <Input id="gc-messages-date" v-model="messagesDate" type="date" class="w-44" />
+      <FormSection
+        :title="t('web.maintenance.messageLog')"
+        :description="t('web.maintenance.messageLogHelp')"
+        data-cy="gc-messages"
+      >
+        <div class="flex flex-wrap items-end gap-4">
+          <div class="space-y-2">
+            <Label for="gc-messages-date">{{ t('maintenance.olderThan') }}</Label>
+            <Input id="gc-messages-date" v-model="messagesDate" type="date" class="w-44" />
+          </div>
+          <Button variant="destructive" :disabled="busy || !messagesDate" @click="pending = 'messages'">
+            {{
+              t('globals.buttons.delete')
+            }}
+          </Button>
         </div>
-        <Button variant="destructive" :disabled="busy || !messagesDate" @click="pending = 'messages'">{{ t('globals.buttons.delete') }}</Button>
-      </div>
-      <p class="text-xs text-muted-foreground">{{ t('web.maintenance.messageLogHelp') }}</p>
-    </section>
+      </FormSection>
 
-    <VacuumCard v-if="can('settings:manage')" />
+      <VacuumCard v-if="can('settings:manage')" />
+    </div>
 
     <ConfirmDialog
       v-model:open="confirmOpen"

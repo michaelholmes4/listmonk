@@ -5,6 +5,7 @@ import { useForm } from 'vee-validate'
 import { watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { z } from 'zod'
+import FormSection from '@/components/layout/FormSection.vue'
 import { Button } from '@/components/ui/button'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -36,28 +37,30 @@ const onSubmit = handleSubmit((v) => save.mutate({ key: 'maintenance.db', value:
 </script>
 
 <template>
-  <form class="space-y-4 rounded-lg border p-4" data-cy="vacuum" @submit.prevent="onSubmit">
-    <div class="space-y-1">
-      <h2 class="font-medium">{{ t('maintenance.database.title') }}</h2>
-      <h3 class="text-sm">Vacuum</h3>
-      <p class="text-xs text-muted-foreground">{{ t('maintenance.database.vacuumHelp') }}</p>
-    </div>
+  <FormSection
+    :title="t('web.maintenance.vacuum')"
+    :description="t('maintenance.database.vacuumHelp')"
+    data-cy="vacuum"
+  >
     <Skeleton v-if="isPending" class="h-9 w-full" />
-    <div v-else class="flex flex-wrap items-start gap-6">
-      <div class="flex items-center gap-2 pt-7">
+    <!-- Saves on its own: the rest of the page are one-off actions, not settings. -->
+    <form v-else class="space-y-6" @submit.prevent="onSubmit">
+      <div class="flex items-center justify-between gap-4 rounded-lg border p-3">
+        <label for="vacuum" class="text-sm font-medium">{{ t('globals.buttons.enabled') }}</label>
         <Switch id="vacuum" :model-value="values.vacuum" @update:model-value="setFieldValue('vacuum', $event)" />
-        <label for="vacuum" class="text-sm">{{ t('globals.buttons.enabled') }}</label>
       </div>
       <FormField v-slot="{ componentField }" name="cron">
-        <FormItem class="w-56">
+        <FormItem>
           <FormLabel>{{ t('settings.maintenance.cron') }}</FormLabel>
-          <FormControl><Input v-bind="componentField" placeholder="0 2 * * *" :disabled="!values.vacuum" /></FormControl>
+          <FormControl>
+            <Input v-bind="componentField" placeholder="0 2 * * *" class="w-40" :disabled="!values.vacuum" />
+          </FormControl>
           <FormMessage />
         </FormItem>
       </FormField>
-      <Button type="submit" class="mt-7" :disabled="save.isPending.value">
+      <Button type="submit" :disabled="save.isPending.value">
         <Loader2 v-if="save.isPending.value" class="animate-spin" />{{ t('globals.buttons.save') }}
       </Button>
-    </div>
-  </form>
+    </form>
+  </FormSection>
 </template>

@@ -188,10 +188,27 @@ Two complaints about record pages: the tabs felt cluttered, and on desktop the i
 | Inputs spanned the whole form width (48rem), and sections were a heading over a full-width column. | `FormSection` puts the title and description on the left and the fields in a column capped at 36rem. Subscriber, campaign, automation settings, list (Details · Access · Archive), user, role and profile editors all use it. The template editor uses the toolbar-and-editor layout of a campaign's Content tab. |
 | Users, roles, lists, templates and profile each grouped fields their own way: bordered boxes, `h2`s or none. | The same sections everywhere. Profile saves from the header like every other editor. |
 | The automation header had Pause, Archive, Save draft and Publish side by side. | Pause / Resume / Archive moved to a "⋯" menu, leaving Save draft and the one primary Publish. |
-| Settings text fields were 48rem wide. | Lone text and tag fields are capped at 36rem. The multi-column SMTP, bounce and messenger cards keep the full column. |
+| Settings text fields were 48rem wide. | Lone text and tag fields are capped at 36rem (later: all settings use `FormSection`). |
 
-Settings keeps one column with sub-headings rather than annotated sections: each settings page's
-header already names and explains the section, and the server cards need the width.
+Settings at first kept one column with sub-headings. It now uses the same sections (see "Settings
+and maintenance" below).
+
+### Settings and maintenance (October 2026)
+
+The settings pages and Maintenance were the last screens still laid out the old way: fields in one
+wide column split by rules, bordered cards for SMTP servers, messengers and maintenance jobs, and
+grids of three fields with long help text side by side.
+
+| Before | Now |
+|--------|-----|
+| One column of fields split by `Separator`s, with an occasional `h2`. | Every settings page except Appearance is a set of `FormSection`s (General: Site · Email · Subscriptions · Archive · Language and updates, and so on). Each section's description explains it, so the page header's help no longer has to cover everything. |
+| An SMTP server or messenger was a bordered card with 2–3 column grids inside. | Each one is a collapsible card (`ServerCard`). Its header always shows the name (or "Server 1"), the host, an *Enabled* switch and a "⋯" menu with *Delete*, so the page reads as a list of servers. Its sections open inside the card: Connection · Authentication · Connections and retries · Routing · Test connection for SMTP, Postback · Connections and retries for messengers. A lone server starts open, several start closed, a new one opens, and one with a problem is flagged *Has errors* and opened. A closed card keeps its fields mounted (`unmount-on-hide=false`, so they are hidden until found), which keeps validation and the sidebar's error dot working. *Test connection* shows its recipient field at once, not behind a button. No messengers shows an empty state with *Add messenger*. |
+| Switches sat left of their label, and the settings field components stretched to the column. | `ToggleRow` is the bordered row the other editors use (label and help on the left, switch on the right). Number inputs are `w-40`, selects `w-56`, and durations and cron lines use `SettingInput short`. |
+| Bounce actions repeated "Bounce count" and its help on every row, and provider webhook fields showed greyed out. | The actions are a small table with column headings. A webhook provider's fields show once it is switched on. |
+| Maintenance was a stack of bordered cards. | One section per job, with its explanation on the left. The vacuum schedule saves on its own, inside its section. |
+| The settings form's hidden `Tabs` were `orientation="vertical"`. That made its root `flex-row`, which shrank the content, and nested segmented tabs (Privacy's domain lists, Appearance) stacked vertically. | The hidden `Tabs` use the default orientation. |
+
+Appearance keeps its full-width code editors, under the editor-page exception in rule 8.
 
 ### Flow builder (October 2026, third pass)
 

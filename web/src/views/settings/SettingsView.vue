@@ -19,12 +19,12 @@ const tab = computed(() => tabOfQuery(route.query.tab))
 </script>
 
 <template>
-  <Page :title="t(tabLabels[tab])" :description="t(`web.settings.help.${tab}`)">
+  <Page width="form" :title="t(tabLabels[tab])" :description="t(`web.settings.help.${tab}`)">
     <template v-if="tab === 'general' && config?.version" #badges>
       <span class="text-sm font-normal text-muted-foreground">{{ config.version }}</span>
     </template>
 
-    <div v-if="!settings" class="max-w-3xl space-y-4">
+    <div v-if="!settings" class="space-y-4">
       <Skeleton class="h-9 w-full" />
       <Skeleton class="h-9 w-full" />
       <Skeleton class="h-64 w-full" />

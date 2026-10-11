@@ -58,7 +58,10 @@ watch(
   (s) => !dirty.value && reset(s),
 )
 
-const { leaveOpen, decide } = useUnsavedGuard(dirty, computed(() => save.isPending.value))
+const { leaveOpen, decide } = useUnsavedGuard(
+  dirty,
+  computed(() => save.isPending.value),
+)
 
 // --- Sections live in the URL (`?tab=`); the sidebar's Settings space links them. -------------------
 const tab = computed(() => tabOfQuery(route.query.tab))
@@ -119,9 +122,9 @@ const sections: Record<SettingsTab, Component> = {
   <FormActions :pending="save.isPending.value" :dirty="dirty" :can-save="canManage" @save="submit" />
 
   <!-- The section's name and help are the page header (SettingsView); the sidebar switches sections. -->
-  <form novalidate class="max-w-3xl min-w-0 space-y-6" @submit.prevent="submit">
+  <form novalidate class="min-w-0 space-y-8" @submit.prevent="submit">
     <!-- Tabs without a TabsList: the sidebar is the switcher, TabsContent mounts the active section. -->
-    <Tabs :model-value="tab" orientation="vertical">
+    <Tabs :model-value="tab">
       <fieldset :disabled="!canManage" class="min-w-0 border-0 p-0">
         <TabsContent v-for="id in tabs" :key="id" :value="id"><component :is="sections[id]" /></TabsContent>
       </fieldset>
