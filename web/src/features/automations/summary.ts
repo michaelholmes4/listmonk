@@ -1,5 +1,6 @@
 import { stepMeta } from './labels'
 import { waitEvents, type Config, type Step, type Trigger } from './model'
+import { isGroup, needsValue, type Rule } from './rule'
 
 type T = (key: string, params?: Record<string, unknown>) => string
 
@@ -8,6 +9,8 @@ export interface Lookups {
   list: (id: number) => string | undefined
   /** A step of the flow by id (a go to shows where it goes). */
   step?: (id: string) => Step | undefined
+  /** What an email step sends: its subject, or its template's name. */
+  email?: (s: Step) => string | undefined
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -42,10 +45,17 @@ export function triggerSummary(t: T, tr: Trigger, l: Lookups): string {
 /** A short description of what a step is set to, for its card. Empty means "not set up yet". */
 export function stepSummary(t: T, s: Step, l: Lookups, c: Config = s.config): string {
   switch (s.type) {
-    case 'send_email':
+    case 'send_email': {
       // A transactional email has no topic.
-      if (c.message_type === 'transactional') return t('web.automations.messageType.transactional')
-      return c.list_id ? `${t('web.automations.messageType.marketing')} · ${listName(l, c.list_id)}` : ''
+      const kind =
+        c.message_type === 'transactional'
+          ? t('web.automations.messageType.transactional')
+          : c.list_id
+            ? `${t('web.automations.messageType.marketing')} · ${listName(l, c.list_id)}`
+            : ''
+      const name = kind ? l.email?.({ ...s, config: c }) : undefined
+      return name ? `${name} · ${kind}` : kind
+    }
     case 'delay':
       return str(c.duration) ? duration(t, str(c.duration)) : ''
     case 'wait_until': {
@@ -61,7 +71,7 @@ export function stepSummary(t: T, s: Step, l: Lookups, c: Config = s.config): st
       return [t('web.automations.waitForEvent.upTo', { time: duration(t, str(c.timeout)) }), names.join(', ')].join(' · ')
     }
     case 'condition':
-      return ''
+      return c.rule ? ruleSummary(t, c.rule as Rule, l) : ''
     case 'go_to': {
       const target = str(c.target) ? l.step?.(str(c.target)) : undefined
       if (!target) return ''
@@ -76,4 +86,36 @@ export function stepSummary(t: T, s: Step, l: Lookups, c: Config = s.config): st
     case 'exit':
       return str(c.reason)
   }
+}
+
+const value = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v))
+
+/** A rule in a line ("plan is pro and Welcome was opened"); a nested group goes in brackets. */
+export function ruleSummary(t: T, r: Rule, l: Lookups, nested = false): string {
+  if (isGroup(r)) {
+    const parts = (r.rules ?? []).map((x) => ruleSummary(t, x, l, true)).filter(Boolean)
+    const joined = parts.join(` ${t(r.op === 'or' ? 'web.automations.rule.or' : 'web.automations.rule.and')} `)
+    return nested && parts.length > 1 ? `(${joined})` : joined
+  }
+  const op = r.operator ? t(`web.automations.rule.op.${r.type === 'subscriber' ? 'attribute' : r.type}.${r.operator}`) : ''
+  switch (r.type) {
+    case 'attribute':
+      if (!r.path) return ''
+      return needsValue(r.operator) ? `${r.path} ${op} ${value(r.value)}` : `${r.path} ${op}`
+    case 'subscriber':
+      return `${t(`web.automations.rule.fields.${r.path}`)} ${op} ${value(r.value)}`
+    case 'list':
+      return r.list_id ? `${op}: ${listName(l, r.list_id)}` : ''
+    case 'step': {
+      const step = r.node_id ? l.step?.(r.node_id) : undefined
+      if (!step) return ''
+      return `${l.email?.(step) ?? t('web.automations.step.send_email')} ${op}`
+    }
+    case 'event':
+      if (!r.name) return ''
+      return r.within ? `${r.name} ${op} ${t('web.automations.rule.within')} ${duration(t, r.within)}` : `${r.name} ${op}`
+    case 'sql':
+      return t('web.automations.rule.types.sql')
+  }
+  return ''
 }

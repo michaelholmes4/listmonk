@@ -48,7 +48,7 @@ const stat = computed(() => b.stats.value.get(props.step.id))
     </div>
     <div class="min-w-0 flex-1">
       <p class="text-sm font-medium">{{ t(meta.title) }}</p>
-      <p class="truncate text-xs text-muted-foreground">
+      <p class="line-clamp-2 text-xs break-words text-muted-foreground">
         <template v-if="summary">{{ summary }}</template>
         <template v-else-if="step.type !== 'condition' && step.type !== 'exit'">{{ t('web.automations.notSetUp') }}</template>
       </p>

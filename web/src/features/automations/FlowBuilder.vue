@@ -9,10 +9,12 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useCampaignsById } from '@/composables/queries/useCampaigns'
 import { useAllLists } from '@/composables/queries/useLists'
+import { useTemplates } from '@/composables/queries/useTemplates'
 import { provideBuilder } from './context'
 import { stepMeta, triggerMeta } from './labels'
-import { hasSettings, insertStep, jumpsInto, locate, moveStep, newId, newStep, removeStep, triggerTypes, type Flow, type StepType, type Trigger, type TriggerType } from './model'
+import { allSteps, hasSettings, insertStep, jumpsInto, locate, moveStep, newId, newStep, removeStep, triggerTypes, type Flow, type StepType, type Trigger, type TriggerType } from './model'
 import StepList from './StepList.vue'
 import StepInspector from './StepInspector.vue'
 import StepLeaveConfirm from './StepLeaveConfirm.vue'
@@ -43,6 +45,10 @@ const emit = defineEmits<{ change: [] }>()
 const { t } = useI18n()
 const { can } = usePermission()
 const { data: lists } = useAllLists()
+// What each email step sends, for its card: the hidden campaign's subject, or the template's name.
+const emailSteps = computed(() => [...allSteps(props.flow.steps)].filter((s) => s.type === 'send_email'))
+const campaigns = useCampaignsById(() => [...new Set(emailSteps.value.flatMap((s) => (typeof s.config.campaign_id === 'number' ? [s.config.campaign_id] : [])))])
+const { data: templates } = useTemplates({ enabled: () => emailSteps.value.some((s) => typeof s.config.template_id === 'number'), silent: true })
 const route = useRoute()
 const router = useRouter()
 const docked = useMediaQuery('(min-width: 1024px)')
@@ -66,6 +72,12 @@ provideBuilder({
     step: (id) => {
       const loc = locate(props.flow, id)
       return loc?.list[loc.index]
+    },
+    email: (s) => {
+      const c = s.config
+      if (typeof c.campaign_id === 'number') return campaigns.value.get(c.campaign_id)?.subject || undefined
+      if (typeof c.template_id === 'number') return templates.value?.find((x) => x.id === c.template_id)?.name
+      return undefined
     },
   },
   jumps: computed(() => jumpsInto(props.flow)),

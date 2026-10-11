@@ -322,6 +322,8 @@
   "web.automations.rule.operator": "Operator",
   "web.automations.rule.value": "Value",
   "web.automations.rule.within": "within the last",
+  "web.automations.rule.and": "and",
+  "web.automations.rule.or": "or",
   "web.automations.rule.op.attribute.eq": "is",
   "web.automations.rule.op.attribute.neq": "is not",
   "web.automations.rule.op.attribute.contains": "contains",

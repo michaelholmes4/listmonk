@@ -1,5 +1,5 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
-import { toValue, type MaybeRefOrGetter } from 'vue'
+import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import * as api from '@/api/campaigns'
 import type { Campaign, NewCampaign } from '@/api/types'
 import { keys } from './keys'
@@ -16,6 +16,18 @@ export const useCampaign = (id: MaybeRefOrGetter<number | undefined>) =>
     queryKey: () => keys.campaigns.detail(toValue(id)!),
     queryFn: () => api.getCampaign(toValue(id)!),
     enabled: () => toValue(id) !== undefined,
+  })
+
+/**
+ * Several campaigns by id, as a map (each one shares the cache of its `useCampaign`). Silent: for
+ * labels that can do without, so a missing permission shows no toast.
+ */
+export const useCampaignsById = (ids: MaybeRefOrGetter<number[]>) =>
+  useQueries({
+    queries: computed(() =>
+      toValue(ids).map((id) => ({ queryKey: keys.campaigns.detail(id), queryFn: () => api.getCampaign(id), meta: { silent: true } })),
+    ),
+    combine: (results) => new Map(results.flatMap((r) => (r.data ? [[r.data.id!, r.data] as const] : []))),
   })
 
 /**

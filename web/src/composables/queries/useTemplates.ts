@@ -4,8 +4,15 @@ import * as api from '@/api/templates'
 import type { NewTemplate } from '@/api/types'
 import { keys } from './keys'
 
-export const useTemplates = () =>
-  useQuery({ queryKey: [...keys.templates.all, 'list'], queryFn: api.getTemplates, staleTime: 30_000 })
+/** `silent`: a failure (say, no permission) shows no toast, for callers that can do without. */
+export const useTemplates = (opts: { enabled?: MaybeRefOrGetter<boolean>; silent?: boolean } = {}) =>
+  useQuery({
+    queryKey: [...keys.templates.all, 'list'],
+    queryFn: api.getTemplates,
+    staleTime: 30_000,
+    enabled: () => toValue(opts.enabled ?? true),
+    meta: { silent: opts.silent },
+  })
 
 export const useTemplate = (id: MaybeRefOrGetter<number | undefined>) =>
   useQuery({
