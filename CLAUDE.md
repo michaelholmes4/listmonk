@@ -4,6 +4,7 @@ Fork of listmonk adding a Vue 3 + shadcn-vue admin UI (`web/`) and marketing aut
 (`internal/automation/`). Fork merge notes: FORK.md.
 
 ## Rules
+- This repository is public. Everything committed (code, comments, docs, tests, fixtures, commit messages) stays generic, written for any listmonk user: no names, domains, data, list names, content or config of a particular deployment, and no secrets.
 - Keep upstream merges cheap: new code goes in new files/dirs; edits to upstream files stay small and hook-like (list in FORK.md).
 - Fork DB migrations go in `internal/migrations/fork/`, never in the upstream sequence.
 - Reuse listmonk concepts (lists as topics, `blocklisted` as suppression, campaigns for email content/tracking) instead of adding parallel tables.
