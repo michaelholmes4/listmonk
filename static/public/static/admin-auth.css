@@ -1,7 +1,8 @@
 /*
  * fork: theme for the server-rendered admin auth pages (login, first-time setup, 2FA,
- * forgot/reset password), matching the new UI in web/. Everything is scoped to pages that
- * contain `section.login`, so the public subscriber pages that share style.css are untouched.
+ * forgot/reset password) and the root home page with its login button, matching the new UI in
+ * web/. Everything is scoped to pages that contain `section.login` or the home page's
+ * `.home-options`, so the public subscriber pages that share style.css are untouched.
  *
  * Token values mirror web/src/assets/main.css (adapted from libredesk, AGPL-3.0; see NOTICE,
  * with the brand hue swapped to listmonk blue).
@@ -15,7 +16,7 @@
   src: url("fonts/geist-latin-wght-normal.woff2") format("woff2-variations");
 }
 
-body:has(section.login) {
+body:has(section.login, .home-options) {
   --background: hsl(0 0% 99.2%);
   --foreground: hsl(0 0% 1%);
   --card: hsl(0 0% 100%);
@@ -40,7 +41,7 @@ body:has(section.login) {
 
 /* Dark mode follows the admin UI's saved choice, or the system's: admin-auth.js sets the
    attribute. */
-:root[data-listmonk-theme="dark"] body:has(section.login) {
+:root[data-listmonk-theme="dark"] body:has(section.login, .home-options) {
   --background: hsl(216 2.6% 7.6%);
   --foreground: hsl(216 6% 93%);
   --card: hsl(216 2% 10%);
@@ -58,12 +59,12 @@ body:has(section.login) {
 
 /* The bundled wordmark is black-on-transparent; flip it in dark mode. A custom logo (Settings →
    Appearance) is left as the admin uploaded it. */
-:root[data-listmonk-theme="dark"] body:has(section.login) .header .logo img[src^="/public/static/logo.svg"] {
+:root[data-listmonk-theme="dark"] body:has(section.login, .home-options) .header .logo img[src^="/public/static/logo.svg"] {
   filter: invert(1) hue-rotate(180deg);
 }
 
 /* The card. */
-body:has(section.login) .container.wrap {
+body:has(section.login, .home-options) .container.wrap {
   max-width: 400px;
   margin-top: 12vh;
   padding: 32px;
@@ -72,45 +73,45 @@ body:has(section.login) .container.wrap {
   border-radius: 0.5rem;
   box-shadow: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
 }
-body:has(section.login) .header {
+body:has(section.login, .home-options) .header {
   padding: 0;
   margin-bottom: 24px;
   border-bottom: 0;
 }
-body:has(section.login) .header .logo img {
+body:has(section.login, .home-options) .header .logo img {
   max-height: 32px;
   width: auto;
 }
 
-body:has(section.login) h2 {
+body:has(section.login, .home-options) h2 {
   margin: 0 0 8px;
   font-size: 20px;
   font-weight: 600;
   line-height: 1.3;
 }
-body:has(section.login) section.login > p {
+body:has(section.login, .home-options) section.login > p {
   margin: 0 0 16px;
   color: var(--muted-foreground);
 }
 
-body:has(section.login) label {
+body:has(section.login, .home-options) label {
   display: block;
   margin-bottom: 6px;
   font-size: 14px;
   font-weight: 500;
   color: var(--foreground);
 }
-body:has(section.login) form p {
+body:has(section.login, .home-options) form p {
   margin: 0 0 16px;
 }
 /* The last paragraph's margin would double the card's bottom padding. */
-body:has(section.login) section.login > :last-child {
+body:has(section.login, .home-options) section.login > :last-child {
   margin-bottom: 0;
 }
 
-body:has(section.login) input[type="text"],
-body:has(section.login) input[type="email"],
-body:has(section.login) input[type="password"] {
+body:has(section.login, .home-options) input[type="text"],
+body:has(section.login, .home-options) input[type="email"],
+body:has(section.login, .home-options) input[type="password"] {
   height: 36px;
   padding: 0 12px;
   background: transparent;
@@ -122,17 +123,17 @@ body:has(section.login) input[type="password"] {
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-body:has(section.login) input:focus {
+body:has(section.login, .home-options) input:focus {
   border-color: var(--ring);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
 }
-body:has(section.login) input[name="totp_code"] {
+body:has(section.login, .home-options) input[name="totp_code"] {
   height: 48px;
   font-size: 24px;
   letter-spacing: 6px;
 }
 
-body:has(section.login) .button {
+body:has(section.login, .home-options) .button {
   min-width: 0;
   height: 36px;
   padding: 0 16px;
@@ -144,34 +145,57 @@ body:has(section.login) .button {
   font-weight: 500;
   transition: opacity 0.15s, background-color 0.15s;
 }
-body:has(section.login) .button:hover {
+body:has(section.login, .home-options) .button:hover {
   background: var(--primary);
   color: var(--primary-foreground);
   opacity: 0.9;
 }
-body:has(section.login) .button:focus-visible {
+body:has(section.login, .home-options) .button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 40%, transparent);
 }
-body:has(section.login) .button.button-outline {
+body:has(section.login, .home-options) .button.button-outline {
   background: transparent;
   color: var(--foreground);
   border-color: var(--input);
 }
-body:has(section.login) .button.button-outline:hover {
+body:has(section.login, .home-options) .button.button-outline:hover {
   background: var(--accent);
   color: var(--foreground);
   opacity: 1;
 }
-body:has(section.login) .login .submit {
+/* The home page's login button is a link: centre its label like a <button>. */
+body:has(section.login, .home-options) a.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+body:has(section.login, .home-options) section.center > a.button {
+  width: 100%;
+}
+body:has(section.login, .home-options) .home-options {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+body:has(section.login, .home-options) .home-options:not(:has(a)) {
+  display: none;
+}
+body:has(section.login, .home-options) .home-options a {
+  margin: 0;
+}
+body:has(section.login, .home-options) .login .submit {
   margin-top: 24px;
 }
-body:has(section.login) .login button img {
+body:has(section.login, .home-options) .login button img {
   max-width: 20px;
   margin-right: 8px;
 }
 
-body:has(section.login) .error {
+body:has(section.login, .home-options) .error {
   display: block;
   padding: 8px 12px;
   color: var(--destructive);
@@ -181,30 +205,30 @@ body:has(section.login) .error {
 }
 
 /* Quiet links, like .link-style in the app. */
-body:has(section.login) a {
+body:has(section.login, .home-options) a {
   color: var(--muted-foreground);
   text-decoration-color: currentColor; /* not style.css's light blue */
   text-underline-offset: 4px;
 }
-body:has(section.login) a:hover {
+body:has(section.login, .home-options) a:hover {
   color: var(--foreground);
 }
-body:has(section.login) footer.container {
+body:has(section.login, .home-options) footer.container {
   margin-top: 16px;
   color: var(--muted-foreground);
 }
-body:has(section.login) footer a {
+body:has(section.login, .home-options) footer a {
   color: inherit;
 }
 
 @media screen and (max-width: 650px) {
-  body:has(section.login) .container.wrap {
+  body:has(section.login, .home-options) .container.wrap {
     margin: 0 16px;
     margin-top: 6vh;
     max-width: none;
     padding: 24px;
   }
-  body:has(section.login) footer.container {
+  body:has(section.login, .home-options) footer.container {
     margin-left: 16px;
     margin-right: 16px;
   }

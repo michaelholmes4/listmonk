@@ -30,7 +30,7 @@ TS types in `web/src/api/schema.d.ts`; after a merge run `pnpm -C web gen:api` a
 `pnpm -C web spec:coverage`.
 
 Admin login, 2FA, forgot/reset and OIDC stay server-rendered (the security boundary); the new UI only
-themes them via `static/public/static/admin-auth.css`, scoped to `section.login` so the public
+themes them (and the root home page with its login button) via `static/public/static/admin-auth.css`, scoped to `section.login` or `.home-options` so the public
 subscriber pages are untouched; `admin-auth.js` applies the light/dark choice the admin saved (same origin). Post-login `next` still defaults to `/admin` until Phase 7.
 
 Everything else we add lives in new files: `web/`, `internal/automation/`,
