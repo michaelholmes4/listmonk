@@ -6,14 +6,17 @@
 
 A fork of [listmonk](https://github.com/knadh/listmonk), the self-hosted newsletter and mailing list manager. It adds:
 
-- **A new admin UI**, built with Vue 3 and shadcn-vue, served at `/admin`.
+- **A new admin UI**, built with Vue 3 and shadcn-vue, with dark mode.
 - **Marketing automation**: drip sequences and journeys started by list joins, attribute changes, or events from your
   app (`POST /api/track`).
 - **A message log** of every email sent, with the mail server's response.
 - **Drop-in replacement**: swap the image in an existing listmonk install and run `--upgrade`. Your lists,
   subscribers, campaigns and APIs carry over, and you can switch back to stock listmonk later.
 
-![The automation builder: a welcome series that branches on whether the first email was opened](.github/assets/automation.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/assets/automation-dark.png">
+  <img alt="The automation builder: a welcome series that branches on whether the first email was opened" src=".github/assets/automation.png">
+</picture>
 
 It is not affiliated with the listmonk project. For everything else, see [listmonk.app](https://listmonk.app/docs).
 
