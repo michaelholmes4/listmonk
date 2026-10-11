@@ -19,6 +19,7 @@ Known conflict hotspots (the only upstream files we edit):
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
 - `static/public/templates/index.html` (one `<link>` for `admin-auth.css`, one `<script>` for `admin-auth.js`)
 - `.devcontainer/*`, `.gitignore`
+- `README.md` is the fork's own: on a conflict keep ours, and port anything upstream added that still applies
 
 The hooks are one-liners that call into `cmd/web.go` (`/app` routes, `webFSFiles()`), so a
 conflict there is resolved by re-adding the line.

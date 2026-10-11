@@ -1,47 +1,60 @@
-<a href="https://zerodha.tech"><img src="https://zerodha.tech/static/images/github-badge.svg" align="right" /></a>
+# listmonk (fork) — new admin UI and marketing automation
 
-[![listmonk-logo](https://user-images.githubusercontent.com/547147/231084896-835dba66-2dfe-497c-ba0f-787564c0819e.png)](https://listmonk.app)
+> [!CAUTION]
+> This fork is new and has not yet been proven in production. Use it at your own risk. Back up your database before
+> installing or upgrading, pin a release tag rather than `latest`, and try it on a copy of your data first.
 
-listmonk is a standalone, self-hosted, newsletter and mailing list manager. It is fast, feature-rich, and packed into a single binary. It uses a PostgreSQL database as its data store.
+A fork of [listmonk](https://github.com/knadh/listmonk), the self-hosted newsletter and mailing list manager. It adds:
 
-[![listmonk-dashboard](https://github.com/user-attachments/assets/689b5fbb-dd25-4956-a36f-e3226a65f9c4)](https://listmonk.app)
+- **A new admin UI**, built with Vue 3 and shadcn-vue, served at `/admin`.
+- **Marketing automation**: drip sequences and journeys started by list joins, attribute changes, or events from your
+  app (`POST /api/track`).
+- **A message log** of every email sent, with the mail server's response.
+- **Drop-in replacement**: swap the image in an existing listmonk install and run `--upgrade`. Your lists,
+  subscribers, campaigns and APIs carry over, and you can switch back to stock listmonk later.
 
-Visit [listmonk.app](https://listmonk.app) for more info. Check out the [**live demo**](https://demo.listmonk.app).
+![The automation builder: a welcome series that branches on whether the first email was opened](.github/assets/automation.png)
+
+It is not affiliated with the listmonk project. For everything else, see [listmonk.app](https://listmonk.app/docs).
+
+## Tracking events
+
+Send events from your app to start automations, or to resume ones waiting on an event. Use an API user with the
+`track:send` permission:
+
+```shell
+curl -u 'api_user:token' -X POST http://localhost:9000/api/track \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: order-1234' \
+  -d '{
+    "subscriber": {"email": "jane@example.com", "name": "Jane"},
+    "name": "order_placed",
+    "properties": {"total": 42},
+    "upsert_attribs": {"plan": "pro"}
+  }'
+```
+
+- `subscriber`: either `id` or `email`. An unknown email creates the subscriber, without subscribing them to any list.
+- `name`: the event name that automations match on.
+- `properties` (optional): event data. Emails can use it, for example `{{ .Event.Properties.total }}`.
+- `upsert_attribs` (optional): merged into the subscriber's attributes before the event is recorded.
+- `occurred_at` (optional): an RFC 3339 timestamp. The default is now.
+- `Idempotency-Key` header (optional): a retried request with the same key is recorded only once.
 
 ## Installation
 
-### Docker
+Images are published to `ghcr.io/michaelholmes4/listmonk:<tag>` (see
+[releases](https://github.com/michaelholmes4/listmonk/releases)). The image is a drop-in replacement for
+`listmonk/listmonk`: use upstream's [docker-compose.yml](docker-compose.yml) and change `image:`.
 
-The latest image is available on DockerHub at [`listmonk/listmonk:latest`](https://hub.docker.com/r/listmonk/listmonk/tags?page=1&ordering=last_updated&name=latest).
-Download and use the sample [docker-compose.yml](https://github.com/knadh/listmonk/blob/master/docker-compose.yml).
+To switch an existing install, back up the database, change the image, then run `./listmonk --upgrade --yes`.
+The sample compose file already runs this on every start.
 
+## Development
 
-```shell
-# Download the compose file to the current directory.
-curl -LO https://github.com/knadh/listmonk/raw/master/docker-compose.yml
-
-# Run the services in the background.
-docker compose up -d
-```
-Visit `http://localhost:9000`
-
-See [installation docs](https://listmonk.app/docs/installation)
-
-__________________
-
-### Binary
-- Download the [latest release](https://github.com/knadh/listmonk/releases) and extract the listmonk binary.
-- `./listmonk --new-config` to generate config.toml. Edit it.
-- `./listmonk --install` to setup the Postgres DB (or `--upgrade` to upgrade an existing DB. Upgrades are idempotent and running them multiple times have no side effects).
-- Run `./listmonk` and visit `http://localhost:9000`
-
-See [installation docs](https://listmonk.app/docs/installation)
-__________________
-
-
-## Developers
-listmonk is free and open source software licensed under AGPLv3. If you are interested in contributing, refer to the [developer setup](https://listmonk.app/docs/developer-setup). The backend is written in Go and the frontend is Vue with Buefy for UI. 
-
+`make dev` in the dev container starts the API (`:9000`), the admin UI (`:5173`) and Mailpit (`:8025`). See
+[FORK.md](FORK.md) for how the fork tracks upstream.
 
 ## License
-listmonk is licensed under the AGPL v3 license.
+
+AGPL v3, like listmonk. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
