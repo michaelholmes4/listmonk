@@ -112,9 +112,19 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 	wctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
 	defer cancel()
 	if err != nil {
+		// Over the sending limit: send it when the window ends. That is not a failure, so it is
+		// rescheduled rather than left to the job's retry, whose attempts are limited.
+		var rl *RateLimitedError
+		if errors.As(err, &rl) {
+			if uerr := e.unsend(wctx, enr.ID, n.ID, leaseJob, rl.Until); uerr != nil {
+				e.log.Printf("automation: deferring step %s of enrollment %d: %v", n.ID, enr.ID, uerr)
+				return false, err
+			}
+			return false, nil
+		}
 		// Not handed over: forget that we tried, so the job's retry sends it. If this
 		// fails, the wake-up at the end of the lease finds the 'sending' row and the email is lost.
-		if uerr := e.unsend(wctx, enr.ID, n.ID, leaseJob, now); uerr != nil {
+		if uerr := e.unsend(wctx, enr.ID, n.ID, leaseJob, time.Time{}); uerr != nil {
 			e.log.Printf("automation: clearing step %s of enrollment %d: %v", n.ID, enr.ID, uerr)
 		}
 		return false, err
@@ -167,22 +177,34 @@ func (e *Engine) commitApply(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, 
 }
 
 // unsend undoes part 1 of sendStep for a message that was not handed over: it removes the step's
-// 'sending' row, makes the run due again and removes the lease's wake-up. The job's own retry (with
-// its backoff and its limit) then sends it; were the wake-up left, every failed attempt would add
-// one more job that retries on its own.
-func (e *Engine) unsend(ctx context.Context, enrollmentID int64, nodeID string, leaseJob int64, now time.Time) error {
+// 'sending' row and the lease's wake-up, and makes the run due again. With no retryAt it is due at
+// once and the job's own retry (with its backoff and its limit) sends it; were the wake-up left,
+// every failed attempt would add one more job that retries on its own. With retryAt it is due then,
+// and a wake-up is queued for that time.
+func (e *Engine) unsend(ctx context.Context, enrollmentID int64, nodeID string, leaseJob int64, retryAt time.Time) error {
 	tx, err := e.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `WITH d AS (
+	at := retryAt
+	if at.IsZero() {
+		at = e.clock.Now()
+	}
+	var undone []int64
+	if err := tx.SelectContext(ctx, &undone, `WITH d AS (
 			DELETE FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2 AND status = $3
 			AND visit = (SELECT current_visit FROM enrollments WHERE id = $1)
 			RETURNING enrollment_id)
-		UPDATE enrollments SET next_run_at = $4 WHERE id IN (SELECT enrollment_id FROM d) AND status IN ('active', 'waiting')`,
-		enrollmentID, nodeID, StepSending, now); err != nil {
+		UPDATE enrollments SET next_run_at = $4 WHERE id IN (SELECT enrollment_id FROM d) AND status IN ('active', 'waiting')
+		RETURNING id`,
+		enrollmentID, nodeID, StepSending, at); err != nil {
 		return err
+	}
+	if !retryAt.IsZero() && len(undone) > 0 {
+		if _, err := e.enqueueJob(ctx, tx, enrollmentID, retryAt); err != nil {
+			return err
+		}
 	}
 	// Running only if the lease ran out meanwhile, and that job is carrying the run on: leave it.
 	if _, err := e.river.JobDeleteTx(ctx, tx.Tx, leaseJob); err != nil && !errors.Is(err, rivertype.ErrNotFound) && !errors.Is(err, rivertype.ErrJobRunning) {

@@ -105,6 +105,7 @@ type Manager struct {
 	// sending further messages.
 	slidingCount int
 	slidingStart time.Time
+	forkSlide    sync.Mutex // fork: guards the two above (see slide.go)
 
 	tplFuncs template.FuncMap
 }

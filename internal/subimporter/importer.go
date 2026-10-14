@@ -73,6 +73,8 @@ type Options struct {
 	BlocklistStmt      *sql.Stmt
 	UpdateListDateStmt *sql.Stmt
 	PostCB             func(subject string, data any) error
+	// fork: automation triggers for imported subscribers (see fork.go).
+	ForkBatch func(emails []string, listIDs []int) func()
 
 	DomainBlocklist []string
 	DomainAllowlist []string
@@ -85,6 +87,8 @@ type Session struct {
 	log      *log.Logger
 
 	opt SessionOpt
+
+	forkEmails []string // fork
 }
 
 // SessionOpt represents the options for an importer session.
@@ -318,13 +322,16 @@ func (s *Session) Start() {
 		}
 		cur++
 		total++
+		s.forkAdd(sub.Email) // fork
 
 		// Batch size is met. Commit.
 		if cur%commitBatchSize == 0 {
+			done := s.forkBatch() // fork
 			if err := tx.Commit(); err != nil {
 				tx.Rollback()
 				s.log.Printf("error committing to DB: %v", err)
 			} else {
+				done() // fork
 				s.im.incrementImportCount(cur)
 				s.log.Printf("imported %d", total)
 			}
@@ -345,6 +352,7 @@ func (s *Session) Start() {
 	}
 
 	// Queue's closed and there are records left to commit.
+	done := s.forkBatch() // fork
 	if err := tx.Commit(); err != nil {
 		tx.Rollback()
 		s.im.setStatus(StatusFailed)
@@ -352,6 +360,7 @@ func (s *Session) Start() {
 		s.im.sendNotif(StatusFailed)
 		return
 	}
+	done() // fork
 
 	s.im.incrementImportCount(cur)
 	s.im.setStatus(StatusFinished)

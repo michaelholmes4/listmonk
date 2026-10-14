@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/lib/pq"
@@ -183,6 +184,45 @@ func (c *Core) MergeSubscriberAttribs(id int, attribs map[string]any) error {
 	}
 	c.forkEnd(snap)
 	return nil
+}
+
+// ForkImportBatch is the CSV importer's hook (subimporter.Options.ForkBatch). It is called just
+// before a batch is committed, with the batch's emails and the lists they are being added to: the
+// batch is not visible to other connections yet, so what it reads is the state before. The returned
+// function, called once the batch is committed, reads the state after and fires the triggers for
+// what changed, as forkEnd does for the other mutations. A new subscriber starts from nothing, as in
+// InsertSubscriber.
+func (c *Core) ForkImportBatch(emails []string, listIDs []int) func() {
+	noop := func() {}
+	if !c.forkOn() || len(emails) == 0 {
+		return noop
+	}
+	lower := make([]string, len(emails))
+	for i, e := range emails {
+		lower[i] = strings.ToLower(e)
+	}
+
+	snap := &forkSnap{listIDs: listIDs, subs: map[[2]int]bool{}, attribs: map[int]map[string]any{}}
+	var before []int
+	if err := c.db.Select(&before, `SELECT id FROM subscribers WHERE LOWER(email) = ANY($1)`, pq.Array(lower)); err != nil {
+		c.log.Printf("automation hook: reading imported subscribers: %v; triggers skipped", err)
+		return noop
+	}
+	if len(before) > 0 {
+		var err error
+		if snap.subs, snap.attribs, err = c.forkRead(before, listIDs); err != nil {
+			c.log.Printf("automation hook: %v; triggers skipped", err)
+			return noop
+		}
+	}
+
+	return func() {
+		if err := c.db.Select(&snap.subIDs, `SELECT id FROM subscribers WHERE LOWER(email) = ANY($1)`, pq.Array(lower)); err != nil {
+			c.log.Printf("automation hook: reading imported subscribers: %v; triggers skipped", err)
+			return
+		}
+		c.forkEnd(snap)
+	}
 }
 
 // forkSubscriberID resolves a subscriber UUID (the optin link carries one).

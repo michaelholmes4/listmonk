@@ -84,6 +84,9 @@ func (s *automationSender) SendEmail(ctx context.Context, m automation.Message) 
 		if err != nil {
 			return fmt.Errorf("rendering step %s: %w", m.NodeID, err)
 		}
+		if err := s.reserve(m.MessageType); err != nil {
+			return err
+		}
 		return s.mgr.SendAutomationMessage(ctx, msg, deliveryWait)
 	}
 
@@ -112,7 +115,23 @@ func (s *automationSender) SendEmail(ctx context.Context, m automation.Message) 
 		msglog.HdrAutomation: {strconv.Itoa(m.AutomationID)},
 		msglog.HdrEnrollment: {strconv.FormatInt(m.EnrollmentID, 10)},
 	}
+	if err := s.reserve(m.MessageType); err != nil {
+		return err
+	}
 	return s.mgr.SendMessageNow(msg)
+}
+
+// reserve counts a marketing email against the sliding window (the sending limit campaigns share),
+// or reports when the window has room again. Transactional emails are not counted or held back, as
+// listmonk's own /api/tx messages are not.
+func (s *automationSender) reserve(msgType string) error {
+	if msgType == automation.MessageTransactional {
+		return nil
+	}
+	if ok, until := s.mgr.SlidingReserve(); !ok {
+		return &automation.RateLimitedError{Until: until}
+	}
+	return nil
 }
 
 // campaign returns the compiled hidden campaign behind an email step.

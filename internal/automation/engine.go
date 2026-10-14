@@ -40,6 +40,14 @@ type Sender interface {
 	SendEmail(ctx context.Context, m Message) error
 }
 
+// RateLimitedError is returned by a Sender that did not send because the sending limit (the
+// sliding window) is reached. The step is sent again at Until, without counting as a failed attempt.
+type RateLimitedError struct{ Until time.Time }
+
+func (e *RateLimitedError) Error() string {
+	return "sending limit reached until " + e.Until.Format(time.RFC3339)
+}
+
 // Clock lets tests control time.
 type Clock interface{ Now() time.Time }
 

@@ -12,7 +12,9 @@ Known conflict hotspots (the only upstream files we edit):
 - `queries/campaigns.sql` (exclude `automation` campaigns from the manager, the list, the dashboard counts and both deletes)
 - `internal/core/core.go`, `subscribers.go`, `subscriptions.go` (automation trigger hooks: `Hooks.OnSubscriptionsConfirmed`
   / `OnAttribsChanged`, and one `forkBegin`/`forkEnd` pair around each mutation; the logic is in `fork_hooks.go`)
-- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to; a `delivery` field and two worker lines, `if !msg.forkClaim() { continue }` before the push and `msg.forkSent()` after it, let an automation step wait until its email reaches the messenger (and withdraw it if no worker takes it); `&& !msg.forkTransactional()` on the List-Unsubscribe condition leaves the header off transactional automation emails)
+- `internal/manager/manager.go` (`Event` and `Automation` fields on `CampaignMessage`; the constructor is in `fork.go`; one `msg.forkLogHeaders(h)` line tells the message log which automation a message belongs to; a `delivery` field and two worker lines, `if !msg.forkClaim() { continue }` before the push and `msg.forkSent()` after it, let an automation step wait until its email reaches the messenger (and withdraw it if no worker takes it); `&& !msg.forkTransactional()` on the List-Unsubscribe condition leaves the header off transactional automation emails; a `forkSlide` mutex field guards the sliding-window count)
+- `internal/manager/pipe.go` (the sliding-window block in `NextSubscribers` is one `slidingCountPipe()` call and a sleep; the window, shared with automation emails, is in `slide.go`)
+- `internal/subimporter/importer.go` (an `Options.ForkBatch` hook, wired to `core.ForkImportBatch` in `cmd/init.go`; `s.forkAdd(email)` per row and `done := s.forkBatch()` / `done()` around each batch commit, so imports fire the automation triggers; the rest is in `subimporter/fork.go`)
 - `internal/notifs/notifs.go` (a 1-line `Pusher` interface in place of `*email.Emailer`, so notifications can go through the message log)
 - `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `stopAutomations(eng)` in the shutdown closure (it must fit the 3 s before `awaitReload` forces the reload); `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
@@ -44,7 +46,10 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   process died mid-send (it carries on without sending). The sender returns once the messenger has the email: a campaign-content
   step waits for a campaign worker to take it (`manager.SendAutomationMessage`), a template step pushes directly
   (`manager.SendMessageNow`), so nothing is marked sent while it only sits in memory. An email not handed over (no worker took it
-  in time, e.g. at shutdown) is withdrawn and retried; the last failed attempt marks the enrollment `failed`. Once the messenger
+  in time, e.g. at shutdown) is withdrawn and retried; the last failed attempt marks the enrollment `failed`.
+  Marketing automation emails count toward the sliding window (the "N messages per period" limit) together with
+  campaigns; one over the limit is not sent and the run waits until the window ends, without using up a retry.
+  Transactional ones are neither counted nor held back, like `/api/tx`. Once the messenger
   has it, the automation never retries it: an SMTP rejection shows in the message log, not in the step.
 - **Email content** is a hidden campaign (`campaigns.type = 'automation'`) per step, linked to the step's topic list so the
   unsubscribe link records an opt-out. Automation campaigns are filtered out of every upstream campaign query and of the
@@ -62,7 +67,8 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   keeps its upstream behaviour and does *not* check the blocklist: the two differ on purpose.
 - **Triggers** fire from core hooks after the mutation commits, in the background. "Joined a list" means a *live*
   subscription: confirmed, or unconfirmed on a single opt-in list. The by-query bulk subscription endpoints
-  (`/api/subscribers/query/lists`) do not fire triggers. An automation that adds people to lists can start another
+  (`/api/subscribers/query/lists`) do not fire triggers; CSV imports (subscribe mode) do, per batch: new subscribers and
+  ones newly on the import's lists start list triggers, and changed attributes (overwrite on) start attribute triggers. An automation that adds people to lists can start another
   (chains are possible; the re-entry rule is what stops loops).
 - **Opened / clicked conditions** only work when `privacy.individual_tracking` is on (otherwise views and clicks carry no
   subscriber). The builder should say so.

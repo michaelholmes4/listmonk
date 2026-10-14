@@ -106,3 +106,73 @@ func TestForkReadFailureSkipsTriggers(t *testing.T) {
 	case <-time.After(300 * time.Millisecond):
 	}
 }
+
+// An import batch is compared with the state before it, read while the batch is not committed yet:
+// a new subscriber and an existing one newly on the list start automations; one already on it does not.
+func TestForkImportBatch(t *testing.T) {
+	db := testdb.New(t)
+	var listID, onList, offList int
+	if err := db.Get(&listID, `INSERT INTO lists (uuid, name, type, optin) VALUES (gen_random_uuid(), 'L', 'public', 'single') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []struct {
+		email string
+		id    *int
+	}{{"on@example.com", &onList}, {"off@example.com", &offList}} {
+		if err := db.Get(s.id, `INSERT INTO subscribers (uuid, email, name, status) VALUES (gen_random_uuid(), $1, 'x', 'enabled') RETURNING id`, s.email); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.Exec(`INSERT INTO subscriber_lists (subscriber_id, list_id, status) VALUES ($1, $2, 'confirmed')`, onList, listID); err != nil {
+		t.Fatal(err)
+	}
+
+	joined := make(chan int, 4)
+	c := &Core{db: db, log: log.New(io.Discard, "", 0), h: &Hooks{
+		OnSubscriptionsConfirmed: func(sub int, _ []int) { joined <- sub },
+	}}
+
+	// The batch, as the importer writes it: subscribers upserted and added to the list in one transaction.
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	emails := []string{"On@example.com", "off@example.com", "new@example.com"}
+	for _, e := range emails {
+		if _, err := tx.Exec(`WITH sub AS (
+				INSERT INTO subscribers (uuid, email, name, status) VALUES (gen_random_uuid(), LOWER($1), 'x', 'enabled')
+				ON CONFLICT (email) DO UPDATE SET updated_at = NOW() RETURNING id)
+			INSERT INTO subscriber_lists (subscriber_id, list_id, status) SELECT id, $2, 'confirmed' FROM sub
+			ON CONFLICT (subscriber_id, list_id) DO UPDATE SET updated_at = NOW()`, e, listID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	done := c.ForkImportBatch(emails, []int{listID})
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	done()
+
+	var newSub int
+	if err := db.Get(&newSub, `SELECT id FROM subscribers WHERE email = 'new@example.com'`); err != nil {
+		t.Fatal(err)
+	}
+	got := map[int]bool{}
+	for len(got) < 2 {
+		select {
+		case id := <-joined:
+			got[id] = true
+		case <-time.After(2 * time.Second):
+			t.Fatalf("joined %v, want subscribers %d and %d", got, offList, newSub)
+		}
+	}
+	if !got[offList] || !got[newSub] {
+		t.Fatalf("joined %v, want subscribers %d and %d", got, offList, newSub)
+	}
+	select {
+	case id := <-joined:
+		t.Errorf("subscriber %d joined again, already on the list: %v", id, id == onList)
+	case <-time.After(300 * time.Millisecond):
+	}
+}
