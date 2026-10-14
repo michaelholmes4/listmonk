@@ -19,6 +19,7 @@ Known conflict hotspots (the only upstream files we edit):
 - `cmd/main.go` (`App.automation`, `initAutomation(...)` after `go mgr.Run()`, `stopAutomations(eng)` in the shutdown closure (it must fit the 3 s before `awaitReload` forces the reload); `logMessenger(...)` around the two uses of `emailMsgr`, and `closeMessageLog()` before `db.Close()`)
 - `cmd/users.go` (DisableTOTP reads the password with `utils.FormValue`, which also parses DELETE bodies; helper in `internal/utils/formvalue.go`)
 - `Makefile` (fork section is appended at the end), `permissions.json`, `docs/swagger/*`
+- `.github/workflows/build-sanity.yml` (sets up Node with corepack: `make dist` builds the UI with pnpm and the email builder with yarn)
 - `static/public/templates/index.html` (one `<link>` for `admin-auth.css`, one `<script>` for `admin-auth.js`)
 - `.devcontainer/*`, `.gitignore`
 - `README.md` is the fork's own: on a conflict keep ours, and port anything upstream added that still applies
