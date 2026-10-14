@@ -47,8 +47,9 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   step waits for a campaign worker to take it (`manager.SendAutomationMessage`), a template step pushes directly
   (`manager.SendMessageNow`), so nothing is marked sent while it only sits in memory. An email not handed over (no worker took it
   in time, e.g. at shutdown) is withdrawn and retried; the last failed attempt marks the enrollment `failed`.
-  Automation emails count toward the sliding window (the "N messages per period" limit) together with campaigns; one
-  over the limit is not sent and the run waits until the window ends, without using up a retry. Once the messenger
+  Marketing automation emails count toward the sliding window (the "N messages per period" limit) together with
+  campaigns; one over the limit is not sent and the run waits until the window ends, without using up a retry.
+  Transactional ones are neither counted nor held back, like `/api/tx`. Once the messenger
   has it, the automation never retries it: an SMTP rejection shows in the message log, not in the step.
 - **Email content** is a hidden campaign (`campaigns.type = 'automation'`) per step, linked to the step's topic list so the
   unsubscribe link records an opt-out. Automation campaigns are filtered out of every upstream campaign query and of the
