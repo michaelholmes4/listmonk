@@ -38,6 +38,9 @@ SRC := $(shell find . -type f -name "*.go")
 .PHONY: build
 build: $(BIN)
 
+$(BIN): $(SRC) go.mod go.sum schema.sql $(SQL) permissions.json
+	CGO_ENABLED=0 go build -o ${BIN} -ldflags="-s -w -X 'main.buildString=${BUILDSTR}' -X 'main.versionString=${VERSION}'" ./cmd
+
 $(STUFFBIN):
 	go install github.com/knadh/stuffbin/...
 
