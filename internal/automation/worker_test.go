@@ -146,3 +146,45 @@ func TestNotSentIsRetriedByTheJobAlone(t *testing.T) {
 		t.Fatalf("status = %s", enr.Status)
 	}
 }
+
+// Over the sending limit, the email waits for the window to end: the attempt is not a failure (it
+// would use up the job's retries), and nothing else wakes the run before then.
+func TestRateLimitedWaitsForTheWindow(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	list := h.list("l", "single")
+	auto := h.publish("w", &Graph{Triggers: listTrigger(list), Root: "m", Nodes: []Node{{ID: "m", Type: NodeSendEmail, Config: mail(MessageMarketing, list, h.campaign())}}}, Settings{})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.subscribe(sub, list, "confirmed")
+	h.must(h.eng.OnListJoined(ctx, sub, list))
+	var id int64
+	h.must(h.db.Get(&id, `SELECT id FROM enrollments WHERE automation_id = $1`, auto))
+
+	until := h.clock.Now().Add(40 * time.Minute)
+	h.sender.Err = &RateLimitedError{Until: until}
+	w := &advanceWorker{e: h.eng}
+	job := &river.Job[AdvanceArgs]{JobRow: &rivertype.JobRow{Attempt: maxAttempts, MaxAttempts: maxAttempts}, Args: AdvanceArgs{EnrollmentID: id}}
+	if err := w.Work(ctx, job); err != nil {
+		t.Fatalf("a full window is not a failure, got %v", err)
+	}
+	if enr := h.enrollment(auto, sub); enr.Status == EnrollmentFailed {
+		t.Fatal("the enrollment failed")
+	}
+	if st, ok := h.steps(id)["m"]; ok {
+		t.Fatalf("step left as %q", st)
+	}
+
+	h.clock.t = until.Add(-time.Second)
+	if n := h.drain(); h.sender.count() != 0 {
+		t.Fatalf("sent before the window ended (%d jobs ran)", n)
+	}
+	h.sender.Err = nil
+	h.clock.t = until
+	h.drain()
+	if h.sender.count() != 1 {
+		t.Fatalf("sent %d, want 1", h.sender.count())
+	}
+	if enr := h.enrollment(auto, sub); enr.Status != EnrollmentCompleted {
+		t.Fatalf("status = %s", enr.Status)
+	}
+}

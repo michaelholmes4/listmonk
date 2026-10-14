@@ -88,3 +88,39 @@ func TestSendAutomationMessageRefusesAnUnknownMessenger(t *testing.T) {
 		t.Fatalf("err = %v, want ErrNotSent", err)
 	}
 }
+
+// Automation emails and campaigns share the sliding window: a full window refuses automation emails
+// until it ends, and a campaign that fills it waits that long.
+func TestSlidingWindowIsShared(t *testing.T) {
+	m := New(Config{Concurrency: 1, MessageRate: 10, SlidingWindow: true, SlidingWindowRate: 3, SlidingWindowDuration: time.Hour}, nil, nil, log.New(io.Discard, "", 0))
+	for i := 0; i < 2; i++ {
+		if ok, _ := m.SlidingReserve(); !ok {
+			t.Fatalf("automation email %d refused", i+1)
+		}
+	}
+	wait := m.slidingCountPipe()
+	if wait < 59*time.Minute || wait > time.Hour {
+		t.Fatalf("campaign that filled the window waits %s, want about an hour", wait)
+	}
+	ok, until := m.SlidingReserve()
+	if ok {
+		t.Fatal("automation email sent over the limit")
+	}
+	if d := time.Until(until); d < 59*time.Minute || d > time.Hour {
+		t.Fatalf("refused until %s from now, want about an hour", d)
+	}
+
+	// Once the window is over the count starts again.
+	m.slidingStart = time.Now().Add(-time.Hour)
+	if ok, _ := m.SlidingReserve(); !ok {
+		t.Fatal("refused in a new window")
+	}
+
+	// Without a limit nothing is counted or refused.
+	off := New(Config{Concurrency: 1, MessageRate: 10}, nil, nil, log.New(io.Discard, "", 0))
+	for i := 0; i < 5; i++ {
+		if ok, _ := off.SlidingReserve(); !ok || off.slidingCountPipe() != 0 {
+			t.Fatal("limited without a sliding window")
+		}
+	}
+}
