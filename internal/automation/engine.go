@@ -63,6 +63,8 @@ type EnrollContext struct {
 	// TriggerEventID is the event that started the run. Event is replaced when a wait_for_event
 	// restarts, so this is what tells a retried event job that it already started this run.
 	TriggerEventID int64 `json:"trigger_event_id,omitempty"`
+	// StartedAt is when the starting event happened, which "since entered" rules count from.
+	StartedAt *time.Time `json:"started_at,omitempty"`
 }
 
 // Config wires an Engine.
@@ -348,7 +350,8 @@ func (e *Engine) enroll(ctx context.Context, a *Automation, subscriberID int, ec
 	// An event's job can run more than once (it retries); the event starts a run only once.
 	if len(ec.Event) > 0 {
 		var ev struct {
-			ID int64 `json:"id"`
+			ID         int64     `json:"id"`
+			OccurredAt time.Time `json:"occurred_at"`
 		}
 		if json.Unmarshal(ec.Event, &ev) == nil && ev.ID > 0 {
 			var done bool
@@ -359,6 +362,9 @@ func (e *Engine) enroll(ctx context.Context, a *Automation, subscriberID int, ec
 				return false, nil
 			}
 			ec.TriggerEventID = ev.ID
+			if !ev.OccurredAt.IsZero() {
+				ec.StartedAt = &ev.OccurredAt
+			}
 		}
 	}
 
@@ -408,7 +414,7 @@ type triggerRow struct {
 }
 
 // fire enrolls the subscriber into every active automation with a matching trigger.
-func (e *Engine) fire(ctx context.Context, typ string, subscriberID int, match func(TriggerConfig) bool, ec EnrollContext) error {
+func (e *Engine) fire(ctx context.Context, typ string, subscriberID int, match func(TriggerConfig) (bool, error), ec EnrollContext) error {
 	var rows []triggerRow
 	if err := e.db.SelectContext(ctx, &rows, e.q.get("find-triggers"), typ); err != nil {
 		return err
@@ -422,7 +428,15 @@ func (e *Engine) fire(ctx context.Context, typ string, subscriberID int, match f
 				continue
 			}
 		}
-		if seen[r.AutomationID] || !match(c) {
+		if seen[r.AutomationID] {
+			continue
+		}
+		ok, err := match(c)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("automation %d: %w", r.AutomationID, err))
+			continue
+		}
+		if !ok {
 			continue
 		}
 		seen[r.AutomationID] = true
@@ -437,7 +451,7 @@ func (e *Engine) fire(ctx context.Context, typ string, subscriberID int, match f
 // OnListJoined is called when a subscription becomes confirmed: on a single opt-in list that is
 // when they subscribe, on a double opt-in list when they confirm.
 func (e *Engine) OnListJoined(ctx context.Context, subscriberID, listID int) error {
-	return e.fire(ctx, TriggerListJoined, subscriberID, func(c TriggerConfig) bool { return c.ListID == listID }, EnrollContext{ListID: listID})
+	return e.fire(ctx, TriggerListJoined, subscriberID, func(c TriggerConfig) (bool, error) { return c.ListID == listID, nil }, EnrollContext{ListID: listID})
 }
 
 // OnEvent is called for every recorded event.
@@ -445,12 +459,27 @@ func (e *Engine) OnEvent(ctx context.Context, subscriberID int, ev Event) error 
 	// Runs already waiting for this event first; the event that starts a run never counts for it.
 	derr := e.deliverEvent(ctx, subscriberID, ev)
 	raw, _ := json.Marshal(ev)
-	return errors.Join(derr, e.fire(ctx, TriggerEvent, subscriberID, func(c TriggerConfig) bool { return c.Event == ev.Name }, EnrollContext{Event: raw}))
+	match := func(c TriggerConfig) (bool, error) {
+		if c.Event != ev.Name {
+			return false, nil
+		}
+		if c.Where == nil {
+			return true, nil
+		}
+		return e.evalFilter(ctx, *c.Where, ev.Properties, Env{Now: e.clock.Now(), NoRunEvent: true}, subscriberID)
+	}
+	return errors.Join(derr, e.fire(ctx, TriggerEvent, subscriberID, match, EnrollContext{Event: raw}))
 }
 
 // OnAttributesChanged is called with a subscriber's attributes before and after an update.
 func (e *Engine) OnAttributesChanged(ctx context.Context, subscriberID int, before, after map[string]any) error {
-	return e.fire(ctx, TriggerAttributeChanged, subscriberID, func(c TriggerConfig) bool {
+	return e.fire(ctx, TriggerAttributeChanged, subscriberID, func(c TriggerConfig) (bool, error) {
+		return attributeMatches(c, before, after), nil
+	}, EnrollContext{})
+}
+
+func attributeMatches(c TriggerConfig, before, after map[string]any) bool {
+	{
 		old, _ := attrPath(before, c.Attribute)
 		now, ok := attrPath(after, c.Attribute)
 		if jsonEqual(old, now) {
@@ -467,7 +496,7 @@ func (e *Engine) OnAttributesChanged(ctx context.Context, subscriberID int, befo
 			return jsonEqual(now, want)
 		}
 		return true
-	}, EnrollContext{})
+	}
 }
 
 func jsonEqual(a, b any) bool {

@@ -75,9 +75,9 @@ func (e *Engine) deliverEvent(ctx context.Context, subscriberID int, ev Event) e
 	return errors.Join(errs...)
 }
 
-// watched returns the node's config and the watched event matching name, if the run is waiting on
-// a wait_for_event that lists it.
-func watched(ix *Index, nodeID *string, name string) (*Node, *WaitEvent, WaitForEventConfig) {
+// watched returns the node's config and the watched events named name, in their order, if the run
+// is waiting on a wait_for_event that lists it. Their filters are not checked yet.
+func watched(ix *Index, nodeID *string, name string) (*Node, []*WaitEvent, WaitForEventConfig) {
 	var c WaitForEventConfig
 	if nodeID == nil {
 		return nil, nil, c
@@ -86,12 +86,33 @@ func watched(ix *Index, nodeID *string, name string) (*Node, *WaitEvent, WaitFor
 	if n == nil || n.Type != NodeWaitForEvent || json.Unmarshal(n.Config, &c) != nil {
 		return nil, nil, c
 	}
+	var out []*WaitEvent
 	for i := range c.Events {
 		if c.Events[i].Name == name {
-			return n, &c.Events[i], c
+			out = append(out, &c.Events[i])
 		}
 	}
-	return nil, nil, c
+	if len(out) == 0 {
+		return nil, nil, c
+	}
+	return n, out, c
+}
+
+// matchWait returns the first watched event whose filter the event passes, or nil.
+func (e *Engine) matchWait(ctx context.Context, enr Enrollment, ix *Index, cands []*WaitEvent, ev Event) (*WaitEvent, error) {
+	for _, we := range cands {
+		if we.Where == nil {
+			return we, nil
+		}
+		ok, err := e.evalFilter(ctx, *we.Where, ev.Properties, e.env(ix, &enr, e.clock.Now()), enr.SubscriberID)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return we, nil
+		}
+	}
+	return nil, nil
 }
 
 func (e *Engine) deliverTo(ctx context.Context, row Enrollment, ev Event) error {
@@ -121,7 +142,7 @@ func (e *Engine) deliverTo(ctx context.Context, row Enrollment, ev Event) error 
 	if enr.Status != EnrollmentWaiting || enr.CurrentNode == nil || row.CurrentNode == nil || *enr.CurrentNode != *row.CurrentNode {
 		return nil
 	}
-	n, we, c := watched(ix, enr.CurrentNode, ev.Name)
+	n, cands, c := watched(ix, enr.CurrentNode, ev.Name)
 	if n == nil {
 		return nil
 	}
@@ -138,6 +159,13 @@ func (e *Engine) deliverTo(ctx context.Context, row Enrollment, ev Event) error 
 		return err
 	}
 	if r.Branch != "" || ev.OccurredAt.Before(r.Since) {
+		return nil
+	}
+	we, err := e.matchWait(ctx, enr, ix, cands, ev)
+	if err != nil {
+		return err
+	}
+	if we == nil {
 		return nil
 	}
 

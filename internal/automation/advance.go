@@ -125,7 +125,7 @@ func (e *Engine) step(ctx context.Context, id int64, first bool) (again bool, er
 			return false, e.exitNow(ctx, tx, &enr, ExitBlocklisted, now)
 		}
 		if settings.Goal != nil {
-			hit, err := e.evalRule(ctx, *settings.Goal, e.env(ix, enr.ID, now), sub.ID)
+			hit, err := e.evalRule(ctx, *settings.Goal, e.env(ix, &enr, now), sub.ID)
 			if err != nil {
 				return false, permanent("goal: %v", err)
 			}
@@ -165,8 +165,28 @@ func (e *Engine) step(ctx context.Context, id int64, first bool) (again bool, er
 	return again, nil
 }
 
-func (e *Engine) env(ix *Index, enrollmentID int64, now time.Time) Env {
-	return Env{EnrollmentID: enrollmentID, CampaignOf: ix.CampaignOf, Now: now, AllowSQL: true}
+func (e *Engine) env(ix *Index, enr *Enrollment, now time.Time) Env {
+	env := Env{EnrollmentID: enr.ID, CampaignOf: ix.CampaignOf, Now: now, AllowSQL: true, Entered: enr.EnteredAt}
+	var ec EnrollContext
+	if json.Unmarshal(enr.Context, &ec) == nil {
+		env.Event = eventProps(ec.Event)
+		env.TriggerEventID = ec.TriggerEventID
+		if ec.StartedAt != nil && ec.StartedAt.Before(env.Entered) {
+			env.Entered = *ec.StartedAt
+		}
+	}
+	return env
+}
+
+// eventProps returns the properties of an event as kept in an enrollment's context.
+func eventProps(raw json.RawMessage) json.RawMessage {
+	var ev struct {
+		Properties json.RawMessage `json:"properties"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &ev) != nil {
+		return nil
+	}
+	return ev.Properties
 }
 
 // evalRule runs a condition for a subscriber in a read-only transaction with a time limit, so even
@@ -176,6 +196,19 @@ func (e *Engine) evalRule(ctx context.Context, r Rule, env Env, subscriberID int
 	if err != nil {
 		return false, err
 	}
+	return e.evalCompiled(ctx, c, subscriberID)
+}
+
+// evalFilter tests an incoming event's properties against an event filter.
+func (e *Engine) evalFilter(ctx context.Context, r Rule, props json.RawMessage, env Env, subscriberID int) (bool, error) {
+	c, err := r.CompileFilter(props, env)
+	if err != nil {
+		return false, err
+	}
+	return e.evalCompiled(ctx, c, subscriberID)
+}
+
+func (e *Engine) evalCompiled(ctx context.Context, c Compiled, subscriberID int) (bool, error) {
 	tx, err := e.db.BeginTxx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return false, err
@@ -252,7 +285,7 @@ func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *
 		if err := decodeConfig(n, &c); err != nil {
 			return outcome{}, err
 		}
-		yes, err := e.evalRule(ctx, c.Rule, e.env(ix, enr.ID, now), sub.ID)
+		yes, err := e.evalRule(ctx, c.Rule, e.env(ix, enr, now), sub.ID)
 		if err != nil {
 			var perr *permanentError
 			if errors.As(err, &perr) {

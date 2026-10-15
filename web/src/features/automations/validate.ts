@@ -36,12 +36,14 @@ export function stepIssues(s: Step, ctx: Context): Issue[] {
       if (!isDuration(String(c.timeout ?? ''))) bad('timeout', 'web.automations.invalidDuration')
       const events = waitEvents(c)
       if (events.length < 1 || events.length > 10) bad('events', 'web.automations.waitForEvent.eventCount')
-      const seen = new Set<string>()
+      // A name may repeat with different filters; the first that matches wins, so one listed after an unfiltered one is never reached.
+      const open = new Set<string>()
       events.forEach((e, i) => {
         const name = (e.name ?? '').trim()
         if (!name) bad(`event.${i}`, 'web.automations.waitForEvent.nameRequired')
-        else if (seen.has(name)) bad(`event.${i}`, 'web.automations.waitForEvent.nameUnique')
-        seen.add(name)
+        else if (open.has(name)) bad(`event.${i}`, 'web.automations.waitForEvent.unreachable')
+        else if (e.where && ruleIssues(e.where, { allowSQL: false, emailSteps: [], filter: true }).length) bad(`event.${i}`, 'web.automations.rule.filterIncomplete')
+        if (!e.where) open.add(name)
       })
       break
     }
@@ -124,7 +126,10 @@ export function triggerIssues(t: Trigger): Issue[] {
         ? []
         : [{ field: 'attribute', key: 'web.automations.attributeRequired' }]
     case 'event':
-      return has(c.event) ? [] : [{ field: 'event', key: 'web.automations.trigger.eventRequired' }]
+      if (!has(c.event)) return [{ field: 'event', key: 'web.automations.trigger.eventRequired' }]
+      if (c.where && ruleIssues(c.where as Rule, { allowSQL: false, emailSteps: [], filter: true, noRunEvent: true }).length)
+        return [{ field: 'where', key: 'web.automations.rule.filterIncomplete' }]
+      return []
     case 'manual':
       return []
   }

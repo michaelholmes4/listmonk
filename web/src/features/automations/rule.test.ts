@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { coerceValue, emptyGroup, emptyLeaf, isDuration, ruleIssues, usesEngagement, type Rule } from './rule'
+import { coerceValue, emptyFilter, emptyGroup, emptyLeaf, isDuration, ruleIssues, usesEngagement, type Rule, type RuleOpts } from './rule'
 
-const ok = { allowSQL: false, emailSteps: ['welcome'] }
+const ok: RuleOpts = { allowSQL: false, emailSteps: ['welcome'] }
 
 describe('rule issues', () => {
   it('accepts a complete attribute rule and flags missing parts', () => {
@@ -56,5 +56,34 @@ describe('helpers', () => {
     expect(usesEngagement({ op: 'and', rules: [emptyLeaf('attribute'), { op: 'or', rules: [emptyLeaf('step')] }] })).toBe(true)
     expect(usesEngagement(emptyGroup())).toBe(false)
     expect(usesEngagement(undefined)).toBe(false)
+  })
+})
+
+describe('event properties', () => {
+  const keys = (r: Rule, o = ok) => ruleIssues(r, o).map((i) => i.key)
+
+  it('tests the run event by value or against another of its properties', () => {
+    expect(keys({ type: 'property', path: 'product', operator: 'eq', value: 'a' })).toEqual([])
+    expect(keys({ type: 'property', path: 'items.count', operator: 'exists' })).toEqual([])
+    expect(keys({ type: 'property', path: '', operator: 'eq', value: 'a' })).toEqual(['web.automations.rule.propertyRequired'])
+    expect(keys({ type: 'property', path: 'product', operator: 'eq', value: '' })).toEqual(['web.automations.rule.valueRequired'])
+    expect(keys({ type: 'property', path: 'product', operator: 'neq', value_from: 'product' })).toEqual([])
+    expect(keys({ type: 'property', path: 'product', operator: 'gt', value_from: 'product' })).toEqual(['web.automations.rule.compareEqOnly'])
+    expect(keys({ type: 'property', path: 'product', operator: 'eq', value_from: '' })).toEqual(['web.automations.rule.propertyRequired'])
+  })
+
+  it('keeps a filter to property tests, and a trigger filter to values', () => {
+    const filter = { ...ok, filter: true }
+    expect(keys(emptyFilter(), filter)).toEqual(['web.automations.rule.propertyRequired'])
+    expect(keys({ op: 'and', rules: [{ type: 'attribute', path: 'plan', operator: 'exists' }] }, filter)).toEqual(['web.automations.rule.propertyOnly'])
+    const fromRun: Rule = { op: 'and', rules: [{ type: 'property', path: 'product', operator: 'eq', value_from: 'product' }] }
+    expect(keys(fromRun, filter)).toEqual([])
+    expect(keys(fromRun, { ...filter, noRunEvent: true })).toEqual(['web.automations.rule.noRunEvent'])
+  })
+
+  it('reports an unfinished filter on the event test that holds it', () => {
+    const ev: Rule = { type: 'event', name: 'order_completed', operator: 'occurred', since: 'entered', where: emptyFilter() }
+    expect(keys(ev)).toEqual(['web.automations.rule.filterIncomplete'])
+    expect(keys({ ...ev, where: { op: 'and', rules: [{ type: 'property', path: 'product', operator: 'eq', value_from: 'product' }] } })).toEqual([])
   })
 })

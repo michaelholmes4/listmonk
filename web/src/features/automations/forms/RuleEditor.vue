@@ -9,7 +9,9 @@ import { Textarea } from '@/components/ui/textarea'
 import ListSelect from '../ListSelect.vue'
 import type { Step } from '../model'
 import {
+  canCompareWithEvent,
   coerceValue,
+  emptyFilter,
   emptyGroup,
   emptyLeaf,
   isGroup,
@@ -35,8 +37,12 @@ const props = withDefaults(
     path?: number[]
     depth?: number
     disabled?: boolean
+    /** An event filter: only tests of the event's properties. */
+    filter?: boolean
+    /** No run's event to compare with (a trigger's filter). */
+    noRunEvent?: boolean
   }>(),
-  { errors: () => ({}), path: () => [], depth: 0, disabled: false },
+  { errors: () => ({}), path: () => [], depth: 0, disabled: false, filter: false, noRunEvent: false },
 )
 const rule = defineModel<Rule>({ required: true })
 const { t } = useI18n()
@@ -51,8 +57,8 @@ const rules = computed(() => rule.value.rules ?? [])
 const setRules = (r: Rule[]) => (rule.value = { ...rule.value, rules: r })
 const update = (i: number, r: Rule) => setRules(rules.value.map((x, j) => (j === i ? r : x)))
 const remove = (i: number) => setRules(rules.value.filter((_, j) => j !== i))
-const addLeaf = () => setRules([...rules.value, emptyLeaf('attribute')])
-const addGroup = () => setRules([...rules.value, emptyGroup()])
+const addLeaf = () => setRules([...rules.value, emptyLeaf(props.filter ? 'property' : 'attribute')])
+const addGroup = () => setRules([...rules.value, props.filter ? emptyFilter() : emptyGroup()])
 
 // --- Leaf operations --------------------------------------------------------------------------------------
 const patch = (p: Partial<Rule>) => {
@@ -61,7 +67,17 @@ const patch = (p: Partial<Rule>) => {
   rule.value = next
 }
 const setType = (type: RuleType) => (rule.value = emptyLeaf(type))
-const opLabel = (type: RuleType, op: string) => t(`web.automations.rule.op.${type === 'subscriber' ? 'attribute' : type}.${op}`)
+const opLabel = (type: RuleType, op: string) => t(`web.automations.rule.op.${type === 'subscriber' || type === 'property' ? 'attribute' : type}.${op}`)
+
+// A property test compares with a typed value, or with a property of the run's event.
+const fromEvent = computed(() => rule.value.value_from !== undefined)
+const setOperator = (operator: string) =>
+  patch(canCompareWithEvent(operator) ? { operator } : { operator, value_from: undefined, value: fromEvent.value ? '' : rule.value.value })
+const setSource = (src: string) => patch(src === 'event' ? { value_from: '', value: undefined } : { value_from: undefined, value: '' })
+
+// An event test counts any occurrence, those in the last N, or those since the run started.
+const eventWindow = computed(() => (rule.value.since ? 'entered' : rule.value.within !== undefined ? 'within' : 'any'))
+const setWindow = (w: string) => patch({ since: w === 'entered' ? 'entered' : undefined, within: w === 'within' ? '7d' : undefined })
 </script>
 
 <template>
@@ -90,6 +106,8 @@ const opLabel = (type: RuleType, op: string) => t(`web.automations.rule.op.${typ
         :path="[...path, i]"
         :depth="depth + 1"
         :disabled="disabled"
+        :filter="filter"
+        :no-run-event="noRunEvent"
         @update:model-value="update(i, $event)"
       />
       <Button
@@ -116,20 +134,20 @@ const opLabel = (type: RuleType, op: string) => t(`web.automations.rule.op.${typ
   <!-- A single test. -->
   <div v-else class="space-y-2" :data-cy="`rule-${path.join('-')}`">
     <div class="flex flex-wrap items-center gap-2">
-      <Select :model-value="rule.type" :disabled="disabled" @update:model-value="setType($event as RuleType)">
+      <Select v-if="!filter" :model-value="rule.type" :disabled="disabled" @update:model-value="setType($event as RuleType)">
         <SelectTrigger size="sm" class="w-40" :aria-label="t('web.automations.rule.type')"><SelectValue /></SelectTrigger>
         <SelectContent>
           <SelectItem v-for="x in types" :key="x" :value="x">{{ t(`web.automations.rule.types.${x}`) }}</SelectItem>
         </SelectContent>
       </Select>
 
-      <!-- attribute -->
-      <template v-if="rule.type === 'attribute'">
+      <!-- attribute, event property -->
+      <template v-if="rule.type === 'attribute' || rule.type === 'property'">
         <Input
           class="h-8 w-40"
           :model-value="rule.path ?? ''"
-          placeholder="plan"
-          :aria-label="t('web.automations.rule.attributeName')"
+          :placeholder="rule.type === 'property' ? 'product' : 'plan'"
+          :aria-label="t(rule.type === 'property' ? 'web.automations.rule.propertyName' : 'web.automations.rule.attributeName')"
           :disabled="disabled"
           @update:model-value="patch({ path: String($event) })"
         />
@@ -174,7 +192,7 @@ const opLabel = (type: RuleType, op: string) => t(`web.automations.rule.op.${typ
         v-if="rule.type && rule.type !== 'sql'"
         :model-value="rule.operator"
         :disabled="disabled"
-        @update:model-value="patch({ operator: String($event) })"
+        @update:model-value="setOperator(String($event))"
       >
         <SelectTrigger size="sm" class="w-44" :aria-label="t('web.automations.rule.operator')"><SelectValue /></SelectTrigger>
         <SelectContent>
@@ -182,9 +200,32 @@ const opLabel = (type: RuleType, op: string) => t(`web.automations.rule.op.${typ
         </SelectContent>
       </Select>
 
+      <!-- what a property is compared with -->
+      <Select
+        v-if="rule.type === 'property' && !noRunEvent && canCompareWithEvent(rule.operator)"
+        :model-value="fromEvent ? 'event' : 'value'"
+        :disabled="disabled"
+        @update:model-value="setSource(String($event))"
+      >
+        <SelectTrigger size="sm" class="w-44" :aria-label="t('web.automations.rule.compareWith')"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="value">{{ t('web.automations.rule.aValue') }}</SelectItem>
+          <SelectItem value="event">{{ t('web.automations.rule.runEventProperty') }}</SelectItem>
+        </SelectContent>
+      </Select>
+      <Input
+        v-if="rule.type === 'property' && fromEvent"
+        class="h-8 w-40"
+        :model-value="rule.value_from ?? ''"
+        placeholder="product"
+        :aria-label="t('web.automations.rule.runEventProperty')"
+        :disabled="disabled"
+        @update:model-value="patch({ value_from: String($event) })"
+      />
+
       <!-- value -->
       <Input
-        v-if="(rule.type === 'attribute' || rule.type === 'subscriber') && needsValue(rule.operator)"
+        v-else-if="(rule.type === 'attribute' || rule.type === 'subscriber' || rule.type === 'property') && needsValue(rule.operator)"
         class="h-8 w-44"
         :model-value="rule.value === undefined ? '' : String(rule.value)"
         :aria-label="t('web.automations.rule.value')"
@@ -194,10 +235,40 @@ const opLabel = (type: RuleType, op: string) => t(`web.automations.rule.op.${typ
 
       <!-- event window -->
       <template v-if="rule.type === 'event'">
-        <span class="text-sm text-muted-foreground">{{ t('web.automations.rule.within') }}</span>
-        <DurationInput :model-value="rule.within ?? ''" :disabled="disabled" @update:model-value="patch({ within: $event || undefined })" />
+        <Select :model-value="eventWindow" :disabled="disabled" @update:model-value="setWindow(String($event))">
+          <SelectTrigger size="sm" class="w-48" :aria-label="t('web.automations.rule.when')"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">{{ t('web.automations.rule.anyTime') }}</SelectItem>
+            <SelectItem value="within">{{ t('web.automations.rule.within') }}</SelectItem>
+            <SelectItem value="entered">{{ t('web.automations.rule.sinceEntered') }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <DurationInput v-if="eventWindow === 'within'" :model-value="rule.within ?? ''" :disabled="disabled" @update:model-value="patch({ within: $event || '' })" />
       </template>
     </div>
+
+    <!-- event filter -->
+    <template v-if="rule.type === 'event'">
+      <div v-if="rule.where" class="space-y-2 rounded-lg border bg-muted/30 p-3" :data-cy="`rule-${path.join('-')}-where`">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-sm">{{ t('web.automations.rule.onlyWhere') }}</span>
+          <Button v-if="!disabled" type="button" variant="ghost" size="sm" @click="patch({ where: undefined })">{{ t('web.automations.rule.removeFilter') }}</Button>
+        </div>
+        <RuleEditor
+          :model-value="rule.where"
+          :email-steps="emailSteps"
+          :allow-sql="false"
+          :depth="0"
+          :disabled="disabled"
+          filter
+          :no-run-event="noRunEvent"
+          @update:model-value="patch({ where: $event })"
+        />
+      </div>
+      <Button v-else-if="!disabled" type="button" variant="ghost" size="sm" :data-cy="`rule-${path.join('-')}-add-where`" @click="patch({ where: emptyFilter() })">
+        <Plus />{{ t('web.automations.rule.addFilter') }}
+      </Button>
+    </template>
 
     <Textarea
       v-if="rule.type === 'sql'"

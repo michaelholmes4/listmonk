@@ -1,4 +1,5 @@
 import type { AutomationGraph } from '@/api/types'
+import type { Rule } from './rule'
 
 /**
  * The builder edits a tree (a list of steps, where a condition owns a "yes" and a "no" list, a wait for an event one list per path); the
@@ -57,6 +58,8 @@ export interface WaitEvent {
   id: string
   name: string
   restart?: boolean
+  /** Only events whose properties match (a group of property tests). */
+  where?: Rule
 }
 
 export const waitEvents = (c: Config): WaitEvent[] => (Array.isArray(c.events) ? (c.events as WaitEvent[]) : [])

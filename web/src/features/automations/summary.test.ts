@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import webEn from '@/locales/en.json'
 import type { Step } from './model'
-import { ruleSummary, stepSummary, type Lookups } from './summary'
+import { ruleSummary, stepSummary, triggerSummary, type Lookups } from './summary'
 
 const en = webEn as Record<string, string>
 // Enough of vue-i18n for these strings: "{n} day | {n} days" picks by n.
@@ -51,5 +51,17 @@ describe('rule summaries', () => {
     )
     // An unfinished test is left out rather than shown half-written.
     expect(ruleSummary(t, { op: 'and', rules: [plan, { type: 'attribute', path: '', operator: 'eq' }] }, l)).toBe('plan is pro')
+  })
+})
+
+describe('event filters', () => {
+  it('says which events count', () => {
+    const where = { op: 'and' as const, rules: [{ type: 'property' as const, path: 'product', operator: 'eq', value_from: 'product' }] }
+    expect(ruleSummary(t, { type: 'event', name: 'order_completed', operator: 'occurred', since: 'entered', where }, l)).toBe(
+      "order_completed (event product is the starting event's property product) happened since they entered",
+    )
+    expect(ruleSummary(t, { type: 'property', path: 'plan', operator: 'eq', value: 'pro' }, l)).toBe('event plan is pro')
+    const trig = { id: 't', type: 'event' as const, config: { event: 'trial_started', where: { op: 'and', rules: [{ type: 'property', path: 'plan', operator: 'exists' }] } } }
+    expect(triggerSummary(t, trig, l)).toBe('trial_started (event plan is set)')
   })
 })

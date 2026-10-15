@@ -78,6 +78,14 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
 - **Wait for an event.** `POST /api/track` events also reach runs waiting on a `wait_for_event` step (before triggers fire).
   `.Event` in emails is the event that started the run, or the latest one that restarted a wait.
+- **Event property filters.** A `property` rule tests a property of an event: the run's event (the `.Event` above) at
+  the top of a condition or goal, the event being matched inside a filter. Filters (`where`, groups of property rules
+  only) sit on event triggers, on each `wait_for_event` event and on `event` rules; `value_from` compares with a property
+  of the run's event (eq / neq only; not in trigger filters, where there is no run yet). A wait may list one event name
+  more than once with different filters; the first match wins, and one listed after an unfiltered twin is refused as
+  unreachable. An `event` rule's `since: entered` counts events from the run's start (the trigger event's `occurred_at`,
+  or enrollment time), not counting the trigger event itself. Property paths are checked against the same pattern as
+  attribute paths and passed as parameters, never spliced into SQL.
 - **Go to.** A `go_to` step ends its path and sends the run to another step of the same version (join a path further down, or
   go back to a wait). A run can therefore visit a step more than once (migration 7: `enrollments.current_visit`,
   `enrollment_steps.visit`); each visit sends and waits afresh, and "has this step run?" looks only at the current visit. Every

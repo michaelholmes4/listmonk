@@ -238,7 +238,7 @@ func TestWaitForEventValidation(t *testing.T) {
 		{"event id timeout", waitGraph([]WaitEvent{{ID: "timeout", Name: "a"}}, "1h"), "own id"},
 		{"blank name", waitGraph([]WaitEvent{{ID: "e1", Name: "  "}}, "1h"), "needs a name"},
 		{"long name", waitGraph([]WaitEvent{{ID: "e1", Name: strings.Repeat("x", 201)}}, "1h"), "at most 200"},
-		{"duplicate name", waitGraph([]WaitEvent{{ID: "e1", Name: "a"}, {ID: "e2", Name: " a "}}, "1h"), "twice"},
+		{"duplicate name", waitGraph([]WaitEvent{{ID: "e1", Name: "a"}, {ID: "e2", Name: " a "}}, "1h"), "never reached"},
 		{"restart event cannot have a path", waitGraph(restart, "1h", Edge{To: "x", Handle: "e2"}), "connects only to its events"},
 		{"unknown path", waitGraph(one, "1h", Edge{To: "x", Handle: "e9"}), "connects only to its events"},
 		{"no handle", waitGraph(one, "1h", Edge{To: "x"}), "connects only to its events"},
