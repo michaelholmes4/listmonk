@@ -206,11 +206,13 @@ func (b *builder) rule(r Rule, depth int) (string, error) {
 			return "", fmt.Errorf("invalid property name %q", r.ValueFrom)
 		}
 		other := fmt.Sprintf("(%s #>> %s::text[])", b.runEventSQL(), b.add(pgPath(r.ValueFrom)))
+		// Two numbers compare as numbers (10.5 = 10.50), anything else as text.
+		bothNumbers := fmt.Sprintf("%s ~ %s AND %s ~ %s", text, numberRe, other, numberRe)
 		switch r.Operator {
 		case "eq":
-			return fmt.Sprintf("%s = %s", text, other), nil
+			return fmt.Sprintf("(CASE WHEN %s THEN %s::numeric = %s::numeric ELSE %s = %s END)", bothNumbers, text, other, text, other), nil
 		case "neq":
-			return fmt.Sprintf("%s IS DISTINCT FROM %s", text, other), nil
+			return fmt.Sprintf("(CASE WHEN %s THEN %s::numeric <> %s::numeric ELSE %s IS DISTINCT FROM %s END)", bothNumbers, text, other, text, other), nil
 		}
 		return "", errors.New("comparing with the run's event works with equals and not equals only")
 
@@ -352,17 +354,25 @@ func (b *builder) textTest(text, raw string, r Rule) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// A number compares as a number, so 10.5 matches a stored 10.50.
+	num := fmt.Sprintf("(CASE WHEN %s ~ %s THEN (%s)::numeric END)", text, numberRe, text)
 	switch r.Operator {
 	case "eq":
+		if kind == "number" {
+			return fmt.Sprintf("%s = %s::numeric", num, b.add(v)), nil
+		}
 		return fmt.Sprintf("%s = %s", text, b.add(v)), nil
 	case "neq":
+		if kind == "number" {
+			return fmt.Sprintf("%s IS DISTINCT FROM %s::numeric", num, b.add(v)), nil
+		}
 		return fmt.Sprintf("%s IS DISTINCT FROM %s", text, b.add(v)), nil
 	case "contains":
 		return fmt.Sprintf(`%s ILIKE '%%' || %s || '%%' ESCAPE '\'`, text, b.add(likeEsc.Replace(v))), nil
 	case "gt", "gte", "lt", "lte":
 		op := map[string]string{"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}[r.Operator]
 		if kind == "number" {
-			return fmt.Sprintf("(CASE WHEN %s ~ %s THEN (%s)::numeric END) %s %s::numeric", text, numberRe, text, op, b.add(v)), nil
+			return fmt.Sprintf("%s %s %s::numeric", num, op, b.add(v)), nil
 		}
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
@@ -370,7 +380,8 @@ func (b *builder) textTest(text, raw string, r Rule) (string, error) {
 				return "", fmt.Errorf("%q needs a number or a date, not %q", r.Operator, v)
 			}
 		}
-		return fmt.Sprintf(`(CASE WHEN %s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN (%s)::timestamptz END) %s %s::timestamptz`, text, text, op, b.add(t)), nil
+		// A value that isn't a real date (2026-02-30) is no date, rather than an error.
+		return fmt.Sprintf(`automation_try_timestamptz(%s) %s %s::timestamptz`, text, op, b.add(t)), nil
 	}
 	return "", fmt.Errorf("unknown operator %q", r.Operator)
 }

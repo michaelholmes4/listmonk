@@ -2,6 +2,7 @@ package automation
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -259,5 +260,72 @@ func TestGoalSinceEnteringWithAFilter(t *testing.T) {
 	enr := h.enrollment(auto, sub)
 	if h.sender.count() != 1 || enr.Status != EnrollmentExited || *enr.ExitReason != ExitGoalReached {
 		t.Fatalf("sent %d, %+v", h.sender.count(), enr)
+	}
+}
+
+func rawEvent(sub int, name, props string, h *harness) Event {
+	eventSeq++
+	return Event{ID: eventSeq, SubscriberID: sub, Name: name, Properties: json.RawMessage(props), OccurredAt: h.clock.Now()}
+}
+
+// Event properties come from other systems: 10.50 is the number 10.5, whether the rule has the
+// value or reads it from the run's event.
+func TestNumbersCompareAsNumbers(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.publish("price", &Graph{
+		Triggers: []Trigger{{ID: "t", Type: TriggerEvent, Config: cfg(TriggerConfig{Event: "order",
+			Where: filter(prop("total", "eq", 10.5), prop("qty", "neq", 2))})}},
+		Root: "m", Nodes: []Node{tx("m", h.campaign())},
+	}, Settings{Reentry: Reentry{Mode: "always"}})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	h.must(h.eng.OnEvent(ctx, sub, rawEvent(sub, "order", `{"total":10.50,"qty":2.0}`, h)))
+	h.drain()
+	if h.sender.count() != 0 {
+		t.Fatalf("qty 2.0 passed \"is not 2\"")
+	}
+	h.must(h.eng.OnEvent(ctx, sub, rawEvent(sub, "order", `{"total":10.50,"qty":1}`, h)))
+	h.drain()
+	if h.sender.count() != 1 {
+		t.Fatalf("total 10.50 did not match 10.5")
+	}
+
+	h2 := newHarness(t)
+	g, same, _, _ := h2.sameProductGraph()
+	h2.publish("checkout", g, Settings{})
+	sub = h2.subscriber("a@example.com", "enabled", nil)
+	h2.must(h2.eng.OnEvent(ctx, sub, rawEvent(sub, "checkout_started", `{"product":10.50}`, h2)))
+	h2.drain()
+	h2.must(h2.eng.OnEvent(ctx, sub, rawEvent(sub, "order_completed", `{"product":"10.5"}`, h2)))
+	h2.drain()
+	if h2.sender.count() != 1 || h2.sender.Sent[0].CampaignID != same {
+		t.Fatalf("10.5 and 10.50 were not the same: %+v", h2.sender.Sent)
+	}
+}
+
+// A value that looks like a date but isn't one doesn't match a date rule, and isn't an error
+// (which would fail the event's job and retry it).
+func TestABadDateDoesNotMatch(t *testing.T) {
+	h := newHarness(t)
+	ctx := context.Background()
+	h.publish("filtered", &Graph{
+		Triggers: []Trigger{{ID: "t", Type: TriggerEvent, Config: cfg(TriggerConfig{Event: "renewal",
+			Where: filter(prop("renews_at", "gt", "2026-01-01"))})}},
+		Root: "m", Nodes: []Node{tx("m", h.campaign())},
+	}, Settings{Reentry: Reentry{Mode: "always"}})
+	sub := h.subscriber("a@example.com", "enabled", nil)
+	for _, bad := range []string{"2026-02-30", "2026-99-99", "2026-03-01T25:00:00Z"} {
+		if err := h.eng.OnEvent(ctx, sub, rawEvent(sub, "renewal", `{"renews_at":"`+bad+`"}`, h)); err != nil {
+			t.Fatalf("%s: %v", bad, err)
+		}
+	}
+	h.drain()
+	if h.sender.count() != 0 {
+		t.Fatalf("a bad date matched")
+	}
+	h.must(h.eng.OnEvent(ctx, sub, rawEvent(sub, "renewal", `{"renews_at":"2026-03-01T10:00:00+01:00"}`, h)))
+	h.drain()
+	if h.sender.count() != 1 {
+		t.Fatalf("a good date did not match")
 	}
 }

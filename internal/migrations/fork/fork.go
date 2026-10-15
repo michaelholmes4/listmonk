@@ -48,6 +48,9 @@ var sqlStepVisits string
 //go:embed 008_step_campaigns_cancelled.sql
 var sqlStepCampaignsCancelled string
 
+//go:embed 009_try_timestamptz.sql
+var sqlTryTimestamptz string
+
 // All is every migration in order. Add new ones at the end with the next number.
 var All = []Migration{
 	{1, "automation tables", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlAutomations) }},
@@ -59,6 +62,7 @@ var All = []Migration{
 	{6, "message log", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlMessageLog) }},
 	{7, "automation step visits", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlStepVisits) }},
 	{8, "automation step campaigns are cancelled", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlStepCampaignsCancelled) }},
+	{9, "date rules read a bad date as none", func(ctx context.Context, db *sqlx.DB) error { return execTx(ctx, db, sqlTryTimestamptz) }},
 }
 
 func execTx(ctx context.Context, db *sqlx.DB, query string) error {
