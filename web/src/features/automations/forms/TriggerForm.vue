@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { Plus } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ListSelect from '../ListSelect.vue'
 import type { Config, TriggerType } from '../model'
+import { emptyFilter, type Rule } from '../rule'
+import RuleEditor from './RuleEditor.vue'
 
 const props = defineProps<{ type: TriggerType; errors: Record<string, string>; disabled?: boolean }>()
 const config = defineModel<Config>({ required: true })
@@ -53,6 +57,25 @@ function setEquals(text: string) {
       <Input id="tr-event" :model-value="String(config.event ?? '')" placeholder="signed_up" :disabled="disabled" :aria-invalid="!!errors.event || undefined" @update:model-value="patch({ event: String($event) })" />
       <p v-if="errors.event" class="text-sm text-destructive">{{ errors.event }}</p>
       <p class="text-xs text-muted-foreground">{{ t('web.automations.trigger.eventHelp2') }}</p>
+      <div v-if="config.where" class="space-y-2 rounded-lg border bg-muted/30 p-3" data-cy="trigger-where">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-sm">{{ t('web.automations.rule.onlyWhere') }}</span>
+          <Button v-if="!disabled" type="button" variant="ghost" size="sm" @click="patch({ where: undefined })">{{ t('web.automations.rule.removeFilter') }}</Button>
+        </div>
+        <RuleEditor
+          :model-value="config.where as Rule"
+          :email-steps="[]"
+          :allow-sql="false"
+          :disabled="disabled"
+          filter
+          no-run-event
+          @update:model-value="patch({ where: $event })"
+        />
+        <p v-if="errors.where" class="text-sm text-destructive">{{ errors.where }}</p>
+      </div>
+      <Button v-else-if="!disabled" type="button" variant="ghost" size="sm" data-cy="trigger-add-where" @click="patch({ where: emptyFilter() })">
+        <Plus />{{ t('web.automations.rule.addFilter') }}
+      </Button>
     </div>
   </div>
 </template>

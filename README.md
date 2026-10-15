@@ -44,6 +44,16 @@ curl -u 'api_user:token' -X POST http://localhost:9000/api/track \
 - `occurred_at` (optional): an RFC 3339 timestamp. The default is now.
 - `Idempotency-Key` header (optional): a retried request with the same key is recorded only once.
 
+Automations can also look at an event's properties:
+
+- **Only some events.** An event trigger, each event a "Wait for an event" step watches, and an event test in a
+  condition can each have a filter on the event's properties, for example "only `trial_started` where `plan` is
+  `pro`". A filter can also compare with the event that started the run: wait for an `order_completed` whose
+  `product` is the same as the starting event's `product`.
+- **Split on the event.** A condition can test the starting event's properties ("Event property").
+- **Since they entered.** An event test can count only events since the person entered the automation, as an
+  abandoned-cart flow needs ("`order_completed` did not happen since they entered").
+
 ## Installation
 
 Images are published to `ghcr.io/michaelholmes4/listmonk:<tag>` (see

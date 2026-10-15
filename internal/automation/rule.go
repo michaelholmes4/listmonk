@@ -20,15 +20,22 @@ type Rule struct {
 	Rules []Rule `json:"rules,omitempty"`
 
 	// Leaf.
-	Type     string          `json:"type,omitempty"` // attribute, subscriber, list, step, event, sql
-	Path     string          `json:"path,omitempty"` // attribute: "plan" or "address.city"; subscriber: email|name|status
+	Type     string          `json:"type,omitempty"` // attribute, subscriber, list, step, event, property, sql
+	Path     string          `json:"path,omitempty"` // attribute, property: "plan" or "address.city"; subscriber: email|name|status
 	Operator string          `json:"operator,omitempty"`
 	Value    json.RawMessage `json:"value,omitempty"`
-	ListID   int             `json:"list_id,omitempty"`
-	NodeID   string          `json:"node_id,omitempty"` // step: the email step to look at
-	Name     string          `json:"name,omitempty"`    // event
-	Within   string          `json:"within,omitempty"`  // event: only occurrences in the last "7d"
-	Query    string          `json:"query,omitempty"`   // sql
+	// property: compare with this property of the run's event instead of Value (eq and neq only),
+	// e.g. "an order for the same product as the checkout that started the run".
+	ValueFrom string `json:"value_from,omitempty"`
+	ListID    int    `json:"list_id,omitempty"`
+	NodeID    string `json:"node_id,omitempty"` // step: the email step to look at
+	Name      string `json:"name,omitempty"`    // event
+	Within    string `json:"within,omitempty"`  // event: only occurrences in the last "7d"
+	// event: "entered" counts only occurrences since the run started (not the event that started it).
+	Since string `json:"since,omitempty"`
+	// event: only occurrences whose properties match; a group of property rules.
+	Where *Rule  `json:"where,omitempty"`
+	Query string `json:"query,omitempty"` // sql
 }
 
 // Rule leaf types.
@@ -38,8 +45,12 @@ const (
 	RuleList       = "list"
 	RuleStep       = "step"
 	RuleEvent      = "event"
+	RuleProperty   = "property"
 	RuleSQL        = "sql"
 )
+
+// SinceEntered is the event rule's "since the run started" window.
+const SinceEntered = "entered"
 
 // Env is what compiling a rule needs to know about its surroundings.
 type Env struct {
@@ -49,6 +60,16 @@ type Env struct {
 	Now        time.Time
 	// AllowSQL permits the advanced raw-SQL rule.
 	AllowSQL bool
+	// Event is the properties of the run's event (what started it, or what last restarted a
+	// wait). Property rules in a condition or goal test it, and value_from reads it. Nil when the
+	// run has none.
+	Event json.RawMessage
+	// NoRunEvent refuses value_from: in a trigger's filter the event is the one starting the run.
+	NoRunEvent bool
+	// Entered is when the run started (its starting event's time, if it has one) and
+	// TriggerEventID that event; "since entered" event rules count from there, without it.
+	Entered        time.Time
+	TriggerEventID int64
 }
 
 // Compiled is a boolean SQL expression over `subscribers s` plus its parameters, numbered from $2
@@ -67,6 +88,24 @@ var (
 type builder struct {
 	env  Env
 	args []any
+	// props is the SQL for the properties property rules test: the run's event at the top
+	// level, the stored event inside an event rule's where, the incoming event in a filter.
+	props string
+	// filter allows property rules (and groups) only.
+	filter   bool
+	runEvent string
+}
+
+// runEventSQL is the run's event properties as a parameter, added once.
+func (b *builder) runEventSQL() string {
+	if b.runEvent == "" {
+		ev := string(b.env.Event)
+		if len(b.env.Event) == 0 {
+			ev = "{}"
+		}
+		b.runEvent = b.add(ev) + "::jsonb"
+	}
+	return b.runEvent
 }
 
 // add registers a parameter and returns its placeholder.
@@ -88,6 +127,27 @@ func (r Rule) Compile(env Env) (Compiled, error) {
 // Validate reports whether the rule can be compiled and run.
 func (r Rule) Validate(env Env) error {
 	_, err := r.Compile(env)
+	return err
+}
+
+// CompileFilter compiles an event filter, a group of property rules, against an incoming event's
+// properties (a trigger's or a wait's event, which is not stored with the run yet).
+func (r Rule) CompileFilter(props json.RawMessage, env Env) (Compiled, error) {
+	b := &builder{env: env, filter: true}
+	if len(props) == 0 {
+		props = json.RawMessage("{}")
+	}
+	b.props = b.add(string(props)) + "::jsonb"
+	sql, err := b.rule(r, 0)
+	if err != nil {
+		return Compiled{}, err
+	}
+	return Compiled{SQL: sql, Args: b.args}, nil
+}
+
+// ValidateFilter reports whether the rule is a usable event filter.
+func (r Rule) ValidateFilter(env Env) error {
+	_, err := r.CompileFilter(nil, env)
 	return err
 }
 
@@ -122,12 +182,45 @@ func (b *builder) rule(r Rule, depth int) (string, error) {
 		return "(" + strings.Join(parts, join) + ")", nil
 	}
 
+	if b.filter && r.Type != RuleProperty {
+		return "", errors.New("an event filter can only test event properties")
+	}
+
 	switch r.Type {
+	case RuleProperty:
+		if !attrPathRe.MatchString(r.Path) {
+			return "", fmt.Errorf("invalid property name %q", r.Path)
+		}
+		if b.props == "" {
+			b.props = b.runEventSQL()
+		}
+		path := b.add(pgPath(r.Path))
+		text, raw := fmt.Sprintf("(%s #>> %s::text[])", b.props, path), fmt.Sprintf("(%s #> %s::text[])", b.props, path)
+		if r.ValueFrom == "" {
+			return b.textTest(text, raw, r)
+		}
+		if b.env.NoRunEvent {
+			return "", errors.New("a trigger's filter can't compare with the run's event")
+		}
+		if !attrPathRe.MatchString(r.ValueFrom) {
+			return "", fmt.Errorf("invalid property name %q", r.ValueFrom)
+		}
+		other := fmt.Sprintf("(%s #>> %s::text[])", b.runEventSQL(), b.add(pgPath(r.ValueFrom)))
+		// Two numbers compare as numbers (10.5 = 10.50), anything else as text.
+		bothNumbers := fmt.Sprintf("%s ~ %s AND %s ~ %s", text, numberRe, other, numberRe)
+		switch r.Operator {
+		case "eq":
+			return fmt.Sprintf("(CASE WHEN %s THEN %s::numeric = %s::numeric ELSE %s = %s END)", bothNumbers, text, other, text, other), nil
+		case "neq":
+			return fmt.Sprintf("(CASE WHEN %s THEN %s::numeric <> %s::numeric ELSE %s IS DISTINCT FROM %s END)", bothNumbers, text, other, text, other), nil
+		}
+		return "", errors.New("comparing with the run's event works with equals and not equals only")
+
 	case RuleAttribute:
 		if !attrPathRe.MatchString(r.Path) {
 			return "", fmt.Errorf("invalid attribute name %q", r.Path)
 		}
-		path := b.add("{" + strings.Join(strings.Split(r.Path, "."), ",") + "}")
+		path := b.add(pgPath(r.Path))
 		return b.textTest(fmt.Sprintf("(s.attribs #>> %s::text[])", path), fmt.Sprintf("(s.attribs #> %s::text[])", path), r)
 
 	case RuleSubscriber:
@@ -189,12 +282,32 @@ func (b *builder) rule(r Rule, depth int) (string, error) {
 		}
 		name := b.add(r.Name)
 		q := "EXISTS (SELECT 1 FROM subscriber_events ev WHERE ev.subscriber_id = s.id AND ev.name = " + name
+		if r.Within != "" && r.Since != "" {
+			return "", errors.New("event rule: use either within or since, not both")
+		}
 		if r.Within != "" {
 			d, err := ParseDuration(r.Within)
 			if err != nil {
 				return "", fmt.Errorf("event window: %w", err)
 			}
 			q += " AND ev.occurred_at >= " + b.add(b.env.Now.Add(-d))
+		}
+		switch r.Since {
+		case "":
+		case SinceEntered:
+			q += " AND ev.occurred_at >= " + b.add(b.env.Entered) + " AND ev.id <> " + b.add(b.env.TriggerEventID)
+		default:
+			return "", fmt.Errorf("unknown event window %q", r.Since)
+		}
+		if r.Where != nil {
+			outer, filter := b.props, b.filter
+			b.props, b.filter = "ev.properties", true
+			w, err := b.rule(*r.Where, depth+1)
+			b.props, b.filter = outer, filter
+			if err != nil {
+				return "", err
+			}
+			q += " AND " + w
 		}
 		q += ")"
 		switch r.Operator {
@@ -218,6 +331,11 @@ func (b *builder) rule(r Rule, depth int) (string, error) {
 	return "", fmt.Errorf("unknown rule type %q", r.Type)
 }
 
+// pgPath turns "address.city" into the text[] literal `{address,city}`.
+func pgPath(p string) string {
+	return "{" + strings.Join(strings.Split(p, "."), ",") + "}"
+}
+
 // textTest compares a text expression (and, for existence, the raw jsonb one) with the rule value.
 func (b *builder) textTest(text, raw string, r Rule) (string, error) {
 	switch r.Operator {
@@ -236,17 +354,25 @@ func (b *builder) textTest(text, raw string, r Rule) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// A number compares as a number, so 10.5 matches a stored 10.50.
+	num := fmt.Sprintf("(CASE WHEN %s ~ %s THEN (%s)::numeric END)", text, numberRe, text)
 	switch r.Operator {
 	case "eq":
+		if kind == "number" {
+			return fmt.Sprintf("%s = %s::numeric", num, b.add(v)), nil
+		}
 		return fmt.Sprintf("%s = %s", text, b.add(v)), nil
 	case "neq":
+		if kind == "number" {
+			return fmt.Sprintf("%s IS DISTINCT FROM %s::numeric", num, b.add(v)), nil
+		}
 		return fmt.Sprintf("%s IS DISTINCT FROM %s", text, b.add(v)), nil
 	case "contains":
 		return fmt.Sprintf(`%s ILIKE '%%' || %s || '%%' ESCAPE '\'`, text, b.add(likeEsc.Replace(v))), nil
 	case "gt", "gte", "lt", "lte":
 		op := map[string]string{"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}[r.Operator]
 		if kind == "number" {
-			return fmt.Sprintf("(CASE WHEN %s ~ %s THEN (%s)::numeric END) %s %s::numeric", text, numberRe, text, op, b.add(v)), nil
+			return fmt.Sprintf("%s %s %s::numeric", num, op, b.add(v)), nil
 		}
 		t, err := time.Parse(time.RFC3339, v)
 		if err != nil {
@@ -254,7 +380,8 @@ func (b *builder) textTest(text, raw string, r Rule) (string, error) {
 				return "", fmt.Errorf("%q needs a number or a date, not %q", r.Operator, v)
 			}
 		}
-		return fmt.Sprintf(`(CASE WHEN %s ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN (%s)::timestamptz END) %s %s::timestamptz`, text, text, op, b.add(t)), nil
+		// A value that isn't a real date (2026-02-30) is no date, rather than an error.
+		return fmt.Sprintf(`automation_try_timestamptz(%s) %s %s::timestamptz`, text, op, b.add(t)), nil
 	}
 	return "", fmt.Errorf("unknown operator %q", r.Operator)
 }

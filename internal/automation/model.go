@@ -108,6 +108,8 @@ type TriggerConfig struct {
 	Equals *json.RawMessage `json:"equals,omitempty"`
 	// event
 	Event string `json:"event,omitempty"`
+	// Optional: only events whose properties match this group of property rules.
+	Where *Rule `json:"where,omitempty"`
 }
 
 // Node types.
@@ -213,6 +215,9 @@ type WaitEvent struct {
 	Name string `json:"name"`
 	// Restart starts the wait again (with this event as the run's event data) instead of taking a path.
 	Restart bool `json:"restart,omitempty"`
+	// Optional: only events whose properties match this group of property rules. Its value_from
+	// reads the run's event, e.g. "an order with the same product as the checkout".
+	Where *Rule `json:"where,omitempty"`
 }
 
 // ConditionConfig configures a condition node.

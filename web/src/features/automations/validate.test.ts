@@ -69,6 +69,12 @@ describe('trigger issues', () => {
     expect(triggerIssues({ id: 't', type: 'manual', config: {} })).toEqual([])
   })
 
+  it('checks an event trigger filter, which has no run event to compare with', () => {
+    const where = (rule: object) => ({ id: 't', type: 'event' as const, config: { event: 'trial_started', where: { op: 'and', rules: [rule] } } })
+    expect(triggerIssues(where({ type: 'property', path: 'product', operator: 'eq', value: 'a' }))).toEqual([])
+    expect(triggerIssues(where({ type: 'property', path: 'product', operator: 'eq', value_from: 'product' })).map((i) => i.field)).toEqual(['where'])
+  })
+
   it('collects issues for the whole flow by id', () => {
     const f = flow([{ id: 'd', type: 'delay', config: {} }])
     f.triggers.push({ id: 't2', type: 'event', config: {} })
@@ -96,6 +102,13 @@ describe('wait for an event', () => {
     expect(fields(wait({ timeout: '1h', events: eleven }))).toEqual(['events'])
     expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: ' ' }] }))).toEqual(['event.0'])
     expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: 'a' }, { id: 'e2', name: ' a' }] }))).toEqual(['event.1'])
+  })
+
+  it('lists an event more than once only when the earlier ones are filtered', () => {
+    const only = (value: string) => ({ op: 'and' as const, rules: [{ type: 'property' as const, path: 'product', operator: 'eq', value }] })
+    expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: 'a', where: only('x') }, { id: 'e2', name: 'a' }] }))).toEqual([])
+    expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: 'a' }, { id: 'e2', name: 'a', where: only('x') }] }))).toEqual(['event.1'])
+    expect(fields(wait({ timeout: '1h', events: [{ id: 'e1', name: 'a', where: { op: 'and', rules: [] } }] }))).toEqual(['event.0'])
   })
 })
 

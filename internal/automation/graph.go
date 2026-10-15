@@ -145,6 +145,11 @@ func (g *Graph) Validate(opts ValidateOpts) []Problem {
 			if strings.TrimSpace(c.Event) == "" {
 				bad("", "trigger %s: choose an event name", t.ID)
 			}
+			if c.Where != nil {
+				if err := c.Where.ValidateFilter(Env{Now: time.Now(), NoRunEvent: true}); err != nil {
+					bad("", "trigger %s: %v", t.ID, err)
+				}
+			}
 		case TriggerManual:
 		default:
 			bad("", "trigger %s: unknown type %q", t.ID, t.Type)
@@ -321,7 +326,9 @@ func validateNode(ix *Index, n Node, opts ValidateOpts) []Problem {
 		if len(c.Events) < 1 || len(c.Events) > maxWaitEvents {
 			bad("needs between 1 and %d events to wait for", maxWaitEvents)
 		}
-		ids, names := map[string]bool{}, map[string]bool{}
+		// The same name may be listed again with different filters; the first that matches wins,
+		// so one listed after an unfiltered one is never reached.
+		ids, open := map[string]bool{}, map[string]bool{}
 		for _, ev := range c.Events {
 			if !idRe.MatchString(ev.ID) || ev.ID == HandleTimeout || ids[ev.ID] {
 				bad("every event needs its own id")
@@ -333,10 +340,14 @@ func validateNode(ix *Index, n Node, opts ValidateOpts) []Problem {
 				bad("every event needs a name")
 			case len(name) > maxEventName:
 				bad("event names are at most %d characters", maxEventName)
-			case names[name]:
-				bad("%q is watched for twice", name)
+			case open[name]:
+				bad("%q is listed after one with no filter, so it is never reached", name)
 			}
-			names[name] = true
+			if ev.Where == nil {
+				open[name] = true
+			} else if err := ev.Where.ValidateFilter(Env{Now: time.Now()}); err != nil {
+				bad("event %q: %v", name, err)
+			}
 		}
 
 	case NodeCondition:

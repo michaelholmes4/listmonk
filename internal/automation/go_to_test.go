@@ -365,7 +365,8 @@ func TestTheStepRuleLooksAtTheLatestVisit(t *testing.T) {
 	sub, _ := h.startRun(auto, "go")
 	h.clock.Advance(25 * time.Hour)
 	h.drain()
-	ok, err := h.eng.evalRule(context.Background(), Rule{Type: RuleStep, NodeID: "a", Operator: "not_opened"}, h.eng.env(NewIndex(g), h.enrollment(auto, sub).ID, h.clock.Now()), sub)
+	enr := h.enrollment(auto, sub)
+	ok, err := h.eng.evalRule(context.Background(), Rule{Type: RuleStep, NodeID: "a", Operator: "not_opened"}, h.eng.env(NewIndex(g), &enr, h.clock.Now()), sub)
 	if err != nil || !ok || a == 0 {
 		t.Fatalf("ok = %v, err = %v", ok, err)
 	}

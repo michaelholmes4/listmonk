@@ -35,8 +35,10 @@ export function triggerSummary(t: T, tr: Trigger, l: Lookups): string {
       return c.equals === undefined || c.equals === null
         ? str(c.attribute)
         : `${str(c.attribute)} = ${typeof c.equals === 'string' ? c.equals : JSON.stringify(c.equals)}`
-    case 'event':
-      return str(c.event)
+    case 'event': {
+      const where = c.where ? ruleSummary(t, c.where as Rule, l, true) : ''
+      return where && str(c.event) ? `${str(c.event)} (${where})` : str(c.event)
+    }
     case 'manual':
       return ''
   }
@@ -66,7 +68,10 @@ export function stepSummary(t: T, s: Step, l: Lookups, c: Config = s.config): st
     case 'wait_for_event': {
       const names = waitEvents(c)
         .filter((e) => str(e.name))
-        .map((e) => (e.restart ? `${e.name} (${t('web.automations.waitForEvent.restarts')})` : e.name))
+        .map((e) => {
+          const name = e.where ? `${e.name} (${ruleSummary(t, e.where, l, true)})` : e.name
+          return e.restart ? `${name} (${t('web.automations.waitForEvent.restarts')})` : name
+        })
       if (!names.length) return ''
       return [t('web.automations.waitForEvent.upTo', { time: duration(t, str(c.timeout)) }), names.join(', ')].join(' · ')
     }
@@ -97,7 +102,7 @@ export function ruleSummary(t: T, r: Rule, l: Lookups, nested = false): string {
     const joined = parts.join(` ${t(r.op === 'or' ? 'web.automations.rule.or' : 'web.automations.rule.and')} `)
     return nested && parts.length > 1 ? `(${joined})` : joined
   }
-  const op = r.operator ? t(`web.automations.rule.op.${r.type === 'subscriber' ? 'attribute' : r.type}.${r.operator}`) : ''
+  const op = r.operator ? t(`web.automations.rule.op.${r.type === 'subscriber' || r.type === 'property' ? 'attribute' : r.type}.${r.operator}`) : ''
   switch (r.type) {
     case 'attribute':
       if (!r.path) return ''
@@ -111,9 +116,19 @@ export function ruleSummary(t: T, r: Rule, l: Lookups, nested = false): string {
       if (!step) return ''
       return `${l.email?.(step) ?? t('web.automations.step.send_email')} ${op}`
     }
-    case 'event':
+    case 'property': {
+      if (!r.path) return ''
+      const subject = `${t('web.automations.rule.eventPrefix')} ${r.path}`
+      if (r.value_from !== undefined) return `${subject} ${op} ${t('web.automations.rule.runEventProperty')} ${r.value_from}`
+      return needsValue(r.operator) ? `${subject} ${op} ${value(r.value)}` : `${subject} ${op}`
+    }
+    case 'event': {
       if (!r.name) return ''
-      return r.within ? `${r.name} ${op} ${t('web.automations.rule.within')} ${duration(t, r.within)}` : `${r.name} ${op}`
+      const where = r.where ? ruleSummary(t, r.where, l, true) : ''
+      const name = where ? `${r.name} (${where})` : r.name
+      if (r.since) return `${name} ${op} ${t('web.automations.rule.sinceEntered')}`
+      return r.within ? `${name} ${op} ${t('web.automations.rule.within')} ${duration(t, r.within)}` : `${name} ${op}`
+    }
     case 'sql':
       return t('web.automations.rule.types.sql')
   }

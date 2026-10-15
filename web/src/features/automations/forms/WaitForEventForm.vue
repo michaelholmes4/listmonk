@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { Config, Step, WaitEvent } from '../model'
 import { waitEvents } from '../model'
+import { emptyFilter } from '../rule'
 import DurationInput from './DurationInput.vue'
+import RuleEditor from './RuleEditor.vue'
 
 const MAX_EVENTS = 10
 
@@ -79,6 +81,23 @@ function add() {
             <Trash2 />
           </Button>
         </div>
+        <div v-if="e.where" class="space-y-2 rounded-lg border bg-muted/30 p-3" :data-cy="`wait-event-${e.id}-where`">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-sm">{{ t('web.automations.rule.onlyWhere') }}</span>
+            <Button v-if="!disabled" type="button" variant="ghost" size="sm" @click="patch(i, { where: undefined })">{{ t('web.automations.rule.removeFilter') }}</Button>
+          </div>
+          <RuleEditor
+            :model-value="e.where"
+            :email-steps="[]"
+            :allow-sql="false"
+            :disabled="disabled"
+            filter
+            @update:model-value="patch(i, { where: $event })"
+          />
+        </div>
+        <Button v-else-if="!disabled" type="button" variant="ghost" size="sm" :data-cy="`wait-event-${e.id}-add-where`" @click="patch(i, { where: emptyFilter() })">
+          <Plus />{{ t('web.automations.rule.addFilter') }}
+        </Button>
         <p v-if="errors[`event.${i}`]" class="text-sm text-destructive">{{ errors[`event.${i}`] }}</p>
         <p v-if="hasSteps(e)" class="text-xs text-muted-foreground">{{ t('web.automations.waitForEvent.removeStepsFirst') }}</p>
       </div>
