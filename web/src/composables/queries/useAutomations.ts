@@ -100,6 +100,8 @@ export const useEnrollSubscribers = () =>
 export const useSaveDraft = () =>
   useMutation({ mutationFn: (v: { id: number; graph: AutomationGraph }) => api.saveDraft(v.id, v.graph) })
 
+export const useDiscardDraft = () => useAutomationMutation((id: number) => api.discardDraft(id))
+
 export const useCreateStepEmail = () => useMutation({ mutationFn: api.createStepEmail })
 
 export const useUpdateStepEmail = () => {

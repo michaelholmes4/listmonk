@@ -2930,6 +2930,19 @@ paths:
                     properties:
                       version: { $ref: "#/components/schemas/AutomationVersion" }
                       problems: { type: array, items: { $ref: "#/components/schemas/AutomationProblem" } }
+    delete:
+      tags: [Automations]
+      description: >-
+        discards the draft's changes: the draft becomes a copy of the live version again. Only for a published
+        automation that is not archived (409 otherwise). Email content is edited in place, not drafted, so it
+        is not affected.
+      operationId: discardAutomationDraft
+      responses:
+        "200":
+          description: The draft, now a copy of the live version
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/AutomationVersion" } } }
 
   "/automations/{id}/publish":
     parameters:

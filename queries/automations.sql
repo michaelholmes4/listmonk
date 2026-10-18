@@ -9,11 +9,11 @@ SELECT * FROM automations WHERE id = $1;
 -- name: automation-list-automations
 -- $1 search text, $2 statuses (NULL = any), $3 offset, $4 limit, $5 only those whose published version
 -- people can be added to by hand. %order% is substituted from a whitelist.
--- unpublished_changes: a published automation whose draft differs from its live version (opening the
--- editor makes a draft that is a copy of the live one, which doesn't count).
+-- unpublished_changes: a published automation, not archived, whose draft differs from its live version
+-- (opening the editor makes a draft that is a copy of the live one, which doesn't count).
 SELECT a.*,
     COUNT(*) OVER () AS total,
-    EXISTS (SELECT 1 FROM automation_versions d JOIN automation_versions cur ON cur.id = a.current_version_id
+    a.status <> 'archived' AND EXISTS (SELECT 1 FROM automation_versions d JOIN automation_versions cur ON cur.id = a.current_version_id
             WHERE d.automation_id = a.id AND d.published_at IS NULL AND d.graph <> cur.graph) AS unpublished_changes,
     COALESCE(c.active, 0) AS active, COALESCE(c.waiting, 0) AS waiting, COALESCE(c.completed, 0) AS completed,
     COALESCE(c.exited, 0) AS exited, COALESCE(c.failed, 0) AS failed
@@ -69,6 +69,13 @@ SELECT * FROM automation_versions WHERE id = $1 AND published_at IS NULL FOR UPD
 
 -- name: automation-update-draft
 UPDATE automation_versions SET graph = $2 WHERE id = $1 AND published_at IS NULL RETURNING *;
+
+-- name: automation-reset-draft
+-- Puts the live graph back into the draft, throwing its changes away. No row: there is no draft.
+UPDATE automation_versions d SET graph = cur.graph
+FROM automations a JOIN automation_versions cur ON cur.id = a.current_version_id
+WHERE a.id = $1 AND d.automation_id = a.id AND d.published_at IS NULL
+RETURNING d.*;
 
 -- name: automation-publish-version
 UPDATE automation_versions SET published_at = NOW() WHERE id = $1 AND published_at IS NULL RETURNING *;

@@ -1209,7 +1209,8 @@ export interface paths {
         /** @description saves the draft. An incomplete draft is accepted; the problems found so far come back with it. Raw SQL conditions need the `subscribers:sql_query` permission. */
         put: operations["saveAutomationDraft"];
         post?: never;
-        delete?: never;
+        /** @description discards the draft's changes: the draft becomes a copy of the live version again. Only for a published automation that is not archived (409 otherwise). Email content is edited in place, not drafted, so it is not affected. */
+        delete: operations["discardAutomationDraft"];
         options?: never;
         head?: never;
         patch?: never;
@@ -6021,6 +6022,30 @@ export interface operations {
                             version?: components["schemas"]["AutomationVersion"];
                             problems?: components["schemas"]["AutomationProblem"][];
                         };
+                    };
+                };
+            };
+        };
+    };
+    discardAutomationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft, now a copy of the live version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: components["schemas"]["AutomationVersion"];
                     };
                 };
             };

@@ -1,12 +1,17 @@
 <script setup lang="ts">
+import { History } from '@lucide/vue'
 import { format } from 'date-fns'
 import { useI18n } from 'vue-i18n'
+import type { AutomationVersion } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAutomationVersions } from '@/composables/queries/useAutomations'
 import { countSteps, graphToFlow } from './model'
 
-const props = defineProps<{ automationId: number; currentVersionId?: number | null }>()
+const props = defineProps<{ automationId: number; currentVersionId?: number | null; canRestore?: boolean }>()
+/** Copy this version into the draft (the editor confirms). */
+const emit = defineEmits<{ restore: [v: AutomationVersion] }>()
 const { t } = useI18n()
 const { data, isPending } = useAutomationVersions(() => props.automationId)
 const stamp = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : '')
@@ -25,6 +30,9 @@ const stamp = (iso?: string | null) => (iso ? format(new Date(iso), 'PP p') : ''
           </p>
         </div>
         <Badge v-if="v.id === currentVersionId" variant="success">{{ t('web.automations.versions.current') }}</Badge>
+        <Button v-else-if="canRestore" variant="outline" size="sm" :data-cy="`restore-${v.version}`" @click="emit('restore', v)">
+          <History />{{ t('web.automations.versions.restore') }}
+        </Button>
       </div>
       <p v-if="!data?.some((x) => x.published_at)" class="text-sm text-muted-foreground">{{ t('web.automations.versions.none') }}</p>
     </template>

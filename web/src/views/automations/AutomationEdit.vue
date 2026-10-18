@@ -22,6 +22,7 @@ import {
   useAutomation,
   useAutomationDraft,
   useAutomationVersions,
+  useDiscardDraft,
   useNodeStats,
   usePauseAutomation,
   usePublishAutomation,
@@ -30,6 +31,8 @@ import {
 } from '@/composables/queries/useAutomations'
 import { usePermission } from '@/composables/usePermission'
 import { useUnsavedGuard } from '@/composables/useUnsavedGuard'
+import ChangesCard from '@/features/automations/ChangesCard.vue'
+import { flowChanges } from '@/features/automations/diff'
 import EnrollmentsPanel from '@/features/automations/EnrollmentsPanel.vue'
 import FlowBuilder from '@/features/automations/FlowBuilder.vue'
 import { allSteps, emptyFlow, flowToGraph, graphToFlow, type Flow } from '@/features/automations/model'
@@ -60,27 +63,34 @@ const { data: stats } = useNodeStats(id, live)
 // --- The working copy of the flow. Edited in place; every change to it is saved to the draft. -------------
 const flow = reactive<Flow>(emptyFlow())
 const loaded = ref(false)
+function setFlow(graph: AutomationVersion['graph']) {
+  const f = graphToFlow(graph)
+  flow.triggers = f.triggers
+  flow.steps = f.steps
+}
 watch(
   draft,
   (d) => {
     if (!d || loaded.value) return
-    const f = graphToFlow(d.graph)
-    flow.triggers = f.triggers
-    flow.steps = f.steps
+    setFlow(d.graph)
     loaded.value = true
   },
   { immediate: true },
 )
 const currentJson = computed(() => JSON.stringify(flowToGraph(flow)))
 
-// Whether the live version differs from what is being edited.
-const publishedJson = computed(() => {
-  const cur = versions.value?.find((v) => v.id === automation.value?.current_version_id)
-  return cur ? JSON.stringify(flowToGraph(graphToFlow(cur.graph))) : undefined
-})
+// Whether the live version differs from what is being edited (an archived one can't be published again,
+// so its leftover draft doesn't count).
+const liveVersion = computed(() => versions.value?.find((v) => v.id === automation.value?.current_version_id))
+const liveFlow = computed(() => (liveVersion.value ? graphToFlow(liveVersion.value.graph) : undefined))
 const unpublished = computed(
-  () => loaded.value && publishedJson.value !== undefined && publishedJson.value !== currentJson.value,
+  () =>
+    loaded.value &&
+    status.value !== 'archived' &&
+    !!liveFlow.value &&
+    JSON.stringify(flowToGraph(liveFlow.value)) !== currentJson.value,
 )
+const changes = computed(() => (unpublished.value && liveFlow.value ? flowChanges(liveFlow.value, flow) : []))
 const neverPublished = computed(() => automation.value?.current_version_id == null)
 
 // --- Problems the server found (on save and publish), shown on the steps. -----------------------------
@@ -145,6 +155,34 @@ async function doPublish(enrollExisting: boolean) {
       },
     },
   )
+}
+
+// --- Going back: discard the draft's changes, or restore an earlier version into it. -----------------------
+const discard = useDiscardDraft()
+const discardOpen = ref(false)
+// The open step may not survive, so its panel closes first (asking, if it has edits).
+const askDiscard = () => (builder.value ? builder.value.leavePanel(() => (discardOpen.value = true)) : (discardOpen.value = true))
+async function confirmDiscard() {
+  // A save still under way would land after the discard and bring the changes back.
+  await saver.flush()
+  discard.mutate(id.value, {
+    onSuccess: (v) => {
+      setFlow(v.graph)
+      discardOpen.value = false
+      toast.success(t('web.automations.changes.discarded'))
+    },
+  })
+}
+
+const restoring = ref<AutomationVersion | null>(null)
+const restoreOpen = computed({ get: () => !!restoring.value, set: (o) => !o && (restoring.value = null) })
+function confirmRestore() {
+  const v = restoring.value!
+  setFlow(v.graph)
+  saver.request()
+  restoring.value = null
+  tab.value = 'flow'
+  toast.success(t('web.automations.versions.restored', { n: v.version }))
 }
 
 type Act = 'pause' | 'resume' | 'archive'
@@ -273,6 +311,7 @@ function onKey(e: KeyboardEvent) {
                 <p v-for="m in general" :key="m">{{ m }}</p>
               </AlertDescription>
             </Alert>
+            <ChangesCard v-if="unpublished" :changes="changes" :can-discard="!readonly" @discard="askDiscard" />
             <Alert v-if="live && status !== 'archived'" class="mb-4">
               <AlertDescription>{{ t('web.automations.liveNote') }}</AlertDescription>
             </Alert>
@@ -288,7 +327,12 @@ function onKey(e: KeyboardEvent) {
         <SettingsPanel ref="settingsPanel" :automation="automation" :flow="flow" :readonly="readonly" />
       </TabsContent>
       <TabsContent value="versions">
-        <VersionsPanel :automation-id="id" :current-version-id="automation.current_version_id" />
+        <VersionsPanel
+          :automation-id="id"
+          :current-version-id="automation.current_version_id"
+          :can-restore="!readonly"
+          @restore="(v) => (restoring = v)"
+        />
       </TabsContent>
     </Tabs>
   </Page>
@@ -309,6 +353,24 @@ function onKey(e: KeyboardEvent) {
     :confirm-label="acting ? t(`web.automations.${acting}`) : ''"
     :pending="pause.isPending.value || resume.isPending.value || archive.isPending.value"
     @confirm="confirmAct"
+  />
+
+  <ConfirmDialog
+    v-model:open="discardOpen"
+    destructive
+    :title="t('web.automations.changes.discardTitle')"
+    :description="t('web.automations.changes.discardWarning', { n: liveVersion?.version })"
+    :confirm-label="t('web.automations.changes.discard')"
+    :pending="discard.isPending.value"
+    @confirm="confirmDiscard"
+  />
+
+  <ConfirmDialog
+    v-model:open="restoreOpen"
+    :title="t('web.automations.versions.restoreTitle', { n: restoring?.version })"
+    :description="t('web.automations.versions.restoreWarning', { n: restoring?.version })"
+    :confirm-label="t('web.automations.versions.restore')"
+    @confirm="confirmRestore"
   />
 
   <LeaveConfirm :open="leaveOpen" @decide="decide" />
