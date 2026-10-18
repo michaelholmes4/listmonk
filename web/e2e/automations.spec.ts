@@ -577,3 +577,56 @@ test('unsaved settings survive a switch to another tab', async ({ page, request 
     await request.delete(`/api/automations/${id}`)
   }
 })
+
+// --- Going back: what's changed, discard, restore ---------------------------------------------------------------
+
+test('unpublished changes are listed, can be discarded, and an old version restored', async ({ page, request }) => {
+  test.skip((await request.get('/api/automations')).status() === 404, 'backend without automations')
+  const id = await newAutomation(request, waitFlow)
+  const flagged = async () => {
+    const rows = (await (await request.get(`/api/automations?per_page=all`)).json()).data.results as { id: number; unpublished_changes: boolean }[]
+    return rows.find((r) => r.id === id)?.unpublished_changes
+  }
+  const withDelays = (s1: string, s2?: string) => ({
+    ...waitFlow,
+    nodes: s2 ? [{ id: 's1', type: 'delay', config: { duration: s1 } }, { id: 's2', type: 'delay', config: { duration: s2 } }] : [{ id: 's1', type: 'delay', config: { duration: s1 } }],
+    edges: s2 ? waitFlow.edges : [],
+  })
+  try {
+    // Version 1 is 2d then 3d; version 2 is 5d then 3d; the draft is 7d alone.
+    await request.post(`/api/automations/${id}/publish`, { data: {} })
+    await request.put(`/api/automations/${id}/draft`, { data: withDelays('5d', '3d') })
+    await request.post(`/api/automations/${id}/publish`, { data: {} })
+    await request.put(`/api/automations/${id}/draft`, { data: withDelays('7d') })
+    expect(await flagged()).toBe(true)
+
+    await page.goto(`/admin/automations/${id}`)
+    const changes = page.locator('[data-cy=changes]')
+    await expect(changes).toContainText('2 unpublished changes')
+    await changes.locator('[data-cy=changes-toggle]').click()
+    const list = page.locator('[data-cy=changes-list]')
+    await expect(list.locator('li')).toHaveCount(2)
+    await expect(list.locator('li').nth(0)).toContainText('Changed')
+    await expect(list.locator('li').nth(0)).toContainText('7 days')
+    await expect(list.locator('li').nth(0)).toContainText('Was: 5 days')
+    await expect(list.locator('li').nth(1)).toContainText('Removed')
+
+    await changes.locator('[data-cy=discard]').click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Discard changes' }).click()
+    await expect(changes).toHaveCount(0)
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('5 days')
+    await expect(page.locator('[data-cy=step-s2]')).toContainText('3 days')
+    expect(await flagged()).toBe(false)
+
+    await page.getByRole('tab', { name: 'Versions' }).click()
+    await expect(page.locator('[data-cy=restore-2]')).toHaveCount(0) // the live one
+    await page.locator('[data-cy=restore-1]').click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Restore' }).click()
+    await expect(page.locator('[data-cy=step-s1]')).toContainText('2 days')
+    await draftSaved(page)
+    await expect(changes).toContainText('1 unpublished change')
+    expect(await flagged()).toBe(true)
+  } finally {
+    await dropAutomation(request, id)
+  }
+})

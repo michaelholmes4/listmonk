@@ -64,6 +64,26 @@ type Settings struct {
 	Timezone string `json:"timezone,omitempty"`
 	// Goal, when true for a subscriber at any pause, ends their enrollment as `goal_reached`.
 	Goal *Rule `json:"goal,omitempty"`
+	// QuietPeriod, when set, holds back this automation's marketing emails from someone who has
+	// just had one from another automation.
+	QuietPeriod *QuietPeriod `json:"quiet_period,omitempty"`
+}
+
+// Quiet period modes.
+const (
+	QuietSkip = "skip"
+	QuietWait = "wait"
+)
+
+// QuietPeriod is a limit shared by every automation: a marketing email step is held back when the
+// subscriber was sent a marketing email by another run (of any automation) within Duration. The
+// run's own earlier emails don't count: their spacing is the automation's design. Transactional
+// emails neither count nor are held back, and neither do campaigns.
+type QuietPeriod struct {
+	Duration string `json:"duration"`
+	// QuietSkip (the default) leaves the email out and carries on with the next step; QuietWait
+	// sends it once the period is over.
+	Mode string `json:"mode,omitempty"`
 }
 
 // Reentry decides whether a subscriber who finished (or left) can enter again.

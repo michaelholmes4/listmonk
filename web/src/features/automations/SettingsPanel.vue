@@ -18,7 +18,7 @@ import RuleEditor from './forms/RuleEditor.vue'
 import { allSteps, type Flow } from './model'
 import { emptyGroup, isDuration, ruleIssues, type Rule } from './rule'
 
-/** Name, re-entry, send window, timezone and goal: the rules that apply to the whole automation. */
+/** Name, re-entry, send window, timezone, quiet period and goal: the rules that apply to the whole automation. */
 const props = defineProps<{ automation: Automation; flow: Flow; readonly: boolean }>()
 const { t } = useI18n()
 const { can } = usePermission()
@@ -31,6 +31,9 @@ interface Form {
   start: string
   end: string
   timezone: string
+  quiet: boolean
+  quietDuration: string
+  quietMode: string
   goal: Rule | null
 }
 
@@ -44,6 +47,9 @@ function toForm(a: Automation): Form {
     start: s.send_window?.start ?? '09:00',
     end: s.send_window?.end ?? '17:00',
     timezone: s.timezone ?? '',
+    quiet: !!s.quiet_period,
+    quietDuration: s.quiet_period?.duration ?? '16h',
+    quietMode: s.quiet_period?.mode || 'skip',
     goal: (s.goal as Rule | undefined) ?? null,
   }
 }
@@ -52,6 +58,7 @@ function toSettings(f: Form): AutomationSettings {
   if (f.reentry.mode === 'interval') s.reentry = { ...s.reentry, interval: f.reentry.interval }
   if (f.window) s.send_window = { days: f.days, start: f.start, end: f.end }
   if (f.timezone.trim()) s.timezone = f.timezone.trim()
+  if (f.quiet) s.quiet_period = { duration: f.quietDuration, mode: f.quietMode as 'skip' | 'wait' }
   if (f.goal) s.goal = f.goal as AutomationSettings['goal']
   return s
 }
@@ -76,6 +83,7 @@ const errors = computed(() => {
   const e: Record<string, string> = {}
   if (!form.value.name.trim()) e.name = t('web.automations.nameRequired')
   if (form.value.reentry.mode === 'interval' && !isDuration(form.value.reentry.interval)) e.interval = t('web.automations.invalidDuration')
+  if (form.value.quiet && !isDuration(form.value.quietDuration)) e.quiet = t('web.automations.invalidDuration')
   if (form.value.window && form.value.end <= form.value.start) e.window = t('web.automations.window.order')
   if (form.value.goal) {
     for (const i of ruleIssues(form.value.goal, { allowSQL: allowSQL.value, emailSteps: emailSteps.value.map((s) => s.id) })) e[`rule.${i.at.join('.')}`] = t(i.key)
@@ -152,6 +160,29 @@ defineExpose({ dirty })
         <Label for="a-tz">{{ t('web.automations.timezone.title') }}</Label>
         <Input id="a-tz" v-model="form.timezone" placeholder="Europe/Berlin" class="max-w-xs" :disabled="readonly" />
         <p class="text-xs text-muted-foreground">{{ t('web.automations.timezone.help') }}</p>
+      </div>
+    </FormSection>
+
+    <FormSection :title="t('web.automations.quiet.title')" :description="t('web.automations.quiet.help')">
+      <div class="flex items-center justify-between gap-4 rounded-lg border p-3">
+        <Label for="a-quiet" class="font-medium">{{ t('globals.buttons.enabled') }}</Label>
+        <Switch id="a-quiet" v-model="form.quiet" :disabled="readonly" />
+      </div>
+      <div v-if="form.quiet" class="space-y-4">
+        <div class="space-y-2">
+          <Label>{{ t('web.automations.quiet.duration') }}</Label>
+          <DurationInput v-model="form.quietDuration" :invalid="!!errors.quiet" :disabled="readonly" />
+          <p v-if="errors.quiet" class="text-sm text-destructive">{{ errors.quiet }}</p>
+        </div>
+        <RadioGroup v-model="form.quietMode" class="gap-3" :disabled="readonly" :aria-label="t('web.automations.quiet.title')">
+          <div v-for="m in ['skip', 'wait']" :key="m" class="flex items-start gap-2">
+            <RadioGroupItem :id="`quiet-${m}`" :value="m" class="mt-1" />
+            <Label :for="`quiet-${m}`" class="block font-normal">
+              {{ t(`web.automations.quiet.${m}`) }}
+              <span class="block text-xs text-muted-foreground">{{ t(`web.automations.quiet.${m}Help`) }}</span>
+            </Label>
+          </div>
+        </RadioGroup>
       </div>
     </FormSection>
 

@@ -526,6 +526,16 @@ func (s Settings) Validate(opts ValidateOpts) []Problem {
 			bad("unknown timezone %q", s.Timezone)
 		}
 	}
+	if q := s.QuietPeriod; q != nil {
+		if d, err := ParseDuration(q.Duration); err != nil || d <= 0 {
+			bad("quiet period needs a duration like 16h")
+		}
+		switch q.Mode {
+		case "", QuietSkip, QuietWait:
+		default:
+			bad("unknown quiet period mode %q", q.Mode)
+		}
+	}
 	if s.Goal != nil {
 		if err := s.Goal.Validate(Env{Now: time.Now(), AllowSQL: opts.AllowSQL}); err != nil {
 			bad("goal: %v", err)

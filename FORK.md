@@ -66,6 +66,11 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   "was removed" look the same. A marketing step can't use a transactional template (no unsubscribe link). An Add to list
   step never undoes an `unsubscribed` status or downgrades a confirmed one. `POST /api/tx`
   keeps its upstream behaviour and does *not* check the blocklist: the two differ on purpose.
+- **Quiet period** (`settings.quiet_period`, `send.go`): an automation can hold back its marketing emails while the
+  subscriber had a marketing email from another run within the period (`skip` the step, or `wait` until it ends). It
+  looks at other runs' email steps (`result.message_type` / `result.sent_at`, stamped when the send starts); a run's own
+  emails, transactional emails and campaigns don't count. Marketing sends to one subscriber take a per-subscriber
+  advisory lock (`pg_advisory_xact_lock(1366, id)`) so two runs can't both find the period clear.
 - **Triggers** fire from core hooks after the mutation commits, in the background. "Joined a list" means a *live*
   subscription: confirmed, or unconfirmed on a single opt-in list. The by-query bulk subscription endpoints
   (`/api/subscribers/query/lists`) do not fire triggers; CSV imports (subscribe mode) do, per batch: new subscribers and

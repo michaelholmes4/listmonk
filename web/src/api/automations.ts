@@ -51,6 +51,9 @@ export const getDraft = (id: number) => api.get<AutomationVersion>(`/api/automat
 export const saveDraft = (id: number, graph: AutomationGraph) =>
   api.put<{ version: AutomationVersion; problems: AutomationProblem[] }>(`/api/automations/${id}/draft`, graph)
 
+/** Throws the draft's changes away; it comes back as a copy of the live version. */
+export const discardDraft = (id: number) => api.delete<AutomationVersion>(`/api/automations/${id}/draft`)
+
 /** Why publishing was refused: the server answers 400 with every problem found. */
 export class PublishError extends ApiError {
   readonly problems: AutomationProblem[]

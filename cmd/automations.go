@@ -257,6 +257,16 @@ func (a *App) SaveAutomationDraft(c echo.Context) error {
 	return c.JSON(http.StatusOK, okResp{map[string]any{"version": v, "problems": problems}})
 }
 
+// DiscardAutomationDraft throws away the draft's changes, making it a copy of the live version again,
+// and returns it.
+func (a *App) DiscardAutomationDraft(c echo.Context) error {
+	v, err := a.automation.Store().DiscardDraft(c.Request().Context(), getID(c))
+	if err != nil {
+		return a.autoErr(c, err)
+	}
+	return c.JSON(http.StatusOK, okResp{v})
+}
+
 // PublishAutomation freezes the draft and makes it live. With `enroll_existing`, the current
 // members of the lists that trigger it are enrolled too (in the background, as there may be many).
 func (a *App) PublishAutomation(c echo.Context) error {
@@ -588,6 +598,7 @@ func initAutomationRoutes(g *echo.Group, a *App) {
 	g.DELETE("/api/automations/:id", pm(hasID(a.DeleteAutomation), manage))
 	g.GET("/api/automations/:id/draft", pm(hasID(a.GetAutomationDraft), get))
 	g.PUT("/api/automations/:id/draft", pm(hasID(a.SaveAutomationDraft), manage))
+	g.DELETE("/api/automations/:id/draft", pm(hasID(a.DiscardAutomationDraft), manage))
 	g.POST("/api/automations/:id/publish", pm(hasID(a.PublishAutomation), manage))
 	g.POST("/api/automations/:id/pause", pm(hasID(a.PauseAutomation), manage))
 	g.POST("/api/automations/:id/resume", pm(hasID(a.ResumeAutomation), manage))

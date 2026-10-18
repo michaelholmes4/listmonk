@@ -9,8 +9,12 @@ SELECT * FROM automations WHERE id = $1;
 -- name: automation-list-automations
 -- $1 search text, $2 statuses (NULL = any), $3 offset, $4 limit, $5 only those whose published version
 -- people can be added to by hand. %order% is substituted from a whitelist.
+-- unpublished_changes: a published automation, not archived, whose draft differs from its live version
+-- (opening the editor makes a draft that is a copy of the live one, which doesn't count).
 SELECT a.*,
     COUNT(*) OVER () AS total,
+    a.status <> 'archived' AND EXISTS (SELECT 1 FROM automation_versions d JOIN automation_versions cur ON cur.id = a.current_version_id
+            WHERE d.automation_id = a.id AND d.published_at IS NULL AND d.graph <> cur.graph) AS unpublished_changes,
     COALESCE(c.active, 0) AS active, COALESCE(c.waiting, 0) AS waiting, COALESCE(c.completed, 0) AS completed,
     COALESCE(c.exited, 0) AS exited, COALESCE(c.failed, 0) AS failed
 FROM automations a
@@ -65,6 +69,13 @@ SELECT * FROM automation_versions WHERE id = $1 AND published_at IS NULL FOR UPD
 
 -- name: automation-update-draft
 UPDATE automation_versions SET graph = $2 WHERE id = $1 AND published_at IS NULL RETURNING *;
+
+-- name: automation-reset-draft
+-- Puts the live graph back into the draft, throwing its changes away. No row: there is no draft.
+UPDATE automation_versions d SET graph = cur.graph
+FROM automations a JOIN automation_versions cur ON cur.id = a.current_version_id
+WHERE a.id = $1 AND d.automation_id = a.id AND d.published_at IS NULL
+RETURNING d.*;
 
 -- name: automation-publish-version
 UPDATE automation_versions SET published_at = NOW() WHERE id = $1 AND published_at IS NULL RETURNING *;
@@ -156,6 +167,24 @@ ON CONFLICT (enrollment_id, node_id, visit) DO NOTHING RETURNING *;
 -- name: automation-get-step
 SELECT * FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2
 AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
+
+-- name: automation-mark-step-sending
+-- Stamps a step's 'sending' row with the engine's time and the message type, which is what
+-- other runs' quiet periods look for (a finished send keeps both).
+UPDATE enrollment_steps SET result = jsonb_build_object('message_type', $4::TEXT, 'sent_at', $3::TIMESTAMPTZ)
+WHERE enrollment_id = $1 AND node_id = $2
+AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
+
+-- name: automation-lock-subscriber-sends
+-- Serialises marketing sends to one subscriber until the transaction ends. The first key keeps it
+-- apart from any other advisory lock on the same number.
+SELECT pg_advisory_xact_lock(1366, $1::INT);
+
+-- name: automation-last-marketing-send
+-- The latest marketing email sent (or being sent) to a subscriber by any run but this one, after $3.
+SELECT MAX((es.result->>'sent_at')::TIMESTAMPTZ) FROM enrollment_steps es JOIN enrollments en ON en.id = es.enrollment_id
+WHERE en.subscriber_id = $1 AND en.id <> $2 AND es.status IN ('sending', 'done')
+AND es.result->>'message_type' = 'marketing' AND (es.result->>'sent_at')::TIMESTAMPTZ > $3;
 
 -- name: automation-update-step
 UPDATE enrollment_steps SET status = $3::TEXT,

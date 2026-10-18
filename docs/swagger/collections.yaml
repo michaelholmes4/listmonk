@@ -2930,6 +2930,19 @@ paths:
                     properties:
                       version: { $ref: "#/components/schemas/AutomationVersion" }
                       problems: { type: array, items: { $ref: "#/components/schemas/AutomationProblem" } }
+    delete:
+      tags: [Automations]
+      description: >-
+        discards the draft's changes: the draft becomes a copy of the live version again. Only for a published
+        automation that is not archived (409 otherwise). Email content is edited in place, not drafted, so it
+        is not affected.
+      operationId: discardAutomationDraft
+      responses:
+        "200":
+          description: The draft, now a copy of the live version
+          content:
+            application/json:
+              schema: { type: object, properties: { data: { $ref: "#/components/schemas/AutomationVersion" } } }
 
   "/automations/{id}/publish":
     parameters:
@@ -5613,6 +5626,15 @@ components:
             start: { type: string, example: "09:00" }
             end: { type: string, example: "17:00" }
         timezone: { type: string, example: Europe/Berlin }
+        quiet_period:
+          type: object
+          description: >-
+            Holds back this automation's marketing emails while the subscriber had a marketing email from another
+            automation run within `duration`. `skip` (default) skips the email and carries on; `wait` sends it once
+            the period is over. Transactional emails and campaigns don't count and are never held back.
+          properties:
+            duration: { type: string, example: 16h }
+            mode: { type: string, enum: [skip, wait] }
         goal: { $ref: "#/components/schemas/AutomationRule" }
     AutomationRule:
       type: object
@@ -5658,6 +5680,7 @@ components:
             completed: { type: integer }
             exited: { type: integer }
             failed: { type: integer }
+            unpublished_changes: { type: boolean, description: "A published automation whose draft differs from its live version." }
     AutomationTrigger:
       type: object
       properties:

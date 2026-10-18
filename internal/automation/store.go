@@ -56,6 +56,8 @@ func notFound(err error) error {
 type Row struct {
 	Automation
 	Total int `db:"total" json:"-"`
+	// Its draft differs from its published version.
+	UnpublishedChanges bool `db:"unpublished_changes" json:"unpublished_changes"`
 	Counts
 }
 
@@ -265,6 +267,40 @@ func (s *Store) SaveDraft(ctx context.Context, automationID int, graph *Graph, a
 		return nil, nil, notFound(err)
 	}
 	return &v, problems, nil
+}
+
+// DiscardDraft throws away the draft's changes: it becomes a copy of the live version again. Only for
+// an automation that has been published (there is nothing to go back to otherwise) and isn't archived.
+// Email content is not part of the draft (a step's email is edited in place), so it stays as it is.
+func (s *Store) DiscardDraft(ctx context.Context, automationID int) (*Version, error) {
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// Locked as in Publish (the automation, then the draft), so a publish in between waits.
+	var a Automation
+	if err := tx.GetContext(ctx, &a, s.q.get("lock-automation"), automationID); err != nil {
+		return nil, notFound(err)
+	}
+	if a.Status == StatusArchived {
+		return nil, fmt.Errorf("%w: an archived automation cannot be changed", ErrConflict)
+	}
+	if a.CurrentVersionID == nil {
+		return nil, fmt.Errorf("%w: the automation has not been published, so there is nothing to go back to", ErrConflict)
+	}
+	var v Version
+	err = tx.GetContext(ctx, &v, s.q.get("reset-draft"), automationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		// No draft: the next one is made from the live version anyway.
+		tx.Rollback()
+		return s.Draft(ctx, automationID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &v, tx.Commit()
 }
 
 // Publish freezes the draft, makes it the version new enrollments use, and points the triggers
