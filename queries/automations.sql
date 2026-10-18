@@ -157,6 +157,24 @@ ON CONFLICT (enrollment_id, node_id, visit) DO NOTHING RETURNING *;
 SELECT * FROM enrollment_steps WHERE enrollment_id = $1 AND node_id = $2
 AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
 
+-- name: automation-mark-step-sending
+-- Stamps a step's 'sending' row with the engine's time and the message type, which is what
+-- other runs' quiet periods look for (a finished send keeps both).
+UPDATE enrollment_steps SET result = jsonb_build_object('message_type', $4::TEXT, 'sent_at', $3::TIMESTAMPTZ)
+WHERE enrollment_id = $1 AND node_id = $2
+AND visit = (SELECT current_visit FROM enrollments WHERE id = $1);
+
+-- name: automation-lock-subscriber-sends
+-- Serialises marketing sends to one subscriber until the transaction ends. The first key keeps it
+-- apart from any other advisory lock on the same number.
+SELECT pg_advisory_xact_lock(1366, $1::INT);
+
+-- name: automation-last-marketing-send
+-- The latest marketing email sent (or being sent) to a subscriber by any run but this one, after $3.
+SELECT MAX((es.result->>'sent_at')::TIMESTAMPTZ) FROM enrollment_steps es JOIN enrollments en ON en.id = es.enrollment_id
+WHERE en.subscriber_id = $1 AND en.id <> $2 AND es.status IN ('sending', 'done')
+AND es.result->>'message_type' = 'marketing' AND (es.result->>'sent_at')::TIMESTAMPTZ > $3;
+
 -- name: automation-update-step
 UPDATE enrollment_steps SET status = $3::TEXT,
     finished_at = (CASE WHEN $3::TEXT IN ('done', 'skipped', 'failed') THEN NOW() ELSE NULL END),

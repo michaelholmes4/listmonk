@@ -41,7 +41,7 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 	err := tx.GetContext(ctx, &st, e.q.get("get-step"), enr.ID, n.ID)
 	switch {
 	case err == nil:
-		o := outcome{next: ix.Next(n.ID, ""), stepStatus: StepDone, result: map[string]string{"note": "resumed after an interruption"}}
+		o := outcome{next: ix.Next(n.ID, ""), stepStatus: StepDone, result: map[string]any{"note": "resumed after an interruption", "message_type": c.MessageType, "sent_at": sentAt(st.Result, now)}}
 		if st.Status == StepSkipped || st.Status == StepDone {
 			o.result = nil
 		}
@@ -76,7 +76,29 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 		}
 		return false, tx.Commit()
 	}
+	if c.MessageType == MessageMarketing {
+		// One marketing send per subscriber decides at a time, so two runs can't both find the
+		// quiet period clear. The lock is held until this transaction commits its 'sending' row.
+		if _, err := tx.ExecContext(ctx, e.q.get("lock-subscriber-sends"), sub.ID); err != nil {
+			return false, err
+		}
+		if q := s.QuietPeriod; q != nil {
+			if until, err := e.quietUntil(ctx, tx, enr.ID, sub.ID, q, now); err != nil {
+				return false, err
+			} else if until.After(now) {
+				if q.Mode == QuietWait {
+					return e.commitApply(ctx, tx, enr, n, outcome{wait: &until, noStep: true}, now)
+				}
+				o := outcome{next: ix.Next(n.ID, ""), stepStatus: StepSkipped, result: map[string]string{"reason": "quiet_period"}}
+				return e.commitApply(ctx, tx, enr, n, o, now)
+			}
+		}
+	}
 	if _, err := tx.ExecContext(ctx, e.q.get("insert-step"), enr.ID, n.ID, StepSending); err != nil {
+		return false, err
+	}
+	// What other runs' quiet periods count: when it went, and whether it was marketing.
+	if _, err := tx.ExecContext(ctx, e.q.get("mark-step-sending"), enr.ID, n.ID, now, c.MessageType); err != nil {
 		return false, err
 	}
 	leaseEnd := now.Add(sendLease)
@@ -140,7 +162,7 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 	if err := tx2.GetContext(wctx, &cur, e.q.get("lock-enrollment"), enr.ID); err != nil {
 		return false, err
 	}
-	o := outcome{next: ix.Next(n.ID, ""), stepStatus: StepDone, result: map[string]any{"message_type": c.MessageType}}
+	o := outcome{next: ix.Next(n.ID, ""), stepStatus: StepDone, result: map[string]any{"message_type": c.MessageType, "sent_at": now}}
 	curNode := ix.Graph.Root
 	if cur.CurrentNode != nil && *cur.CurrentNode != "" {
 		curNode = *cur.CurrentNode
@@ -159,6 +181,34 @@ func (e *Engine) sendStep(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, a *
 		return false, tx2.Commit()
 	}
 	return e.commitApply(wctx, tx2, &cur, n, o, now)
+}
+
+// sentAt is when an interrupted send went, from its 'sending' row; now if the row doesn't say.
+func sentAt(result json.RawMessage, now time.Time) time.Time {
+	var r struct {
+		SentAt time.Time `json:"sent_at"`
+	}
+	if json.Unmarshal(result, &r) == nil && !r.SentAt.IsZero() {
+		return r.SentAt
+	}
+	return now
+}
+
+// quietUntil is when the quiet period after the subscriber's latest marketing email from another
+// run ends; zero if there was none within it.
+func (e *Engine) quietUntil(ctx context.Context, tx *sqlx.Tx, enrollmentID int64, subscriberID int, q *QuietPeriod, now time.Time) (time.Time, error) {
+	d, err := ParseDuration(q.Duration)
+	if err != nil {
+		return time.Time{}, permanent("quiet period: %v", err)
+	}
+	var last sql.NullTime
+	if err := tx.GetContext(ctx, &last, e.q.get("last-marketing-send"), subscriberID, enrollmentID, now.Add(-d)); err != nil {
+		return time.Time{}, err
+	}
+	if !last.Valid {
+		return time.Time{}, nil
+	}
+	return last.Time.Add(d), nil
 }
 
 // commitApply applies an outcome and commits.

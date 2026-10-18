@@ -2716,6 +2716,13 @@ export interface components {
             };
             /** @example Europe/Berlin */
             timezone?: string;
+            /** @description Holds back this automation's marketing emails while the subscriber had a marketing email from another automation run within `duration`. `skip` (default) skips the email and carries on; `wait` sends it once the period is over. Transactional emails and campaigns don't count and are never held back. */
+            quiet_period?: {
+                /** @example 16h */
+                duration?: string;
+                /** @enum {string} */
+                mode?: "skip" | "wait";
+            };
             goal?: components["schemas"]["AutomationRule"];
         };
         /** @description A condition. A group has `op` (`and` or `or`) and `rules`. A leaf has a `type`: `attribute` (`path` such as `plan` or `address.city`, an `operator` of eq, neq, contains, gt, gte, lt, lte, exists, not_exists, and a `value`), `subscriber` (`path` email, name or status), `list` (`list_id` and an `operator` of is_member, is_not_member, confirmed, unsubscribed), `step` (`node_id` of an earlier email step and an `operator` of opened, not_opened, clicked, not_clicked), `event` (`name`, an `operator` of occurred or not_occurred, an optional window: `within` such as `7d`, or `since` `entered` for events since the person entered, not counting the one that started the run; and an optional `where`, an event filter), `property` (`path` of a property of the run's event, the attribute operators, and a `value`, or `value_from`, the path of a property of the run's event to compare with, for eq and neq only) or `sql` (`query`). An event filter is a group holding only `property` rules, tested against the event being matched; it appears as `where` on an event rule, on an event trigger and on each event of a wait_for_event step (a step may list the same event more than once with different filters; the first that matches is used). A trigger's filter can't use `value_from`, as there is no run yet. Raw SQL needs the `subscribers:sql_query` permission. Opened and clicked rules only work when `privacy.individual_tracking` is on. */
