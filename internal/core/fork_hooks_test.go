@@ -57,6 +57,27 @@ func TestMergeSubscriberAttribs(t *testing.T) {
 	}
 }
 
+// A subscriber created over the API without attributes has JSON null: the merge starts from empty.
+func TestMergeSubscriberAttribsIntoNull(t *testing.T) {
+	db := testdb.New(t)
+	var id int
+	if err := db.Get(&id, `INSERT INTO subscribers (uuid, email, name, status, attribs)
+		VALUES (gen_random_uuid(), 'n@example.com', 'N', 'enabled', 'null') RETURNING id`); err != nil {
+		t.Fatal(err)
+	}
+	c := &Core{db: db, log: log.New(io.Discard, "", 0), h: &Hooks{}}
+	if err := c.MergeSubscriberAttribs(id, map[string]any{"plan": "pro"}); err != nil {
+		t.Fatal(err)
+	}
+	var got string
+	if err := db.Get(&got, `SELECT attribs::TEXT FROM subscribers WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if got != `{"plan": "pro"}` {
+		t.Errorf("attribs = %s, want {\"plan\": \"pro\"}", got)
+	}
+}
+
 // A snapshot read that fails must skip the triggers: an empty "before" would make every list the
 // subscriber is already on, and every attribute they have, look new, and start those automations again.
 func TestForkReadFailureSkipsTriggers(t *testing.T) {

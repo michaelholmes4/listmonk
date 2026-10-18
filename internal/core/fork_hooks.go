@@ -173,7 +173,10 @@ func (c *Core) MergeSubscriberAttribs(id int, attribs map[string]any) error {
 	}
 
 	snap := c.forkBegin([]int{id}, nil)
-	res, err := c.db.Exec(`UPDATE subscribers SET attribs = COALESCE(attribs, '{}'::JSONB) || $2::JSONB, updated_at = NOW() WHERE id = $1`, id, b)
+	// A subscriber created without attributes has JSON null, not SQL NULL: null || {...} would make
+	// an array, which nothing can read back.
+	res, err := c.db.Exec(`UPDATE subscribers SET attribs = (CASE WHEN jsonb_typeof(attribs) = 'object' THEN attribs ELSE '{}'::JSONB END) || $2::JSONB,
+		updated_at = NOW() WHERE id = $1`, id, b)
 	if err != nil {
 		c.log.Printf("error updating subscriber attributes: %v", err)
 		return echo.NewHTTPError(http.StatusInternalServerError,
