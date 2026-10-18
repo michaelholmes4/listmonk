@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 // waitResult is the step result of a wait_for_event. The advance worker and event delivery both
@@ -24,7 +25,12 @@ type waitResult struct {
 
 // runWaitForEvent is the node itself: it starts the wait, and on a wake-up follows whatever
 // resolved it (an event's path, or time's up).
-func (e *Engine) runWaitForEvent(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *Index, n *Node, now time.Time) (outcome, error) {
+//
+// The wait counts events from when the run reached it (reached), not from when this step ran.
+// Events are often recorded in batches a little after they happen, so the event a wait is for can
+// be recorded before the run gets here, even when it happened after: once the wait has started,
+// the events already recorded since then are handed to it as if they had just arrived.
+func (e *Engine) runWaitForEvent(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *Index, n *Node, now, reached time.Time) (outcome, error) {
 	var st Step
 	err := tx.GetContext(ctx, &st, e.q.get("get-step"), enr.ID, n.ID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -37,7 +43,18 @@ func (e *Engine) runWaitForEvent(ctx context.Context, tx *sqlx.Tx, enr *Enrollme
 			return outcome{}, permanent("step %s: invalid time limit", n.ID)
 		}
 		until := now.Add(d)
-		return outcome{wait: &until, stepStatus: StepWaiting, result: waitResult{Since: now, Until: until}}, nil
+		since := reached
+		if since.IsZero() || since.After(now) {
+			since = now
+		}
+		o := outcome{wait: &until, stepStatus: StepWaiting, result: waitResult{Since: since, Until: until}}
+		row := *enr
+		o.after = append(o.after, func(ctx context.Context) {
+			if err := e.catchUp(ctx, row, ix, n, c, since); err != nil {
+				e.log.Printf("automation: events recorded before step %s of enrollment %d: %v", n.ID, row.ID, err)
+			}
+		})
+		return o, nil
 	}
 	if err != nil {
 		return outcome{}, err
@@ -57,6 +74,33 @@ func (e *Engine) runWaitForEvent(ctx context.Context, tx *sqlx.Tx, enr *Enrollme
 	// Woken too early (shouldn't normally happen): sleep again.
 	until := r.Until
 	return outcome{wait: &until, stepStatus: StepWaiting, result: r}, nil
+}
+
+// catchUp hands a wait that has just started the subscriber's recorded events it is watching for
+// that happened since it was reached, oldest first. Each is delivered as a live one would be, so
+// the first that matches takes its path (or restarts the wait), and once the run has moved on the
+// rest are ignored.
+func (e *Engine) catchUp(ctx context.Context, row Enrollment, ix *Index, n *Node, c WaitForEventConfig, since time.Time) error {
+	names := make([]string, 0, len(c.Events))
+	for _, we := range c.Events {
+		names = append(names, we.Name)
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	var evs []Event
+	trigger := e.env(ix, &row, since).TriggerEventID
+	if err := e.db.SelectContext(ctx, &evs, e.q.get("events-since"), row.SubscriberID, pq.Array(names), since, trigger); err != nil {
+		return err
+	}
+	node := n.ID
+	row.CurrentNode = &node
+	for _, ev := range evs {
+		if err := e.deliverTo(ctx, row, ev); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // deliverEvent hands an event to the subscriber's runs that are waiting for it. It is safe to call
@@ -159,6 +203,18 @@ func (e *Engine) deliverTo(ctx context.Context, row Enrollment, ev Event) error 
 		return err
 	}
 	if r.Branch != "" || ev.OccurredAt.Before(r.Since) {
+		return nil
+	}
+	// The event that started the run never counts for it, and an event that already restarted the
+	// wait (it can be handed over twice: when it arrives, and by catchUp) doesn't again.
+	var ec EnrollContext
+	var last struct {
+		ID int64 `json:"id"`
+	}
+	if json.Unmarshal(enr.Context, &ec) == nil && len(ec.Event) > 0 {
+		_ = json.Unmarshal(ec.Event, &last)
+	}
+	if ev.ID != 0 && (ev.ID == ec.TriggerEventID || ev.ID == last.ID) {
 		return nil
 	}
 	we, err := e.matchWait(ctx, enr, ix, cands, ev)

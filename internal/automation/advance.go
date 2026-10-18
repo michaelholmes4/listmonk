@@ -56,8 +56,9 @@ type outcome struct {
 // queue calls, and it is safe to call at any time and any number of times: it only acts when the
 // enrollment is live, its automation is running, and it is due.
 func (e *Engine) Advance(ctx context.Context, id int64) error {
+	var reached time.Time
 	for first := true; ; first = false {
-		again, err := e.step(ctx, id, first)
+		again, err := e.step(ctx, id, first, &reached)
 		var perm *permanentError
 		if errors.As(err, &perm) {
 			return e.fail(ctx, id, perm)
@@ -69,7 +70,9 @@ func (e *Engine) Advance(ctx context.Context, id int64) error {
 }
 
 // step runs one node in one transaction. It reports whether the enrollment can carry straight on.
-func (e *Engine) step(ctx context.Context, id int64, first bool) (again bool, err error) {
+// reached is when the run got to where it is now: the first step of a call sets it, and the steps
+// it carries straight on to were reached at the same time.
+func (e *Engine) step(ctx context.Context, id int64, first bool, reached *time.Time) (again bool, err error) {
 	tx, err := e.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -121,6 +124,7 @@ func (e *Engine) step(ctx context.Context, id int64, first bool) (again bool, er
 
 	// After every pause: still allowed to be here, and not already done?
 	if first {
+		*reached = reachedAt(&enr, e.env(ix, &enr, now), now)
 		if sub.Status == "blocklisted" {
 			return false, e.exitNow(ctx, tx, &enr, ExitBlocklisted, now)
 		}
@@ -148,7 +152,7 @@ func (e *Engine) step(ctx context.Context, id int64, first bool) (again bool, er
 		return e.sendStep(ctx, tx, &enr, &a, ix, node, settings, sub, now)
 	}
 
-	o, err := e.runNode(ctx, tx, &enr, ix, node, settings, sub, now)
+	o, err := e.runNode(ctx, tx, &enr, ix, node, settings, sub, now, *reached)
 	if err != nil {
 		return false, err
 	}
@@ -176,6 +180,20 @@ func (e *Engine) env(ix *Index, enr *Enrollment, now time.Time) Env {
 		}
 	}
 	return env
+}
+
+// reachedAt is when a run that is due now got to its current step. Before its first pause that is
+// when the starting event happened, as events can be recorded a little after they happen and the
+// first stretch of a run follows straight on from its start. After a pause it is when the pause
+// was due to end.
+func reachedAt(enr *Enrollment, env Env, now time.Time) time.Time {
+	switch {
+	case enr.CurrentNode == nil:
+		return env.Entered
+	case enr.NextRunAt != nil && enr.NextRunAt.Before(now):
+		return *enr.NextRunAt
+	}
+	return now
 }
 
 // eventProps returns the properties of an event as kept in an enrollment's context.
@@ -233,7 +251,7 @@ func decodeConfig(n *Node, v any) error {
 }
 
 // runNode executes every node type except send_email.
-func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *Index, n *Node, s Settings, sub subscriberRow, now time.Time) (outcome, error) {
+func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *Index, n *Node, s Settings, sub subscriberRow, now, reached time.Time) (outcome, error) {
 	done := func(next string, result any) outcome {
 		return outcome{next: next, stepStatus: StepDone, result: result}
 	}
@@ -278,7 +296,7 @@ func (e *Engine) runNode(ctx context.Context, tx *sqlx.Tx, enr *Enrollment, ix *
 		return outcome{wait: &until, stepStatus: StepWaiting, result: map[string]any{"until": until}}, nil
 
 	case NodeWaitForEvent:
-		return e.runWaitForEvent(ctx, tx, enr, ix, n, now)
+		return e.runWaitForEvent(ctx, tx, enr, ix, n, now, reached)
 
 	case NodeCondition:
 		var c ConditionConfig

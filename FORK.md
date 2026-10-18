@@ -78,6 +78,9 @@ Everything else we add lives in new files: `web/`, `internal/automation/`,
   retrying with the same `Idempotency-Key` re-applies those values but does not record or trigger twice.
 - **Wait for an event.** `POST /api/track` events also reach runs waiting on a `wait_for_event` step (before triggers fire).
   `.Event` in emails is the event that started the run, or the latest one that restarted a wait.
+  A wait counts events by when they happened, from when the run reached it (from the starting event, if the run hasn't
+  paused before it). Events recorded before the wait started but that happened since then are handed to it as it starts,
+  so an event sent in the same batch as the one that started the run still counts.
 - **Event property filters.** A `property` rule tests a property of an event: the run's event (the `.Event` above) at
   the top of a condition or goal, the event being matched inside a filter. Filters (`where`, groups of property rules
   only) sit on event triggers, on each `wait_for_event` event and on `event` rules; `value_from` compares with a property

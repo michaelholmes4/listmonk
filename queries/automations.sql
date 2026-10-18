@@ -199,6 +199,12 @@ RETURNING *;
 -- name: automation-get-event
 SELECT * FROM subscriber_events WHERE id = $1;
 
+-- name: automation-events-since
+-- A subscriber's events with these names that happened at or after a time, oldest first, leaving one
+-- out (the event that started the run).
+SELECT * FROM subscriber_events WHERE subscriber_id = $1 AND name = ANY($2::TEXT[])
+    AND occurred_at >= $3 AND id <> $4 ORDER BY occurred_at, id;
+
 -- name: automation-enrolled-by-event
 -- Whether this event already started a run of this automation (its job may run more than once).
 -- `trigger_event_id` never changes; `event` is replaced when a wait_for_event restarts, so it only
