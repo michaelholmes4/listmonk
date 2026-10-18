@@ -46,7 +46,11 @@ export function createColumns(c: Handlers): ColumnDef<any, AutomationRow>[] {
       id: 'status',
       accessorKey: 'status',
       header: () => t('globals.fields.status'),
-      cell: ({ row }) => h(Badge, { variant: automationVariant(row.original.status) }, () => t(`web.automations.status.${row.original.status}`)),
+      cell: ({ row }) =>
+        h('span', { class: 'inline-flex flex-wrap items-center gap-1.5' }, [
+          h(Badge, { variant: automationVariant(row.original.status) }, () => t(`web.automations.status.${row.original.status}`)),
+          row.original.unpublished_changes && h(Badge, { variant: 'warning' }, () => t('web.automations.unpublished')),
+        ]),
     },
     count('active', 'web.automations.inProgress'),
     count('completed', 'web.automations.completed'),

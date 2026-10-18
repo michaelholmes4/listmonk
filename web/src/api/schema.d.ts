@@ -2751,6 +2751,8 @@ export interface components {
             completed?: number;
             exited?: number;
             failed?: number;
+            /** @description A published automation whose draft differs from its live version. */
+            unpublished_changes?: boolean;
         };
         AutomationTrigger: {
             id?: string;

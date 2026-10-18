@@ -56,6 +56,8 @@ func notFound(err error) error {
 type Row struct {
 	Automation
 	Total int `db:"total" json:"-"`
+	// Its draft differs from its published version.
+	UnpublishedChanges bool `db:"unpublished_changes" json:"unpublished_changes"`
 	Counts
 }
 

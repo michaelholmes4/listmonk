@@ -5667,6 +5667,7 @@ components:
             completed: { type: integer }
             exited: { type: integer }
             failed: { type: integer }
+            unpublished_changes: { type: boolean, description: "A published automation whose draft differs from its live version." }
     AutomationTrigger:
       type: object
       properties:
